@@ -331,6 +331,27 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
   background:rgba(79,209,165,.1);border:1px solid rgba(79,209,165,.25);
   padding:2px 7px;border-radius:5px;white-space:nowrap;z-index:5;
 }
+.cat-select-row{display:flex;gap:6px;align-items:stretch;}
+.cat-select-row select{flex:1;min-width:0;}
+.cat-del-btn{
+  flex-shrink:0;width:38px;border-radius:7px;border:1px solid var(--line);
+  background:var(--bg);color:var(--text-faint);cursor:pointer;font-size:13px;
+  transition:border-color .15s,color .15s,opacity .15s;
+}
+.cat-del-btn:hover:not(:disabled){border-color:var(--neg);color:var(--neg);}
+.cat-del-btn:disabled{opacity:.3;cursor:not-allowed;}
+.suggest-list{
+  display:none;position:absolute;top:100%;left:0;right:0;margin-top:3px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:30;max-height:190px;overflow-y:auto;
+}
+.suggest-item{
+  padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text);
+  border-bottom:1px solid var(--line-soft);
+}
+.suggest-item:last-child{border-bottom:none;}
+.suggest-item:hover, .suggest-item.active{background:var(--surface);}
+.suggest-item strong{color:var(--dolar);font-weight:700;}
 .field label{font-size:11px;color:var(--text-faint);font-family:var(--font-mono);}
 .field select, .field input{
   background:var(--bg);border:1px solid var(--line);border-radius:7px;
@@ -550,8 +571,17 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
               <option value="Variable">Variable</option>
             </select>
           </div>
-          <div class="field"><label>Categoría</label><select name="cat" id="gasCat" required></select></div>
-          <div class="field"><label>Descripción</label><input type="text" name="desc" id="gasDesc" list="gasDescList" placeholder="Opcional" autocomplete="off"><datalist id="gasDescList"></datalist></div>
+          <div class="field"><label>Categoría</label>
+            <div class="cat-select-row">
+              <select name="cat" id="gasCat" required></select>
+              <button type="button" class="cat-del-btn" id="btnDelCat" title="Eliminar esta categoría">🗑</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Descripción</label>
+            <input type="text" name="desc" id="gasDesc" placeholder="Opcional" autocomplete="off">
+            <div id="gasDescSuggest" class="suggest-list"></div>
+          </div>
           <div class="field"><label>Monto</label><input type="text" inputmode="decimal" name="monto" id="gasMonto" class="money-input" placeholder="0, o 1500+2300+800" required><div class="money-preview" id="gasMontoPreview"></div></div>
           <button type="submit" class="btn btn-accent-fijo" id="gasSubmitBtn">Agregar</button>
           <button type="button" class="btn btn-cancel-edit" id="gasCancelEdit" style="display:none;">Cancelar</button>
@@ -825,7 +855,10 @@ var DATA = STORE.ejercicios[STORE.activeEjercicio];
 function catsFor(tipo){
   var base = tipo === 'Fijo' ? CAT_FIJAS : CAT_VARIABLES;
   var custom = DATA.customCategorias[tipo] || [];
-  return base.concat(custom);
+  return base.concat(custom).sort(function(a,b){ return a.localeCompare(b, 'es'); });
+}
+function isCustomCat(tipo, cat){
+  return (DATA.customCategorias[tipo]||[]).indexOf(cat) !== -1;
 }
 
 /* ===================== EJERCICIOS (años) ===================== */
@@ -968,24 +1001,124 @@ function fillCatSelect(preserve){
   newOpt.textContent = '+ Agregar categoría nueva…';
   sel.appendChild(newOpt);
   if(prev && list.indexOf(prev)!==-1) sel.value = prev;
+  updateDelCatButton();
 }
-document.getElementById('gasTipo').addEventListener('change', function(){ fillCatSelect(false); updateDescDatalist(); });
+document.getElementById('gasTipo').addEventListener('change', function(){ fillCatSelect(false); updateDescSuggestSource(); });
 fillCatSelect(false);
 
-function updateDescDatalist(){
+function updateDelCatButton(){
+  var tipo = document.getElementById('gasTipo').value;
+  var cat = document.getElementById('gasCat').value;
+  var btn = document.getElementById('btnDelCat');
+  btn.disabled = !isCustomCat(tipo, cat);
+}
+document.getElementById('btnDelCat').addEventListener('click', function(){
+  var tipo = document.getElementById('gasTipo').value;
+  var cat = document.getElementById('gasCat').value;
+  if(!isCustomCat(tipo, cat)) return;
+  var enUso = DATA.gastos.filter(function(g){ return g.tipo===tipo && g.cat===cat; }).length;
+  if(enUso>0){
+    toast('No se puede eliminar: tiene '+enUso+' gasto(s) cargado(s) con esa categoría');
+    return;
+  }
+  if(!confirm('¿Eliminar la categoría "'+cat+'"? Esta acción no se puede deshacer.')) return;
+  DATA.customCategorias[tipo] = DATA.customCategorias[tipo].filter(function(c){ return c!==cat; });
+  saveData();
+  fillCatSelect(false);
+  toast('Categoría "'+cat+'" eliminada');
+});
+
+function updateDescDatalist(){ updateDescSuggestSource(); }
+
+/* ===================== AUTOCOMPLETADO DE DESCRIPCIÓN (estilo Proveedores) ===================== */
+var _gasDescOptions = [];
+var _gasDescSuggestIdx = -1;
+function updateDescSuggestSource(){
   var cat = document.getElementById('gasCat').value;
   var seen = {};
   DATA.gastos.forEach(function(g){
     if(g.cat===cat && g.desc) seen[g.desc]=true;
   });
-  var list = document.getElementById('gasDescList');
-  list.innerHTML = Object.keys(seen).sort().map(function(d){
-    return '<option value="'+escapeHtml(d)+'">';
-  }).join('');
+  _gasDescOptions = Object.keys(seen).sort(function(a,b){ return a.localeCompare(b,'es'); });
 }
+function descGetMatches(q){
+  if(!q) return _gasDescOptions;
+  var lq = normalizeSearchText(q);
+  return [
+    ..._gasDescOptions.filter(function(n){ return normalizeSearchText(n).indexOf(lq)===0; }),
+    ..._gasDescOptions.filter(function(n){ return normalizeSearchText(n).indexOf(lq)!==0 && normalizeSearchText(n).indexOf(lq)!==-1; })
+  ];
+}
+function descSuggest(val){
+  var list = document.getElementById('gasDescSuggest');
+  var q = val.trim();
+  var matches = descGetMatches(q);
+  _gasDescSuggestIdx = -1;
+  if(!matches.length || (matches.length===1 && matches[0]===q)){
+    list.style.display='none';
+    return;
+  }
+  var nq = normalizeSearchText(q);
+  list.innerHTML = matches.slice(0,30).map(function(n, i){
+    var esc = escapeHtml(n);
+    if(nq){
+      var idx = normalizeSearchText(n).indexOf(nq);
+      if(idx!==-1){
+        esc = escapeHtml(n.slice(0,idx))+'<strong>'+escapeHtml(n.slice(idx, idx+nq.length))+'</strong>'+escapeHtml(n.slice(idx+nq.length));
+      }
+    }
+    return '<div class="suggest-item" data-idx="'+i+'">'+esc+'</div>';
+  }).join('');
+  list.style.display='block';
+}
+function descSelectSug(name){
+  document.getElementById('gasDesc').value = name;
+  document.getElementById('gasDescSuggest').style.display='none';
+  _gasDescSuggestIdx = -1;
+}
+var gasDescInput = document.getElementById('gasDesc');
+var gasDescSuggestEl = document.getElementById('gasDescSuggest');
+gasDescInput.addEventListener('input', function(){ descSuggest(this.value); });
+gasDescInput.addEventListener('focus', function(){ descSuggest(this.value); });
+gasDescSuggestEl.addEventListener('mousedown', function(e){
+  var item = e.target.closest('.suggest-item');
+  if(!item) return;
+  e.preventDefault();
+  var matches = descGetMatches(gasDescInput.value.trim());
+  descSelectSug(matches[+item.dataset.idx]);
+});
+gasDescInput.addEventListener('keydown', function(e){
+  var list = gasDescSuggestEl;
+  var items = list.querySelectorAll('.suggest-item');
+  if(!items.length) return;
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    _gasDescSuggestIdx = Math.min(_gasDescSuggestIdx+1, items.length-1);
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    _gasDescSuggestIdx = Math.max(_gasDescSuggestIdx-1, -1);
+  } else if(e.key==='Enter' && _gasDescSuggestIdx>=0){
+    e.preventDefault();
+    var matches = descGetMatches(gasDescInput.value.trim());
+    descSelectSug(matches[_gasDescSuggestIdx]);
+    return;
+  } else if(e.key==='Escape'){
+    list.style.display='none';
+    _gasDescSuggestIdx=-1;
+    return;
+  } else { return; }
+  items.forEach(function(el,i){ el.classList.toggle('active', i===_gasDescSuggestIdx); });
+  if(_gasDescSuggestIdx>=0) items[_gasDescSuggestIdx].scrollIntoView({block:'nearest'});
+});
+document.addEventListener('mousedown', function(e){
+  if(gasDescSuggestEl && !gasDescSuggestEl.contains(e.target) && e.target!==gasDescInput){
+    gasDescSuggestEl.style.display='none';
+  }
+});
+
 document.getElementById('gasCat').addEventListener('change', function(e){
   var sel = e.target;
-  if(sel.value !== '__new__'){ updateDescDatalist(); return; }
+  if(sel.value !== '__new__'){ updateDescSuggestSource(); updateDelCatButton(); return; }
   var tipo = document.getElementById('gasTipo').value;
   var nombre = prompt('Nombre de la nueva categoría de gasto '+tipo.toLowerCase()+':');
   nombre = nombre ? nombre.trim() : '';
@@ -1002,9 +1135,10 @@ document.getElementById('gasCat').addEventListener('change', function(e){
   fillCatSelect(false);
   sel.value = yaExiste ? existentes.filter(function(c){return c.toLowerCase()===nombre.toLowerCase();})[0] : nombre;
   toast('Categoría "'+nombre+'" agregada');
-  updateDescDatalist();
+  updateDescSuggestSource();
+  updateDelCatButton();
 });
-updateDescDatalist();
+updateDescSuggestSource();
 
 /* current month default = current real month name if within Enero-Diciembre else Enero */
 (function setDefaultMonths(){
@@ -1345,6 +1479,7 @@ function populateFormForEdit(kind, item){
     document.getElementById('gasTipo').value = item.tipo;
     fillCatSelect(false);
     document.getElementById('gasCat').value = item.cat;
+    updateDelCatButton();
     updateDescDatalist();
     document.getElementById('gasDesc').value = item.desc||'';
     setMoneyInputValue(document.getElementById('gasMonto'), item.monto);
