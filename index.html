@@ -813,6 +813,9 @@ function normalizeExercise(data){
   if(!data.customCategorias) data.customCategorias = {Fijo:[], Variable:[]};
   if(!data.customCategorias.Fijo) data.customCategorias.Fijo = [];
   if(!data.customCategorias.Variable) data.customCategorias.Variable = [];
+  if(!data.deletedBaseCategorias) data.deletedBaseCategorias = {Fijo:[], Variable:[]};
+  if(!data.deletedBaseCategorias.Fijo) data.deletedBaseCategorias.Fijo = [];
+  if(!data.deletedBaseCategorias.Variable) data.deletedBaseCategorias.Variable = [];
   return data;
 }
 
@@ -854,8 +857,10 @@ var DATA = STORE.ejercicios[STORE.activeEjercicio];
 
 function catsFor(tipo){
   var base = tipo === 'Fijo' ? CAT_FIJAS : CAT_VARIABLES;
+  var deletedBase = DATA.deletedBaseCategorias[tipo] || [];
+  var baseVisible = base.filter(function(c){ return deletedBase.indexOf(c)===-1; });
   var custom = DATA.customCategorias[tipo] || [];
-  return base.concat(custom).sort(function(a,b){ return a.localeCompare(b, 'es'); });
+  return baseVisible.concat(custom).sort(function(a,b){ return a.localeCompare(b, 'es'); });
 }
 function isCustomCat(tipo, cat){
   return (DATA.customCategorias[tipo]||[]).indexOf(cat) !== -1;
@@ -908,6 +913,10 @@ document.getElementById('btnNuevoEjercicio').addEventListener('click', function(
     customCategorias:{
       Fijo: (DATA.customCategorias.Fijo||[]).slice(),
       Variable: (DATA.customCategorias.Variable||[]).slice()
+    },
+    deletedBaseCategorias:{
+      Fijo: (DATA.deletedBaseCategorias.Fijo||[]).slice(),
+      Variable: (DATA.deletedBaseCategorias.Variable||[]).slice()
     }
   });
   STORE.ejercicios[year] = nuevo;
@@ -1007,25 +1016,33 @@ document.getElementById('gasTipo').addEventListener('change', function(){ fillCa
 fillCatSelect(false);
 
 function updateDelCatButton(){
-  var tipo = document.getElementById('gasTipo').value;
   var cat = document.getElementById('gasCat').value;
   var btn = document.getElementById('btnDelCat');
-  btn.disabled = !isCustomCat(tipo, cat);
+  btn.disabled = (cat === '__new__' || !cat);
 }
 document.getElementById('btnDelCat').addEventListener('click', function(){
   var tipo = document.getElementById('gasTipo').value;
   var cat = document.getElementById('gasCat').value;
-  if(!isCustomCat(tipo, cat)) return;
+  if(cat === '__new__' || !cat) return;
   var enUso = DATA.gastos.filter(function(g){ return g.tipo===tipo && g.cat===cat; }).length;
   if(enUso>0){
     toast('No se puede eliminar: tiene '+enUso+' gasto(s) cargado(s) con esa categoría');
     return;
   }
-  if(!confirm('¿Eliminar la categoría "'+cat+'"? Esta acción no se puede deshacer.')) return;
-  DATA.customCategorias[tipo] = DATA.customCategorias[tipo].filter(function(c){ return c!==cat; });
+  var esBase = !isCustomCat(tipo, cat);
+  var msg = esBase
+    ? '¿Eliminar la categoría original "'+cat+'"? Podés volver a agregarla después escribiendo el mismo nombre en "+ Agregar categoría nueva".'
+    : '¿Eliminar la categoría "'+cat+'"? Esta acción no se puede deshacer.';
+  if(!confirm(msg)) return;
+  if(esBase){
+    if(DATA.deletedBaseCategorias[tipo].indexOf(cat)===-1) DATA.deletedBaseCategorias[tipo].push(cat);
+  } else {
+    DATA.customCategorias[tipo] = DATA.customCategorias[tipo].filter(function(c){ return c!==cat; });
+  }
   saveData();
   fillCatSelect(false);
   toast('Categoría "'+cat+'" eliminada');
+  if(typeof renderAll==='function') renderAll();
 });
 
 function updateDescDatalist(){ updateDescSuggestSource(); }
@@ -1137,6 +1154,7 @@ document.getElementById('gasCat').addEventListener('change', function(e){
   toast('Categoría "'+nombre+'" agregada');
   updateDescSuggestSource();
   updateDelCatButton();
+  if(typeof renderAll==='function') renderAll();
 });
 updateDescSuggestSource();
 
