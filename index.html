@@ -219,6 +219,7 @@ a{color:inherit;}
 .sync-dot.ok{background:var(--ingreso);}
 .sync-dot.syncing{background:var(--dolar);animation:pulseDot 1s ease infinite;}
 .sync-dot.err{background:var(--neg);}
+.sync-dot.offline{background:var(--fijo);}
 @keyframes pulseDot{0%,100%{opacity:1;}50%{opacity:.3;}}
 @media (max-width:860px){
   .search-trigger{
@@ -744,7 +745,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
       <button type="button" class="auth-tab" id="authTabSignup">Crear cuenta</button>
     </div>
     <form id="authForm">
-      <div class="field"><label>Email</label><input type="email" id="authEmail" required autocomplete="email"></div>
+      <div class="field"><label id="authIdLabel">Usuario</label><input type="text" id="authEmail" required autocomplete="username" minlength="3" pattern="[A-Za-z0-9_.\-]+" title="Solo letras, números, punto, guion o guion bajo. Sin espacios." placeholder="tu_usuario"></div>
       <div class="field"><label>Contraseña</label><input type="password" id="authPassword" required autocomplete="current-password" minlength="6"></div>
       <div class="auth-error" id="authError"></div>
       <button type="submit" class="btn btn-accent-ingreso" id="authSubmitBtn">Iniciar sesión</button>
@@ -758,14 +759,13 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 /* =========================================================================
    CONFIGURACIÓN DE FIREBASE (login + sincronización entre dispositivos)
    -------------------------------------------------------------------------
-   Por defecto está en null: la app funciona 100% local (localStorage),
-   sin login, exactamente igual que antes. Para activar el login y que
-   cada usuario acceda a sus propios gastos desde cualquier dispositivo:
-
-   1) Andá a https://console.firebase.google.com y creá un proyecto (gratis).
-   2) Build > Authentication > Sign-in method > activá "Correo electrónico/contraseña".
-   3) Build > Firestore Database > Crear base de datos (modo producción, la región no importa).
-   4) En Firestore > Reglas, pegá esto y publicá:
+   Ya está completada con el proyecto de Firebase real. Si en algún momento
+   necesitás cambiar de proyecto, reemplazá el objeto de abajo por el que
+   te muestre la consola de Firebase (Configuración del proyecto > tu app
+   web > firebaseConfig), y no te olvides de:
+   - Activar Authentication > Correo electrónico/contraseña
+   - Crear Firestore Database (modo producción)
+   - Publicar estas reglas en Firestore > Reglas:
 
       rules_version = '2';
       service cloud.firestore {
@@ -775,24 +775,19 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
           }
         }
       }
-
-   5) Configuración del proyecto (ícono de tuerca) > tu app web (</>) > Copiá el
-      objeto firebaseConfig que te muestra Firebase y reemplazá el "null" de
-      abajo por ese objeto. Va a verse algo así:
-
-      window.FIREBASE_CONFIG = {
-        apiKey: "AIzaSy...",
-        authDomain: "tu-proyecto.firebaseapp.com",
-        projectId: "tu-proyecto",
-        storageBucket: "tu-proyecto.appspot.com",
-        messagingSenderId: "123456789",
-        appId: "1:123456789:web:abcdef"
-      };
-
-   6) Guardá el archivo y subilo. Listo — al abrirlo va a pedir iniciar sesión,
-      y cada cuenta va a ver únicamente sus propios datos, desde cualquier compu.
    ========================================================================= */
-window.FIREBASE_CONFIG = null;
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBtbslgNngi9eRFaM18tnw5L4rd0IfgSXk",
+  authDomain: "gastos-cec25.firebaseapp.com",
+  projectId: "gastos-cec25",
+  storageBucket: "gastos-cec25.firebasestorage.app",
+  messagingSenderId: "315119458786",
+  appId: "1:315119458786:web:54a33f1667e320b8be41bb"
+};
+
+// AUTH_MODE: 'username' = login con nombre de usuario (sin recuperar contraseña por email).
+//            'email'    = login con email real (permite "olvidé mi contraseña").
+window.AUTH_MODE = 'username';
 
 </script>
 <script>
@@ -2223,6 +2218,26 @@ document.addEventListener('keydown', function(e){
   var auth = firebase.auth();
   var db = firebase.firestore();
 
+  var toastEl2 = document.getElementById('toast');
+  function toastEl_fallback(msg){
+    if(!toastEl2) return;
+    toastEl2.textContent = msg;
+    toastEl2.classList.add('show');
+    setTimeout(function(){ toastEl2.classList.remove('show'); }, 3200);
+  }
+
+  // Habilita caché offline: permite leer/escribir sin conexión (queda guardado
+  // localmente en IndexedDB) y sincroniza solo apenas vuelve la señal.
+  try{
+    db.enablePersistence({synchronizeTabs:true}).catch(function(err){
+      if(err.code==='failed-precondition'){
+        console.warn('Persistencia offline: ya hay otra pestaña de esta app abierta.');
+      } else if(err.code==='unimplemented'){
+        console.warn('Este navegador no soporta guardado offline con Firestore.');
+      }
+    });
+  }catch(e){ /* SDK viejo sin soporte, seguimos igual */ }
+
   var authGate = document.getElementById('authGate');
   var authLoading = document.getElementById('authLoading');
   var authForm = document.getElementById('authForm');
@@ -2233,10 +2248,39 @@ document.addEventListener('keydown', function(e){
   var authTabLogin = document.getElementById('authTabLogin');
   var authTabSignup = document.getElementById('authTabSignup');
   var authForgotBtn = document.getElementById('authForgotBtn');
+  var authIdLabel = document.getElementById('authIdLabel');
   var userBadge = document.getElementById('userBadge');
   var ubEmail = document.getElementById('ubEmail');
   var syncDot = document.getElementById('syncDot');
   var btnLogout = document.getElementById('btnLogout');
+
+  // 'username' = la persona escribe un nombre de usuario (sin @); por dentro se arma
+  //              una cuenta con un email interno inventado, invisible para el usuario.
+  // 'email'    = login tradicional con email real (habilita recuperar contraseña).
+  var AUTH_MODE = (window.AUTH_MODE === 'email') ? 'email' : 'username';
+  var USERNAME_DOMAIN = '@gastosapp.local';
+
+  if(AUTH_MODE === 'username'){
+    authIdLabel.textContent = 'Usuario';
+    authEmail.type = 'text';
+    authForgotBtn.style.display = 'none';
+  } else {
+    authIdLabel.textContent = 'Email';
+    authEmail.type = 'email';
+    authEmail.removeAttribute('pattern');
+    authEmail.setAttribute('autocomplete','email');
+    authEmail.setAttribute('placeholder','');
+  }
+
+  function toAuthIdentifier(raw){
+    raw = String(raw||'').trim();
+    if(AUTH_MODE === 'email') return raw;
+    return raw.toLowerCase().replace(/[^a-z0-9_.\-]/g,'') + USERNAME_DOMAIN;
+  }
+  function toDisplayName(identifier){
+    if(AUTH_MODE === 'email') return identifier;
+    return String(identifier||'').replace(USERNAME_DOMAIN,'');
+  }
 
   var mode = 'login'; // 'login' | 'signup'
   function setMode(m){
@@ -2253,12 +2297,13 @@ document.addEventListener('keydown', function(e){
     authError.textContent = msg;
     authError.style.display = 'block';
   }
+  var ID_WORD = AUTH_MODE === 'username' ? 'usuario' : 'email';
   var FIREBASE_ERROR_ES = {
-    'auth/invalid-email':'El email no es válido.',
-    'auth/user-not-found':'No existe una cuenta con ese email.',
+    'auth/invalid-email':'El '+ID_WORD+' tiene caracteres inválidos.',
+    'auth/user-not-found':'No existe una cuenta con ese '+ID_WORD+'.',
     'auth/wrong-password':'Contraseña incorrecta.',
-    'auth/invalid-credential':'Email o contraseña incorrectos.',
-    'auth/email-already-in-use':'Ya existe una cuenta con ese email. Probá iniciar sesión.',
+    'auth/invalid-credential':(AUTH_MODE==='username' ? 'Usuario o contraseña incorrectos.' : 'Email o contraseña incorrectos.'),
+    'auth/email-already-in-use':'Ya existe una cuenta con ese '+ID_WORD+'. Probá iniciar sesión.',
     'auth/weak-password':'La contraseña debe tener al menos 6 caracteres.',
     'auth/too-many-requests':'Demasiados intentos. Esperá un momento y volvé a probar.',
     'auth/network-request-failed':'Sin conexión con el servidor. Revisá tu internet.'
@@ -2269,13 +2314,18 @@ document.addEventListener('keydown', function(e){
 
   authForm.addEventListener('submit', function(e){
     e.preventDefault();
-    var email = authEmail.value.trim();
+    var rawId = authEmail.value.trim();
+    if(AUTH_MODE==='username' && rawId.length<3){
+      showAuthError('El usuario debe tener al menos 3 caracteres.');
+      return;
+    }
+    var identifier = toAuthIdentifier(rawId);
     var pass = authPassword.value;
     authSubmitBtn.disabled = true;
     authError.style.display = 'none';
     var action = mode==='login'
-      ? auth.signInWithEmailAndPassword(email, pass)
-      : auth.createUserWithEmailAndPassword(email, pass);
+      ? auth.signInWithEmailAndPassword(identifier, pass)
+      : auth.createUserWithEmailAndPassword(identifier, pass);
     action.catch(function(err){
       showAuthError(friendlyError(err));
     }).finally(function(){
@@ -2304,15 +2354,35 @@ document.addEventListener('keydown', function(e){
   var syncTimer = null;
   var currentUid = null;
   var appStarted = false;
+  var isSyncing = false;
+
+  function updateConnStatus(){
+    if(!syncDot || isSyncing) return;
+    if(!navigator.onLine){
+      syncDot.className = 'sync-dot offline';
+      syncDot.title = 'Sin conexión — los cambios se guardan y se sincronizan solos cuando vuelva internet';
+    } else {
+      syncDot.className = 'sync-dot ok';
+      syncDot.title = 'Sincronizado';
+    }
+  }
+  window.addEventListener('online', updateConnStatus);
+  window.addEventListener('offline', updateConnStatus);
+
   function scheduleSync(store){
     if(!currentUid) return;
-    if(syncDot) syncDot.className = 'sync-dot syncing';
+    if(syncDot){
+      isSyncing = true;
+      syncDot.className = navigator.onLine ? 'sync-dot syncing' : 'sync-dot offline';
+      syncDot.title = navigator.onLine ? 'Guardando…' : 'Sin conexión — se guardó localmente, se va a sincronizar solo';
+    }
     clearTimeout(syncTimer);
     syncTimer = setTimeout(function(){
       docRef(currentUid).set({ store: JSON.stringify(store), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
-        .then(function(){ if(syncDot) syncDot.className = 'sync-dot ok'; })
+        .then(function(){ isSyncing = false; updateConnStatus(); })
         .catch(function(err){
-          if(syncDot) syncDot.className = 'sync-dot err';
+          isSyncing = false;
+          if(syncDot){ syncDot.className = 'sync-dot err'; syncDot.title = 'Error al sincronizar'; }
           console.error('Error sincronizando con Firestore:', err);
         });
     }, 800);
@@ -2323,20 +2393,33 @@ document.addEventListener('keydown', function(e){
       currentUid = user.uid;
       authGate.classList.remove('show');
       userBadge.style.display = 'flex';
-      ubEmail.textContent = user.email || '';
+      ubEmail.textContent = toDisplayName(user.email) || '';
       if(appStarted){
         // Ya arrancó la app antes (ej: refresco de token); no reiniciar.
         window.__gastosCloudSync = scheduleSync;
         return;
       }
       authLoading.style.display = 'flex';
-      docRef(user.uid).get().then(function(doc){
+      var gotDoc = docRef(user.uid).get();
+      var timeoutFallback = new Promise(function(resolve){
+        setTimeout(function(){ resolve({__timeout:true}); }, 7000);
+      });
+      Promise.race([gotDoc, timeoutFallback]).then(function(doc){
+        if(doc && doc.__timeout){
+          authLoading.style.display = 'none';
+          toastEl_fallback('Sin conexión: se muestran los últimos datos guardados en este dispositivo.');
+          window.__gastosCloudSync = scheduleSync;
+          appStarted = true;
+          startApp(null);
+          updateConnStatus();
+          return;
+        }
         var preloaded = (doc.exists && doc.data() && doc.data().store) ? doc.data().store : null;
         authLoading.style.display = 'none';
         window.__gastosCloudSync = scheduleSync;
-        if(syncDot) syncDot.className = 'sync-dot ok';
         appStarted = true;
         startApp(preloaded);
+        updateConnStatus();
       }).catch(function(err){
         authLoading.style.display = 'none';
         console.error('No se pudo leer Firestore, arrancando en modo local:', err);
@@ -2368,6 +2451,15 @@ document.addEventListener('keydown', function(e){
 
 })();
 
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('./sw.js').catch(function(err){
+      console.warn('No se pudo registrar el service worker (la app sigue funcionando igual):', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
