@@ -794,7 +794,7 @@ window.AUTH_MODE = 'username';
 (function(){
 "use strict";
 
-function startApp(preloadedStore){
+function startApp(preloadedStore, cloudMode, cloudUid){
 
 var MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 var CAT_FIJAS = ["Alquiler","Expensas","Gas","Luz","Cable e internet","Celular","Suscripciones mensuales","Impuestos","Obra Social / Prepaga","Seguro","Transporte","Cuotas Tarjeta de Crédito","Universidad","Otros egresos"];
@@ -802,6 +802,7 @@ var CAT_VARIABLES = ["Alimentación","Salidas / Entretenimiento","Ropa","Compras
 var STORAGE_KEY = "libroGastos_v2";
 var LEGACY_KEY = "libroGastos_v1";
 var DEFAULT_YEAR = "2026";
+function cloudCacheKey(){ return STORAGE_KEY+'_cloud_'+cloudUid; }
 
 var collapsedGroups = new Set();
 
@@ -947,36 +948,41 @@ function normalizeExercise(data){
   return data;
 }
 
-function loadStore(){
-  if(preloadedStore){
-    try{
-      var pstore = (typeof preloadedStore === 'string') ? JSON.parse(preloadedStore) : preloadedStore;
-      if(pstore && pstore.ejercicios && Object.keys(pstore.ejercicios).length){
-        Object.keys(pstore.ejercicios).forEach(function(y){ pstore.ejercicios[y] = normalizeExercise(pstore.ejercicios[y]); });
-        if(!pstore.activeEjercicio || !pstore.ejercicios[pstore.activeEjercicio]){
-          pstore.activeEjercicio = Object.keys(pstore.ejercicios).sort()[0];
-        }
-        return pstore;
+function normalizeStoreObj(raw){
+  try{
+    var store = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+    if(store && store.ejercicios && Object.keys(store.ejercicios).length){
+      Object.keys(store.ejercicios).forEach(function(y){ store.ejercicios[y] = normalizeExercise(store.ejercicios[y]); });
+      if(!store.activeEjercicio || !store.ejercicios[store.activeEjercicio]){
+        store.activeEjercicio = Object.keys(store.ejercicios).sort()[0];
       }
-    }catch(e){ /* fall through */ }
-    // Cuenta nueva sin datos todavía en la nube
+      return store;
+    }
+  }catch(e){ /* inválido, seguimos */ }
+  return null;
+}
+
+function loadStore(){
+  if(cloudMode){
+    // Modo con login: los datos de este usuario SOLO pueden venir de:
+    // 1) lo que ya bajamos de Firestore para su cuenta, o
+    // 2) una copia local guardada antes con ESTA MISMA cuenta (para uso offline).
+    // Nunca se usan datos locales de otra sesión ni los datos de ejemplo.
+    var fromCloud = normalizeStoreObj(preloadedStore);
+    if(fromCloud) return fromCloud;
+    var cachedRaw = localStorage.getItem(cloudCacheKey());
+    var fromCache = cachedRaw ? normalizeStoreObj(cachedRaw) : null;
+    if(fromCache) return fromCache;
+    // Cuenta nueva: arranca 100% vacía.
     var storeCloudNew = { activeEjercicio: DEFAULT_YEAR, ejercicios:{} };
     storeCloudNew.ejercicios[DEFAULT_YEAR] = normalizeExercise({});
     return storeCloudNew;
   }
+
+  // ---- Modo local (sin login / Firebase no configurado) ----
   var raw = localStorage.getItem(STORAGE_KEY);
-  if(raw){
-    try{
-      var store = JSON.parse(raw);
-      if(store && store.ejercicios && Object.keys(store.ejercicios).length){
-        Object.keys(store.ejercicios).forEach(function(y){ store.ejercicios[y] = normalizeExercise(store.ejercicios[y]); });
-        if(!store.activeEjercicio || !store.ejercicios[store.activeEjercicio]){
-          store.activeEjercicio = Object.keys(store.ejercicios).sort()[0];
-        }
-        return store;
-      }
-    }catch(e){ /* fall through */ }
-  }
+  var fromLocal = raw ? normalizeStoreObj(raw) : null;
+  if(fromLocal) return fromLocal;
   // Migración desde versión anterior (un solo ejercicio, sin años)
   var legacyRaw = localStorage.getItem(LEGACY_KEY);
   if(legacyRaw){
@@ -993,7 +999,11 @@ function loadStore(){
   return storeNew;
 }
 function saveData(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(STORE));
+  if(cloudMode){
+    localStorage.setItem(cloudCacheKey(), JSON.stringify(STORE));
+  } else {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(STORE));
+  }
   if(window.__gastosCloudSync) window.__gastosCloudSync(STORE);
 }
 
@@ -2410,7 +2420,7 @@ document.addEventListener('keydown', function(e){
           toastEl_fallback('Sin conexión: se muestran los últimos datos guardados en este dispositivo.');
           window.__gastosCloudSync = scheduleSync;
           appStarted = true;
-          startApp(null);
+          startApp(null, true, user.uid);
           updateConnStatus();
           return;
         }
@@ -2418,14 +2428,14 @@ document.addEventListener('keydown', function(e){
         authLoading.style.display = 'none';
         window.__gastosCloudSync = scheduleSync;
         appStarted = true;
-        startApp(preloaded);
+        startApp(preloaded, true, user.uid);
         updateConnStatus();
       }).catch(function(err){
         authLoading.style.display = 'none';
         console.error('No se pudo leer Firestore, arrancando en modo local:', err);
         window.__gastosCloudSync = null;
         appStarted = true;
-        startApp(null);
+        startApp(null, true, user.uid);
       });
     } else {
       currentUid = null;
