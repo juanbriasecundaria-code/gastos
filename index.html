@@ -798,6 +798,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
     </div>
     <form id="authForm">
       <div class="field"><label id="authIdLabel">Usuario</label><input type="text" id="authEmail" required autocomplete="username" minlength="3" pattern="[A-Za-z0-9_.\-]+" title="Solo letras, números, punto, guion o guion bajo. Sin espacios." placeholder="tu_usuario"></div>
+      <div class="field" id="authRealEmailField" style="display:none;"><label>Email (solo para recuperar tu contraseña, no se usa para iniciar sesión)</label><input type="email" id="authRealEmail" autocomplete="email" placeholder="tu@email.com"></div>
       <div class="field"><label>Contraseña</label><input type="password" id="authPassword" required autocomplete="current-password" minlength="6"></div>
       <div class="auth-error" id="authError"></div>
       <button type="submit" class="btn btn-accent-ingreso" id="authSubmitBtn">Iniciar sesión</button>
@@ -2342,6 +2343,8 @@ document.addEventListener('keydown', function(e){
   var authLoading = document.getElementById('authLoading');
   var authForm = document.getElementById('authForm');
   var authEmail = document.getElementById('authEmail');
+  var authRealEmailField = document.getElementById('authRealEmailField');
+  var authRealEmail = document.getElementById('authRealEmail');
   var authPassword = document.getElementById('authPassword');
   var authError = document.getElementById('authError');
   var authSubmitBtn = document.getElementById('authSubmitBtn');
@@ -2370,16 +2373,24 @@ document.addEventListener('keydown', function(e){
   var accDelConfirm = document.getElementById('accDelConfirm');
   var accDelMsg = document.getElementById('accDelMsg');
 
-  // 'username' = la persona escribe un nombre de usuario (sin @); por dentro se arma
-  //              una cuenta con un email interno inventado, invisible para el usuario.
-  // 'email'    = login tradicional con email real (habilita recuperar contraseña).
-  var AUTH_MODE = (window.AUTH_MODE === 'username') ? 'username' : 'email';
-  var USERNAME_DOMAIN = '@gastosapp.local';
+  // 'username' = la persona escribe un nombre de usuario (sin @). Por dentro, la cuenta
+  //              de Firebase usa su email real (que se pide solo al crear la cuenta y
+  //              nunca se muestra en el login), y un mapeo usuario→email en Firestore
+  //              (colección 'usernameIndex') permite resolver el login y la recuperación
+  //              de contraseña sin que el usuario tenga que escribir su email nunca más.
+  // 'email'    = login tradicional con email real, sin usuario.
+  var AUTH_MODE = (window.AUTH_MODE === 'email') ? 'email' : 'username';
+
+  function usernameIndexRef(username){
+    return db.collection('usernameIndex').doc(username);
+  }
+  function normalizeUsername(raw){
+    return String(raw||'').trim().toLowerCase().replace(/[^a-z0-9_.\-]/g,'');
+  }
 
   if(AUTH_MODE === 'username'){
     authIdLabel.textContent = 'Usuario';
     authEmail.type = 'text';
-    authForgotBtn.style.display = 'none';
   } else {
     authIdLabel.textContent = 'Email';
     authEmail.type = 'email';
@@ -2388,15 +2399,6 @@ document.addEventListener('keydown', function(e){
     authEmail.setAttribute('placeholder','');
   }
 
-  function toAuthIdentifier(raw){
-    raw = String(raw||'').trim();
-    if(AUTH_MODE === 'email') return raw;
-    return raw.toLowerCase().replace(/[^a-z0-9_.\-]/g,'') + USERNAME_DOMAIN;
-  }
-  function toDisplayName(identifier){
-    if(AUTH_MODE === 'email') return identifier;
-    return String(identifier||'').replace(USERNAME_DOMAIN,'');
-  }
 
   var mode = 'login'; // 'login' | 'signup'
   function setMode(m){
@@ -2405,6 +2407,10 @@ document.addEventListener('keydown', function(e){
     authTabSignup.classList.toggle('active', m==='signup');
     authSubmitBtn.textContent = m==='login' ? 'Iniciar sesión' : 'Crear cuenta';
     authError.style.display = 'none';
+    if(AUTH_MODE === 'username'){
+      authRealEmailField.style.display = (m==='signup') ? 'block' : 'none';
+      authRealEmail.required = (m==='signup');
+    }
   }
   authTabLogin.addEventListener('click', function(){ setMode('login'); });
   authTabSignup.addEventListener('click', function(){ setMode('signup'); });
@@ -2431,18 +2437,66 @@ document.addEventListener('keydown', function(e){
   authForm.addEventListener('submit', function(e){
     e.preventDefault();
     var rawId = authEmail.value.trim();
-    if(AUTH_MODE==='username' && rawId.length<3){
+    var pass = authPassword.value;
+    authError.style.display = 'none';
+
+    if(AUTH_MODE !== 'username'){
+      authSubmitBtn.disabled = true;
+      var actionEmail = mode==='login'
+        ? auth.signInWithEmailAndPassword(rawId, pass)
+        : auth.createUserWithEmailAndPassword(rawId, pass);
+      actionEmail.catch(function(err){ showAuthError(friendlyError(err)); })
+        .finally(function(){ authSubmitBtn.disabled = false; });
+      return;
+    }
+
+    var username = normalizeUsername(rawId);
+    if(username.length < 3){
       showAuthError('El usuario debe tener al menos 3 caracteres.');
       return;
     }
-    var identifier = toAuthIdentifier(rawId);
-    var pass = authPassword.value;
     authSubmitBtn.disabled = true;
-    authError.style.display = 'none';
-    var action = mode==='login'
-      ? auth.signInWithEmailAndPassword(identifier, pass)
-      : auth.createUserWithEmailAndPassword(identifier, pass);
-    action.catch(function(err){
+
+    if(mode === 'login'){
+      usernameIndexRef(username).get().then(function(doc){
+        if(!doc.exists){
+          showAuthError('No existe una cuenta con ese usuario.');
+          authSubmitBtn.disabled = false;
+          return;
+        }
+        var realEmail = doc.data().email;
+        auth.signInWithEmailAndPassword(realEmail, pass).catch(function(err){
+          showAuthError(friendlyError(err));
+        }).finally(function(){
+          authSubmitBtn.disabled = false;
+        });
+      }).catch(function(err){
+        showAuthError(friendlyError(err));
+        authSubmitBtn.disabled = false;
+      });
+      return;
+    }
+
+    // Signup en modo username
+    var realEmail = authRealEmail.value.trim();
+    if(!realEmail){
+      showAuthError('Escribí un email real: lo necesitamos solo para poder recuperar tu contraseña si la olvidás.');
+      authSubmitBtn.disabled = false;
+      return;
+    }
+    usernameIndexRef(username).get().then(function(doc){
+      if(doc.exists){
+        showAuthError('Ese usuario ya existe. Probá con otro.');
+        authSubmitBtn.disabled = false;
+        return;
+      }
+      return auth.createUserWithEmailAndPassword(realEmail, pass).then(function(cred){
+        return Promise.all([
+          usernameIndexRef(username).set({ email: realEmail, uid: cred.user.uid }),
+          docRef(cred.user.uid).set({ username: username }, { merge: true })
+        ]);
+      });
+    }).catch(function(err){
       showAuthError(friendlyError(err));
     }).finally(function(){
       authSubmitBtn.disabled = false;
@@ -2450,13 +2504,30 @@ document.addEventListener('keydown', function(e){
   });
 
   authForgotBtn.addEventListener('click', function(){
-    var email = authEmail.value.trim();
-    if(!email){
-      showAuthError('Escribí tu email arriba y volvé a tocar "¿Olvidaste tu contraseña?".');
+    var rawId = authEmail.value.trim();
+    if(!rawId){
+      showAuthError(AUTH_MODE==='username'
+        ? 'Escribí tu usuario arriba y volvé a tocar "¿Olvidaste tu contraseña?".'
+        : 'Escribí tu email arriba y volvé a tocar "¿Olvidaste tu contraseña?".');
       return;
     }
-    auth.sendPasswordResetEmail(email).then(function(){
-      showAuthError('Te enviamos un email para restablecer tu contraseña. Si no lo ves en unos minutos, revisá la carpeta de spam/promociones.');
+    if(AUTH_MODE !== 'username'){
+      auth.sendPasswordResetEmail(rawId).then(function(){
+        showAuthError('Te enviamos un email para restablecer tu contraseña. Si no lo ves en unos minutos, revisá la carpeta de spam/promociones.');
+      }).catch(function(err){
+        showAuthError(friendlyError(err));
+      });
+      return;
+    }
+    var username = normalizeUsername(rawId);
+    usernameIndexRef(username).get().then(function(doc){
+      if(!doc.exists){
+        showAuthError('No existe una cuenta con ese usuario.');
+        return;
+      }
+      return auth.sendPasswordResetEmail(doc.data().email).then(function(){
+        showAuthError('Te enviamos un email para restablecer tu contraseña. Si no lo ves en unos minutos, revisá la carpeta de spam/promociones.');
+      });
     }).catch(function(err){
       showAuthError(friendlyError(err));
     });
@@ -2509,7 +2580,9 @@ document.addEventListener('keydown', function(e){
       currentUid = user.uid;
       authGate.classList.remove('show');
       userBadge.style.display = 'flex';
-      ubEmail.textContent = toDisplayName(user.email) || '';
+      if(AUTH_MODE !== 'username'){
+        ubEmail.textContent = user.email || '';
+      }
       if(appStarted){
         // Ya arrancó la app antes (ej: refresco de token); no reiniciar.
         window.__gastosCloudSync = scheduleSync;
@@ -2523,6 +2596,7 @@ document.addEventListener('keydown', function(e){
       Promise.race([gotDoc, timeoutFallback]).then(function(doc){
         if(doc && doc.__timeout){
           authLoading.style.display = 'none';
+          if(AUTH_MODE === 'username'){ ubEmail.textContent = '(usuario)'; }
           toastEl_fallback('Sin conexión: se muestran los últimos datos guardados en este dispositivo.');
           window.__gastosCloudSync = scheduleSync;
           appStarted = true;
@@ -2531,6 +2605,9 @@ document.addEventListener('keydown', function(e){
           return;
         }
         var preloaded = (doc.exists && doc.data() && doc.data().store) ? doc.data().store : null;
+        if(AUTH_MODE === 'username'){
+          ubEmail.textContent = (doc.exists && doc.data() && doc.data().username) ? doc.data().username : '(usuario)';
+        }
         authLoading.style.display = 'none';
         window.__gastosCloudSync = scheduleSync;
         appStarted = true;
@@ -2538,6 +2615,7 @@ document.addEventListener('keydown', function(e){
         updateConnStatus();
       }).catch(function(err){
         authLoading.style.display = 'none';
+        if(AUTH_MODE === 'username'){ ubEmail.textContent = '(usuario)'; }
         console.error('No se pudo leer Firestore, arrancando en modo local:', err);
         window.__gastosCloudSync = null;
         appStarted = true;
