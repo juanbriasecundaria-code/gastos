@@ -2960,7 +2960,7 @@ document.addEventListener('keydown', function(e){
     }
     clearTimeout(syncTimer);
     syncTimer = setTimeout(function(){
-      docRef(currentUid).set({ store: JSON.stringify(store), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+      docRef(currentUid).set({ store: JSON.stringify(store), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
         .then(function(){ isSyncing = false; updateConnStatus(); })
         .catch(function(err){
           isSyncing = false;
@@ -3001,7 +3001,26 @@ document.addEventListener('keydown', function(e){
         }
         var preloaded = (doc.exists && doc.data() && doc.data().store) ? doc.data().store : null;
         if(AUTH_MODE === 'username'){
-          ubEmail.textContent = (doc.exists && doc.data() && doc.data().username) ? doc.data().username : '(usuario)';
+          var savedUsername = (doc.exists && doc.data() && doc.data().username) ? doc.data().username : null;
+          if(savedUsername){
+            ubEmail.textContent = savedUsername;
+          } else {
+            // El campo username no está en el documento (por ejemplo, cuentas afectadas
+            // por un bug anterior que lo borraba al sincronizar). Lo recuperamos buscando
+            // en usernameIndex, que mapea username -> uid, y lo restauramos en el documento.
+            ubEmail.textContent = '(usuario)';
+            db.collection('usernameIndex').where('uid', '==', user.uid).limit(1).get().then(function(qs){
+              if(!qs.empty){
+                var recovered = qs.docs[0].id;
+                ubEmail.textContent = recovered;
+                docRef(user.uid).set({ username: recovered }, { merge: true }).catch(function(e){
+                  console.error('No se pudo restaurar el username:', e);
+                });
+              }
+            }).catch(function(e){
+              console.error('No se pudo buscar el username en usernameIndex:', e);
+            });
+          }
         }
         authLoading.style.display = 'none';
         window.__gastosCloudSync = scheduleSync;
