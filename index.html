@@ -67,11 +67,50 @@ a{color:inherit;}
     height:auto;
     border-right:none;border-bottom:1px solid var(--line);
     padding:10px 12px;overflow-x:auto;gap:6px;
+    background:var(--bg);
   }
   .sidebar .brand{display:none;}
   .sidebar nav{display:flex;flex-direction:row;gap:6px;width:auto;}
   .nav-btn{white-space:nowrap;flex-shrink:0;}
   .sidebar .side-footer{display:none;}
+
+  /* Indicadores de scroll horizontal (hay más tabs a la izq/der) */
+  .sidebar::before,.sidebar::after{
+    content:'';position:sticky;top:0;bottom:0;width:26px;flex-shrink:0;
+    pointer-events:none;opacity:0;transition:opacity .15s;z-index:2;
+  }
+  .sidebar::before{
+    order:-1;margin-left:-12px;left:0;
+    background:linear-gradient(to right, var(--bg), transparent);
+  }
+  .sidebar::after{
+    order:999;margin-right:-12px;right:0;
+    background:linear-gradient(to left, var(--bg), transparent);
+  }
+  .sidebar.scroll-start::before{opacity:1;}
+  .sidebar.scroll-more::after{opacity:1;}
+
+  /* Espacio para la barra inferior fija */
+  main{padding-bottom:78px;}
+}
+
+/* ===== Bottom nav (mobile) ===== */
+.bottom-nav{display:none;}
+@media (max-width:860px){
+  .bottom-nav{
+    display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;
+    background:var(--surface);border-top:1px solid var(--line);
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  .bottom-nav .nav-btn{
+    flex:1;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;padding:6px 2px;border-radius:8px;
+    font-size:10.5px;font-weight:500;color:var(--text-faint);
+    background:none;
+  }
+  .bottom-nav .nav-btn .bn-icon{font-size:17px;line-height:1;}
+  .bottom-nav .nav-btn:hover{background:var(--surface-2);color:var(--text-dim);}
+  .bottom-nav .nav-btn.active{background:none;color:var(--ingreso);}
 }
 
 .brand{
@@ -317,7 +356,7 @@ main{
   width:100%;
   min-width:0;
 }
-@media (max-width:640px){ main{padding:18px 16px 60px;} }
+@media (max-width:640px){ main{padding:18px 16px 78px;} }
 
 .view{display:none;animation:fade .25s ease;}
 .view.active{display:block;}
@@ -559,6 +598,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
   font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:100;
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+@media (max-width:860px){ #toast{bottom:calc(20px + 64px + env(safe-area-inset-bottom));} }
 
 @media (prefers-reduced-motion:reduce){
   *{animation:none !important;transition:none !important;}
@@ -598,6 +638,13 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
       <button class="ghost-btn" id="btnDeleteEjercicio" style="color:var(--neg);border-color:rgba(242,105,107,.3);">✕ Eliminar ejercicio actual</button>
     </div>
   </aside>
+
+  <nav class="bottom-nav" aria-label="Navegación principal">
+    <button class="nav-btn" data-tab="resumen"><span class="bn-icon">📋</span><span class="bn-label">Resumen</span></button>
+    <button class="nav-btn" data-tab="ingresos"><span class="bn-icon">💵</span><span class="bn-label">Ingresos</span></button>
+    <button class="nav-btn" data-tab="gastos"><span class="bn-icon">🧾</span><span class="bn-label">Gastos</span></button>
+    <button class="nav-btn" data-tab="graficos"><span class="bn-icon">📈</span><span class="bn-label">Gráficos</span></button>
+  </nav>
 
   <main>
     <!-- RESUMEN -->
@@ -1204,12 +1251,35 @@ function toast(msg){
 /* ===================== NAV ===================== */
 document.querySelectorAll('.nav-btn').forEach(function(btn){
   btn.addEventListener('click', function(){
-    document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
+    var tab = btn.dataset.tab;
+    document.querySelectorAll('.nav-btn').forEach(function(b){
+      b.classList.toggle('active', b.dataset.tab === tab);
+    });
     document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
-    btn.classList.add('active');
-    document.getElementById('view-'+btn.dataset.tab).classList.add('active');
+    document.getElementById('view-'+tab).classList.add('active');
+    // En mobile, asegurar que el tab activo quede visible dentro del nav con scroll horizontal
+    var sideBtn = document.querySelector('.sidebar .nav-btn[data-tab="'+tab+'"]');
+    if(sideBtn && sideBtn.scrollIntoView){
+      sideBtn.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'});
+    }
   });
 });
+
+/* Indicadores de "hay más tabs" en el nav horizontal del sidebar (mobile) */
+(function(){
+  var sb = document.querySelector('.sidebar');
+  if(!sb) return;
+  function updateScrollFades(){
+    var max = sb.scrollWidth - sb.clientWidth;
+    sb.classList.toggle('scroll-start', sb.scrollLeft > 4);
+    sb.classList.toggle('scroll-more', sb.scrollLeft < max - 4);
+  }
+  sb.addEventListener('scroll', updateScrollFades, {passive:true});
+  window.addEventListener('resize', updateScrollFades);
+  updateScrollFades();
+  // Recalcular una vez cargado todo (fuentes/anchos pueden cambiar el scrollWidth)
+  window.addEventListener('load', updateScrollFades);
+})();
 
 /* ===================== SELECT POPULATION ===================== */
 function fillMonthSelect(sel, withAll){
