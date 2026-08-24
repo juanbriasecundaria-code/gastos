@@ -119,12 +119,14 @@ a{color:inherit;}
     display:flex;flex-direction:row;position:fixed;left:0;right:0;bottom:0;z-index:30;
     background:var(--surface);border-top:1px solid var(--line);
     padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
   }
   .bottom-nav .nav-btn{
-    flex:1;flex-direction:column;align-items:center;justify-content:center;
-    gap:2px;padding:6px 2px;border-radius:8px;
-    font-size:10.5px;font-weight:500;color:var(--text-faint);
-    background:none;
+    flex:0 0 auto;min-width:56px;
+    flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;padding:6px 3px;border-radius:8px;
+    font-size:10px;font-weight:500;color:var(--text-faint);
+    background:none;white-space:nowrap;
   }
   .bottom-nav .nav-btn .bn-icon{font-size:17px;line-height:1;}
   .bottom-nav .nav-btn:hover{background:var(--surface-2);color:var(--text-dim);}
@@ -757,7 +759,10 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
     <button class="nav-btn" data-tab="resumen"><span class="bn-icon">📋</span><span class="bn-label">Resumen</span></button>
     <button class="nav-btn" data-tab="ingresos"><span class="bn-icon">💵</span><span class="bn-label">Ingresos</span></button>
     <button class="nav-btn" data-tab="gastos"><span class="bn-icon">🧾</span><span class="bn-label">Gastos</span></button>
+    <button class="nav-btn" data-tab="dolar"><span class="bn-icon">💲</span><span class="bn-label">Dólar</span></button>
+    <button class="nav-btn" data-tab="inversion"><span class="bn-icon">📊</span><span class="bn-label">Inversión</span></button>
     <button class="nav-btn" data-tab="graficos"><span class="bn-icon">📈</span><span class="bn-label">Gráficos</span></button>
+    <button class="nav-btn" id="btnMobileSearch" aria-label="Buscar"><span class="bn-icon">🔍</span><span class="bn-label">Buscar</span></button>
     <button class="nav-btn" id="btnMobileMenu" aria-label="Abrir menú" aria-expanded="false"><span class="bn-icon">☰</span><span class="bn-label">Menú</span></button>
   </nav>
 
@@ -2732,6 +2737,8 @@ function closeSearch(){
   searchOverlay.classList.remove('open');
 }
 document.getElementById('btnOpenSearch').addEventListener('click', openSearch);
+var btnMobileSearch = document.getElementById('btnMobileSearch');
+if(btnMobileSearch){ btnMobileSearch.addEventListener('click', openSearch); }
 document.getElementById('btnCloseSearch').addEventListener('click', closeSearch);
 searchOverlay.addEventListener('click', function(e){ if(e.target===searchOverlay) closeSearch(); });
 searchInput.addEventListener('input', renderSearchResults);
