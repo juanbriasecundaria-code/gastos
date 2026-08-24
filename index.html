@@ -322,6 +322,24 @@ a{color:inherit;}
 .account-msg.err{color:var(--neg);background:rgba(242,105,107,.1);border:1px solid rgba(242,105,107,.25);display:block;}
 .account-msg.ok{color:var(--ingreso);background:rgba(79,209,165,.1);border:1px solid rgba(79,209,165,.25);display:block;}
 .account-section.danger h4{color:var(--neg);}
+.invite-banner{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  background:rgba(91,159,237,.12);border-bottom:1px solid rgba(91,159,237,.35);
+  color:var(--text);padding:10px 16px;font-size:13px;
+}
+.invite-banner-actions{display:flex;gap:8px;}
+.invite-banner-actions .btn{padding:6px 12px;font-size:12px;width:auto;}
+.invite-banner-actions .ghost-btn{padding:6px 12px;font-size:12px;width:auto;}
+.member-row{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;
+}
+.member-row:last-child{border-bottom:none;}
+.role-pill{
+  font-size:11px;padding:2px 8px;border-radius:999px;
+  background:rgba(91,159,237,.14);color:var(--dolar);border:1px solid rgba(91,159,237,.3);
+}
+.member-remove{width:auto !important;padding:4px 10px !important;font-size:12px !important;color:var(--neg);border-color:rgba(242,105,107,.3);}
 .btn-danger{background:var(--neg);color:#2A0707;}
 .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);flex-shrink:0;transition:background .2s;}
 .sync-dot.ok{background:var(--ingreso);}
@@ -699,6 +717,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 <body>
 <script>(function(){try{if(localStorage.getItem('libroGastos_theme')==='light'){document.documentElement.classList.add('theme-light');}}catch(e){}})();</script>
 <div class="app">
+  <div id="inviteBanner" class="invite-banner" style="display:none;"></div>
   <div class="mobile-sidebar-backdrop" id="mobileSidebarBackdrop"></div>
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span>Libro de Gastos</div>
@@ -725,6 +744,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
         <button class="ub-account" id="btnAccount" title="Cuenta" aria-label="Cuenta">⚙</button>
         <button class="ub-logout" id="btnLogout">Salir</button>
       </div>
+      <button class="ghost-btn" id="btnShare">👥 Compartir este libro</button>
       <button class="ghost-btn" id="btnExport">↓ Exportar backup (.json)</button>
       <button class="ghost-btn" id="btnImport">↑ Importar backup</button>
       <input type="file" id="fileImport" accept="application/json" style="display:none;">
@@ -1010,6 +1030,55 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
   </div>
 </div>
 
+<div class="account-overlay" id="shareOverlay">
+  <div class="account-box">
+    <button class="account-close" id="shareClose" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>
+    <h3>Compartir este libro</h3>
+    <div class="account-msg" id="shareMsg"></div>
+
+    <div class="account-section">
+      <h4>Miembros</h4>
+      <div id="shareMembersList"></div>
+    </div>
+
+    <div class="account-section" id="shareInviteSection" style="display:none;">
+      <h4>Invitar por usuario</h4>
+      <div class="field"><input type="text" id="shareInviteUsername" placeholder="nombre de usuario" autocomplete="off"></div>
+      <div class="field">
+        <select id="shareInviteRole">
+          <option value="editor">Puede cargar y editar</option>
+          <option value="lector">Solo puede ver</option>
+        </select>
+      </div>
+      <button type="button" class="btn" id="btnShareInviteUsername">Invitar</button>
+    </div>
+
+    <div class="account-section" id="shareCodeSection" style="display:none;">
+      <h4>Invitar con código</h4>
+      <div class="field">
+        <select id="shareCodeRole">
+          <option value="editor">Puede cargar y editar</option>
+          <option value="lector">Solo puede ver</option>
+        </select>
+      </div>
+      <button type="button" class="btn" id="btnShareGenCode">Generar código</button>
+      <div id="shareCodeResult" style="display:none;margin-top:10px;font-size:13px;"></div>
+    </div>
+
+    <div class="account-section">
+      <h4>Unirme con un código</h4>
+      <div class="field"><input type="text" id="shareJoinCode" placeholder="Código de invitación" autocomplete="off" style="text-transform:uppercase;"></div>
+      <button type="button" class="btn" id="btnShareJoinCode">Unirme</button>
+    </div>
+
+    <div class="account-section danger" id="shareLeaveSection" style="display:none;">
+      <h4>Salir de este libro</h4>
+      <p style="font-size:13px;color:var(--text-faint);margin:0 0 10px;">Vas a dejar de ver estos datos y volver a tu libro personal.</p>
+      <button type="button" class="btn btn-danger" id="btnShareLeave">Salir de este libro compartido</button>
+    </div>
+  </div>
+</div>
+
 <script id="seedData" type="application/json">{"ingresos": [], "gastos": [], "dolar": [], "inversion": [], "customCategorias": {"Fijo": [], "Variable": []}}</script>
 <script>
 /* =========================================================================
@@ -1098,6 +1167,8 @@ function usd(n){
   return "US$" + fmtDec.format(n);
 }
 function uid(prefix){ return prefix + "_" + Math.random().toString(36).slice(2,9); }
+function currentAutor(){ return window.__gastosCurrentUsername || null; }
+function esSoloLectura(){ return window.__gastosCurrentRol === 'lector'; }
 
 /* ===================== MONEY INPUT (formato de miles + fórmulas de suma) ===================== */
 function formatSingleMoneyTerm(raw){
@@ -1790,7 +1861,7 @@ function renderIngresos(){
     items.forEach(function(it){
       var tagClass = it.tipo==='Sueldo' ? 'tag-sueldo' : 'tag-extra';
       var isEd = editingId.ingresos===it.id;
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc"></span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="ingresos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+(it.autor?('<small>'+escapeHtml(it.autor)+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="ingresos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -1826,7 +1897,8 @@ function renderGastos(){
     items.forEach(function(it){
       var tagClass = it.tipo==='Fijo' ? 'tag-fijo' : 'tag-variable';
       var isEd = editingId.gastos===it.id;
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+it.tipo+'</span><span class="entry-desc">'+(it.recurrente?'<span class="recur-badge" title="Gasto recurrente">🔁</span>':'')+escapeHtml(it.cat)+(it.desc?('<small>'+escapeHtml(it.desc)+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="gastos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="gastos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
+      var subLine = [it.desc?escapeHtml(it.desc):null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+it.tipo+'</span><span class="entry-desc">'+(it.recurrente?'<span class="recur-badge" title="Gasto recurrente">🔁</span>':'')+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="gastos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="gastos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -2022,6 +2094,7 @@ function onDelClick(e){
   }
   var btn = e.target.closest('.entry-del');
   if(!btn) return;
+  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés eliminar registros.'); return; }
   var kind = btn.dataset.kind, id = btn.dataset.id;
   if(editingId[kind]===id){
     editingId[kind] = null;
@@ -2037,17 +2110,18 @@ function onDelClick(e){
 /* ===================== FORMS ===================== */
 document.getElementById('formIngreso').addEventListener('submit', function(e){
   e.preventDefault();
+  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés cargar ingresos.'); return; }
   var fd = new FormData(e.target);
   var monto = parseMoneyValue(fd.get('monto'));
   if(isNaN(monto)) return;
   if(editingId.ingresos){
     var item = DATA.ingresos.filter(function(x){return x.id===editingId.ingresos;})[0];
-    if(item){ item.mes=fd.get('mes'); item.tipo=fd.get('tipo'); item.monto=monto; }
+    if(item){ item.mes=fd.get('mes'); item.tipo=fd.get('tipo'); item.monto=monto; item.autor=currentAutor(); }
     editingId.ingresos = null;
     setFormEditMode('ingresos', false);
     toast('Ingreso actualizado');
   } else {
-    DATA.ingresos.push({id:uid('ing'), mes:fd.get('mes'), tipo:fd.get('tipo'), monto:monto});
+    DATA.ingresos.push({id:uid('ing'), mes:fd.get('mes'), tipo:fd.get('tipo'), monto:monto, autor:currentAutor()});
     toast('Ingreso agregado');
   }
   saveData(); renderAll();
@@ -2057,6 +2131,7 @@ document.getElementById('formIngreso').addEventListener('submit', function(e){
 
 document.getElementById('formGasto').addEventListener('submit', function(e){
   e.preventDefault();
+  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés cargar gastos.'); return; }
   var fd = new FormData(e.target);
   var monto = parseMoneyValue(fd.get('monto'));
   if(isNaN(monto)) return;
@@ -2064,7 +2139,7 @@ document.getElementById('formGasto').addEventListener('submit', function(e){
   if(cat==='__new__') return;
   if(editingId.gastos){
     var item = DATA.gastos.filter(function(x){return x.id===editingId.gastos;})[0];
-    if(item){ item.mes=fd.get('mes'); item.tipo=fd.get('tipo'); item.cat=cat; item.desc=fd.get('desc')||''; item.monto=monto; }
+    if(item){ item.mes=fd.get('mes'); item.tipo=fd.get('tipo'); item.cat=cat; item.desc=fd.get('desc')||''; item.monto=monto; item.autor=currentAutor(); }
     editingId.gastos = null;
     setFormEditMode('gastos', false);
     toast('Gasto actualizado');
@@ -2082,12 +2157,12 @@ document.getElementById('formGasto').addEventListener('submit', function(e){
           return x.mes===m && x.tipo===tipo && x.cat===cat && (x.desc||'')===desc;
         });
         if(yaExiste) return; // evitar duplicar si ya había un gasto igual cargado ese mes
-        DATA.gastos.push({id:uid('gas'), mes:m, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true});
+        DATA.gastos.push({id:uid('gas'), mes:m, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, autor:currentAutor()});
         creados++;
       });
       toast(creados>1 ? 'Gasto agregado y repetido en '+(creados-1)+' mes(es) más' : 'Gasto agregado');
     } else {
-      DATA.gastos.push({id:uid('gas'), mes:mes, tipo:tipo, cat:cat, desc:desc, monto:monto});
+      DATA.gastos.push({id:uid('gas'), mes:mes, tipo:tipo, cat:cat, desc:desc, monto:monto, autor:currentAutor()});
       toast('Gasto agregado');
     }
   }
@@ -2112,6 +2187,7 @@ usdValor.addEventListener('input', autoCalcUsd);
 
 document.getElementById('formDolar').addEventListener('submit', function(e){
   e.preventDefault();
+  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés cargar compras de dólar.'); return; }
   var fd = new FormData(e.target);
   var cantRaw = fd.get('cant'), valorRaw = fd.get('valor');
   var cant = cantRaw==='' ? null : parseMoneyValue(cantRaw);
@@ -2122,12 +2198,12 @@ document.getElementById('formDolar').addEventListener('submit', function(e){
   }
   if(editingId.dolar){
     var item = DATA.dolar.filter(function(x){return x.id===editingId.dolar;})[0];
-    if(item){ item.mes=fd.get('mes'); item.cant=cant; item.valor=valor; item.total=total; }
+    if(item){ item.mes=fd.get('mes'); item.cant=cant; item.valor=valor; item.total=total; item.autor=currentAutor(); }
     editingId.dolar = null;
     setFormEditMode('dolar', false);
     toast('Compra actualizada');
   } else {
-    DATA.dolar.push({id:uid('usd'), mes:fd.get('mes'), cant:cant, valor:valor, total:total});
+    DATA.dolar.push({id:uid('usd'), mes:fd.get('mes'), cant:cant, valor:valor, total:total, autor:currentAutor()});
     toast('Compra registrada');
   }
   saveData(); renderAll();
@@ -2138,6 +2214,7 @@ document.getElementById('formDolar').addEventListener('submit', function(e){
 
 document.getElementById('formInversion').addEventListener('submit', function(e){
   e.preventDefault();
+  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés cargar inversiones.'); return; }
   var fd = new FormData(e.target);
   var pctRaw = fd.get('pct');
   var pct = pctRaw==='' ? 0 : parseMoneyValue(pctRaw);
@@ -2146,12 +2223,12 @@ document.getElementById('formInversion').addEventListener('submit', function(e){
   var valorActual = valorRaw==='' ? null : parseMoneyValue(valorRaw);
   if(editingId.inversion){
     var item = DATA.inversion.filter(function(x){return x.id===editingId.inversion;})[0];
-    if(item){ item.mes=fd.get('mes'); item.pct=pct; item.valorActual=valorActual; }
+    if(item){ item.mes=fd.get('mes'); item.pct=pct; item.valorActual=valorActual; item.autor=currentAutor(); }
     editingId.inversion = null;
     setFormEditMode('inversion', false);
     toast('Inversión actualizada');
   } else {
-    DATA.inversion.push({id:uid('inv'), mes:fd.get('mes'), pct:pct, valorActual:valorActual});
+    DATA.inversion.push({id:uid('inv'), mes:fd.get('mes'), pct:pct, valorActual:valorActual, autor:currentAutor()});
     toast('Inversión agregada');
   }
   saveData(); renderAll();
@@ -2692,6 +2769,20 @@ document.addEventListener('keydown', function(e){
   }
 });
 
+// Permite que la capa de sincronización (fuera de este closure) aplique
+// cambios guardados por otra persona del mismo libro compartido, en vivo.
+window.__gastosApplyRemoteStore = function(json){
+  var incoming = normalizeStoreObj(json);
+  if(!incoming) return;
+  var activeYearStillExists = incoming.ejercicios[STORE.activeEjercicio];
+  STORE = incoming;
+  STORE.activeEjercicio = activeYearStillExists ? STORE.activeEjercicio : Object.keys(STORE.ejercicios).sort()[0];
+  DATA = STORE.ejercicios[STORE.activeEjercicio];
+  if(cloudMode){ localStorage.setItem(cloudCacheKey(), JSON.stringify(STORE)); }
+  renderEjercicioSelect();
+  renderAll();
+};
+
 } /* ===== fin de startApp() ===== */
 
 
@@ -2767,6 +2858,25 @@ document.addEventListener('keydown', function(e){
   var accDelPass = document.getElementById('accDelPass');
   var accDelConfirm = document.getElementById('accDelConfirm');
   var accDelMsg = document.getElementById('accDelMsg');
+
+  var btnShare = document.getElementById('btnShare');
+  var shareOverlay = document.getElementById('shareOverlay');
+  var shareClose = document.getElementById('shareClose');
+  var shareMsg = document.getElementById('shareMsg');
+  var shareMembersList = document.getElementById('shareMembersList');
+  var shareInviteSection = document.getElementById('shareInviteSection');
+  var shareInviteUsername = document.getElementById('shareInviteUsername');
+  var shareInviteRole = document.getElementById('shareInviteRole');
+  var btnShareInviteUsername = document.getElementById('btnShareInviteUsername');
+  var shareCodeSection = document.getElementById('shareCodeSection');
+  var shareCodeRole = document.getElementById('shareCodeRole');
+  var btnShareGenCode = document.getElementById('btnShareGenCode');
+  var shareCodeResult = document.getElementById('shareCodeResult');
+  var shareJoinCode = document.getElementById('shareJoinCode');
+  var btnShareJoinCode = document.getElementById('btnShareJoinCode');
+  var shareLeaveSection = document.getElementById('shareLeaveSection');
+  var btnShareLeave = document.getElementById('btnShareLeave');
+  var inviteBanner = document.getElementById('inviteBanner');
 
   // 'username' = la persona escribe un nombre de usuario (sin @). Por dentro, la cuenta
   //              de Firebase usa su email real (que se pide solo al crear la cuenta y
@@ -2931,12 +3041,31 @@ document.addEventListener('keydown', function(e){
   function docRef(uid){
     return db.collection('gastosUsuarios').doc(uid);
   }
+  function libroRef(libroId){
+    return db.collection('libros').doc(libroId);
+  }
+  function invitacionRef(codigo){
+    return db.collection('invitaciones').doc(codigo);
+  }
+  function generarCodigoInvitacion(){
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin caracteres ambiguos (0/O, 1/I)
+    var out = '';
+    for(var i=0;i<8;i++){ out += chars[Math.floor(Math.random()*chars.length)]; }
+    return out;
+  }
 
   // ---- Sincronización con debounce (evita escribir en cada tecla) ----
   var syncTimer = null;
   var currentUid = null;
   var appStarted = false;
   var isSyncing = false;
+
+  // ---- Estado del libro compartido ----
+  var currentLibroId = null;     // id del libro (documento en la colección "libros") activo
+  var currentUsername = null;
+  var currentRol = 'owner';      // 'owner' | 'editor' | 'lector'
+  var libroUnsub = null;         // cancela el listener en tiempo real al cambiar de libro/salir
+  var lastAppliedStoreJson = null; // evita re-render cuando el snapshot es eco de nuestro propio guardado
 
   function updateConnStatus(){
     if(!syncDot || isSyncing) return;
@@ -2952,7 +3081,8 @@ document.addEventListener('keydown', function(e){
   window.addEventListener('offline', updateConnStatus);
 
   function scheduleSync(store){
-    if(!currentUid) return;
+    if(!currentUid || !currentLibroId) return;
+    if(currentRol === 'lector') return; // solo lectura: no escribe en el libro compartido
     if(syncDot){
       isSyncing = true;
       syncDot.className = navigator.onLine ? 'sync-dot syncing' : 'sync-dot offline';
@@ -2960,7 +3090,14 @@ document.addEventListener('keydown', function(e){
     }
     clearTimeout(syncTimer);
     syncTimer = setTimeout(function(){
-      docRef(currentUid).set({ store: JSON.stringify(store), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+      var json = JSON.stringify(store);
+      lastAppliedStoreJson = json;
+      libroRef(currentLibroId).set({
+        store: json,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedByUid: currentUid,
+        updatedByUsername: currentUsername || null
+      }, { merge: true })
         .then(function(){ isSyncing = false; updateConnStatus(); })
         .catch(function(err){
           isSyncing = false;
@@ -2968,6 +3105,12 @@ document.addEventListener('keydown', function(e){
           console.error('Error sincronizando con Firestore:', err);
         });
     }, 800);
+  }
+
+  function manejarErrorInicio(err){
+    authLoading.style.display = 'none';
+    console.error('Error iniciando el libro compartido:', err);
+    toastEl_fallback('No se pudo cargar tu libro. Reintentá más tarde.');
   }
 
   auth.onAuthStateChanged(function(user){
@@ -2979,7 +3122,6 @@ document.addEventListener('keydown', function(e){
         ubEmail.textContent = user.email || '';
       }
       if(appStarted){
-        // Ya arrancó la app antes (ej: refresco de token); no reiniciar.
         window.__gastosCloudSync = scheduleSync;
         return;
       }
@@ -2988,8 +3130,8 @@ document.addEventListener('keydown', function(e){
       var timeoutFallback = new Promise(function(resolve){
         setTimeout(function(){ resolve({__timeout:true}); }, 7000);
       });
-      Promise.race([gotDoc, timeoutFallback]).then(function(doc){
-        if(doc && doc.__timeout){
+      Promise.race([gotDoc, timeoutFallback]).then(function(userDoc){
+        if(userDoc && userDoc.__timeout){
           authLoading.style.display = 'none';
           if(AUTH_MODE === 'username'){ ubEmail.textContent = '(usuario)'; }
           toastEl_fallback('Sin conexión: se muestran los últimos datos guardados en este dispositivo.');
@@ -2999,34 +3141,73 @@ document.addEventListener('keydown', function(e){
           updateConnStatus();
           return;
         }
-        var preloaded = (doc.exists && doc.data() && doc.data().store) ? doc.data().store : null;
-        if(AUTH_MODE === 'username'){
-          var savedUsername = (doc.exists && doc.data() && doc.data().username) ? doc.data().username : null;
-          if(savedUsername){
-            ubEmail.textContent = savedUsername;
-          } else {
-            // El campo username no está en el documento (por ejemplo, cuentas afectadas
-            // por un bug anterior que lo borraba al sincronizar). Lo recuperamos buscando
-            // en usernameIndex, que mapea username -> uid, y lo restauramos en el documento.
-            ubEmail.textContent = '(usuario)';
-            db.collection('usernameIndex').where('uid', '==', user.uid).limit(1).get().then(function(qs){
-              if(!qs.empty){
-                var recovered = qs.docs[0].id;
-                ubEmail.textContent = recovered;
-                docRef(user.uid).set({ username: recovered }, { merge: true }).catch(function(e){
-                  console.error('No se pudo restaurar el username:', e);
-                });
-              }
-            }).catch(function(e){
-              console.error('No se pudo buscar el username en usernameIndex:', e);
-            });
+        var userData = (userDoc.exists && userDoc.data()) ? userDoc.data() : {};
+
+        function conUsernameResuelto(resolvedUsername){
+          if(AUTH_MODE === 'username'){ ubEmail.textContent = resolvedUsername || '(usuario)'; }
+
+          function conLibro(libroId){
+            currentLibroId = libroId;
+            currentUsername = resolvedUsername;
+            window.__gastosCurrentUsername = resolvedUsername;
+            libroRef(libroId).get().then(function(libroDoc){
+              var libroData = (libroDoc.exists && libroDoc.data()) ? libroDoc.data() : {};
+              var miembros = libroData.miembros || {};
+              currentRol = (miembros[user.uid] && miembros[user.uid].rol) || 'owner';
+              window.__gastosCurrentRol = currentRol;
+              var preloaded = libroData.store || null;
+              lastAppliedStoreJson = preloaded;
+              authLoading.style.display = 'none';
+              window.__gastosCloudSync = scheduleSync;
+              appStarted = true;
+              startApp(preloaded, true, user.uid);
+              updateConnStatus();
+              watchLibroChanges();
+              checkPendingInvites();
+            }).catch(manejarErrorInicio);
           }
+
+          if(userData.libroId){
+            conLibro(userData.libroId);
+            return;
+          }
+
+          var libroIdNuevo = user.uid;
+          var miembrosIniciales = {};
+          miembrosIniciales[user.uid] = { username: resolvedUsername || null, rol: 'owner' };
+          libroRef(libroIdNuevo).set({
+            ownerUid: user.uid,
+            ownerUsername: resolvedUsername || null,
+            store: userData.store || null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedByUid: user.uid,
+            updatedByUsername: resolvedUsername || null,
+            miembros: miembrosIniciales
+          }, { merge: true }).then(function(){
+            return docRef(user.uid).set({ libroId: libroIdNuevo }, { merge: true });
+          }).then(function(){
+            conLibro(libroIdNuevo);
+          }).catch(manejarErrorInicio);
         }
-        authLoading.style.display = 'none';
-        window.__gastosCloudSync = scheduleSync;
-        appStarted = true;
-        startApp(preloaded, true, user.uid);
-        updateConnStatus();
+
+        var savedUsername = userData.username || null;
+        if(savedUsername || AUTH_MODE !== 'username'){
+          conUsernameResuelto(savedUsername);
+        } else {
+          db.collection('usernameIndex').where('uid', '==', user.uid).limit(1).get().then(function(qs){
+            var recovered = !qs.empty ? qs.docs[0].id : null;
+            if(recovered){
+              docRef(user.uid).set({ username: recovered }, { merge: true }).catch(function(e){
+                console.error('No se pudo restaurar el username:', e);
+              });
+            }
+            conUsernameResuelto(recovered);
+          }).catch(function(e){
+            console.error('No se pudo buscar el username en usernameIndex:', e);
+            conUsernameResuelto(null);
+          });
+        }
       }).catch(function(err){
         authLoading.style.display = 'none';
         if(AUTH_MODE === 'username'){ ubEmail.textContent = '(usuario)'; }
@@ -3037,9 +3218,14 @@ document.addEventListener('keydown', function(e){
       });
     } else {
       currentUid = null;
+      currentLibroId = null;
+      currentUsername = null;
+      currentRol = 'owner';
+      if(libroUnsub){ libroUnsub(); libroUnsub = null; }
       window.__gastosCloudSync = null;
       userBadge.style.display = 'none';
       authLoading.style.display = 'none';
+      if(inviteBanner){ inviteBanner.style.display = 'none'; }
       if(!appStarted){
         authGate.classList.add('show');
         setTimeout(function(){ authEmail.focus(); }, 50);
@@ -3052,6 +3238,192 @@ document.addEventListener('keydown', function(e){
     auth.signOut().then(function(){
       location.reload();
     });
+  });
+
+  var ROLE_LABEL = { owner:'Dueño/a', editor:'Puede editar', lector:'Solo puede ver' };
+
+  // ---- Escucha en vivo los cambios que haga la otra persona en el mismo libro ----
+  function watchLibroChanges(){
+    if(libroUnsub){ libroUnsub(); libroUnsub = null; }
+    if(!currentLibroId) return;
+    libroUnsub = libroRef(currentLibroId).onSnapshot(function(doc){
+      if(!doc.exists) return;
+      var data = doc.data();
+      var miembros = data.miembros || {};
+      var nuevoRol = (miembros[currentUid] && miembros[currentUid].rol) || currentRol;
+      if(nuevoRol !== currentRol){
+        currentRol = nuevoRol;
+        window.__gastosCurrentRol = currentRol;
+      }
+      if(data.store && data.store !== lastAppliedStoreJson){
+        lastAppliedStoreJson = data.store;
+        // No pisamos nuestro propio guardado recién hecho (updatedByUid === currentUid
+        // ya coincide con lastAppliedStoreJson, así que esto solo dispara con cambios ajenos).
+        if(window.__gastosApplyRemoteStore) window.__gastosApplyRemoteStore(data.store);
+      }
+      if(shareOverlay.classList.contains('open')) renderShareMembers(data);
+    }, function(err){
+      console.error('Error escuchando cambios del libro compartido:', err);
+    });
+  }
+
+  // ---- Invitaciones pendientes (recibidas por nombre de usuario) ----
+  function checkPendingInvites(){
+    if(!currentUid) return;
+    db.collection('invitaciones')
+      .where('destinoUid', '==', currentUid)
+      .where('estado', '==', 'pendiente')
+      .limit(1).get().then(function(qs){
+        if(qs.empty){ inviteBanner.style.display = 'none'; return; }
+        var doc = qs.docs[0];
+        var inv = doc.data();
+        inviteBanner.innerHTML =
+          '<span>'+escapeHtml(inv.creadoPorUsername||'Alguien')+' te invitó a compartir su libro de gastos como <strong>'+(ROLE_LABEL[inv.rol]||inv.rol)+'</strong>.</span>'+
+          '<span class="invite-banner-actions">'+
+            '<button class="btn" id="btnInviteAceptar">Aceptar</button>'+
+            '<button class="ghost-btn" id="btnInviteRechazar">Rechazar</button>'+
+          '</span>';
+        inviteBanner.style.display = 'flex';
+        document.getElementById('btnInviteAceptar').addEventListener('click', function(){
+          aceptarInvitacion(doc.id, inv);
+        });
+        document.getElementById('btnInviteRechazar').addEventListener('click', function(){
+          invitacionRef(doc.id).set({estado:'rechazada'}, {merge:true}).then(function(){
+            inviteBanner.style.display = 'none';
+          });
+        });
+      }).catch(function(err){ console.error('No se pudieron revisar las invitaciones pendientes:', err); });
+  }
+
+  function unirseALibro(libroId, rol, invitacionId){
+    if(!confirm('Al unirte vas a ver y compartir los datos de ese libro. Tu libro actual queda guardado y podés volver a él saliendo desde el mismo menú. ¿Continuar?')) return;
+    var miembroUpdate = {};
+    miembroUpdate['miembros.'+currentUid] = { username: currentUsername || null, rol: rol };
+    libroRef(libroId).set(miembroUpdate, { merge: true }).then(function(){
+      return docRef(currentUid).set({ libroId: libroId }, { merge: true });
+    }).then(function(){
+      if(invitacionId){ return invitacionRef(invitacionId).set({estado:'aceptada'}, {merge:true}); }
+    }).then(function(){
+      location.reload();
+    }).catch(function(err){
+      toastEl_fallback('No se pudo unir al libro: '+(err.message||err));
+    });
+  }
+  function aceptarInvitacion(invitacionId, inv){
+    unirseALibro(inv.libroId, inv.rol, invitacionId);
+  }
+
+  // ---- Modal "Compartir este libro" ----
+  function renderShareMembers(libroData){
+    var miembros = libroData.miembros || {};
+    var esOwner = currentRol === 'owner';
+    var html = Object.keys(miembros).map(function(uidM){
+      var m = miembros[uidM];
+      var esYo = uidM === currentUid;
+      return '<div class="member-row">'+
+        '<span>'+escapeHtml(m.username || '(usuario)')+(esYo?' (vos)':'')+'</span>'+
+        '<span class="role-pill">'+(ROLE_LABEL[m.rol]||m.rol)+'</span>'+
+        (esOwner && !esYo ? '<button class="ghost-btn member-remove" data-uid="'+uidM+'">Quitar</button>' : '')+
+      '</div>';
+    }).join('');
+    shareMembersList.innerHTML = html || '<div class="empty-state">Sin miembros.</div>';
+    shareMembersList.querySelectorAll('.member-remove').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        if(!confirm('¿Quitar a esta persona del libro compartido?')) return;
+        var upd = {}; upd['miembros.'+btn.dataset.uid] = firebase.firestore.FieldValue.delete();
+        libroRef(currentLibroId).set(upd, {merge:true}).then(function(){
+          return docRef(btn.dataset.uid).set({ libroId: btn.dataset.uid }, { merge: true });
+        }).catch(function(err){ console.error('No se pudo quitar al miembro:', err); });
+      });
+    });
+    shareInviteSection.style.display = esOwner ? 'block' : 'none';
+    shareCodeSection.style.display = esOwner ? 'block' : 'none';
+    shareLeaveSection.style.display = esOwner ? 'none' : 'block';
+  }
+  function openShareModal(){
+    if(!currentLibroId) return;
+    shareMsg.className = 'account-msg';
+    shareMsg.textContent = '';
+    shareCodeResult.style.display = 'none';
+    libroRef(currentLibroId).get().then(function(doc){
+      renderShareMembers(doc.exists ? doc.data() : {});
+    });
+    shareOverlay.classList.add('open');
+  }
+  function closeShareModal(){ shareOverlay.classList.remove('open'); }
+  if(btnShare){ btnShare.addEventListener('click', openShareModal); }
+  shareClose.addEventListener('click', closeShareModal);
+  shareOverlay.addEventListener('click', function(e){ if(e.target===shareOverlay) closeShareModal(); });
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape' && shareOverlay.classList.contains('open')) closeShareModal();
+  });
+
+  btnShareInviteUsername.addEventListener('click', function(){
+    var username = normalizeUsername(shareInviteUsername.value);
+    var rol = shareInviteRole.value;
+    shareMsg.className = 'account-msg'; shareMsg.textContent = '';
+    if(username.length < 3){ shareMsg.className='account-msg err'; shareMsg.textContent='Escribí un nombre de usuario válido.'; return; }
+    usernameIndexRef(username).get().then(function(doc){
+      if(!doc.exists){ shareMsg.className='account-msg err'; shareMsg.textContent='No existe una cuenta con ese usuario.'; return; }
+      var destinoUid = doc.data().uid;
+      if(destinoUid === currentUid){ shareMsg.className='account-msg err'; shareMsg.textContent='Ese sos vos.'; return; }
+      var codigo = generarCodigoInvitacion();
+      return invitacionRef(codigo).set({
+        libroId: currentLibroId, rol: rol,
+        creadoPorUid: currentUid, creadoPorUsername: currentUsername || null,
+        destinoUid: destinoUid, destinoUsername: username,
+        creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+        estado: 'pendiente'
+      }).then(function(){
+        shareMsg.className='account-msg ok';
+        shareMsg.textContent = 'Invitación enviada a '+username+'. La va a ver la próxima vez que entre.';
+        shareInviteUsername.value = '';
+      });
+    }).catch(function(err){ shareMsg.className='account-msg err'; shareMsg.textContent = 'Ocurrió un error: '+(err.message||err); });
+  });
+
+  btnShareGenCode.addEventListener('click', function(){
+    var rol = shareCodeRole.value;
+    var codigo = generarCodigoInvitacion();
+    invitacionRef(codigo).set({
+      libroId: currentLibroId, rol: rol,
+      creadoPorUid: currentUid, creadoPorUsername: currentUsername || null,
+      destinoUid: null, destinoUsername: null,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+      estado: 'pendiente'
+    }).then(function(){
+      shareCodeResult.style.display = 'block';
+      shareCodeResult.innerHTML = 'Código: <strong style="letter-spacing:2px;">'+codigo+'</strong><br><small style="color:var(--text-faint);">Compartíselo a quien quieras invitar como '+(ROLE_LABEL[rol]||rol).toLowerCase()+'. Lo usa en "Unirme con un código".</small>';
+    }).catch(function(err){ shareMsg.className='account-msg err'; shareMsg.textContent = 'No se pudo generar el código: '+(err.message||err); });
+  });
+
+  btnShareJoinCode.addEventListener('click', function(){
+    var codigo = (shareJoinCode.value||'').trim().toUpperCase();
+    shareMsg.className = 'account-msg'; shareMsg.textContent = '';
+    if(!codigo){ shareMsg.className='account-msg err'; shareMsg.textContent='Escribí un código.'; return; }
+    invitacionRef(codigo).get().then(function(doc){
+      if(!doc.exists || doc.data().estado !== 'pendiente'){
+        shareMsg.className='account-msg err'; shareMsg.textContent='Ese código no es válido o ya se usó.';
+        return;
+      }
+      var inv = doc.data();
+      if(inv.destinoUid && inv.destinoUid !== currentUid){
+        shareMsg.className='account-msg err'; shareMsg.textContent='Ese código es para otra cuenta.';
+        return;
+      }
+      closeShareModal();
+      unirseALibro(inv.libroId, inv.rol, doc.id);
+    }).catch(function(err){ shareMsg.className='account-msg err'; shareMsg.textContent = 'Ocurrió un error: '+(err.message||err); });
+  });
+
+  btnShareLeave.addEventListener('click', function(){
+    if(!confirm('¿Salir de este libro compartido? Vas a volver a ver tu propio libro personal.')) return;
+    var upd = {}; upd['miembros.'+currentUid] = firebase.firestore.FieldValue.delete();
+    libroRef(currentLibroId).set(upd, {merge:true}).then(function(){
+      return docRef(currentUid).set({ libroId: currentUid }, { merge: true });
+    }).then(function(){
+      location.reload();
+    }).catch(function(err){ shareMsg.className='account-msg err'; shareMsg.textContent = 'No se pudo salir: '+(err.message||err); });
   });
 
   // ---- Modal de Cuenta (cambiar contraseña / email / eliminar cuenta) ----
