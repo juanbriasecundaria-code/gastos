@@ -31,6 +31,24 @@
   --font-body:'Inter',sans-serif;
   --font-mono:'IBM Plex Mono',monospace;
 }
+/* ===== Tema claro (para uso al sol / poca luminosidad de pantalla) ===== */
+html.theme-light{
+  --bg:#F4F6F8;
+  --surface:#FFFFFF;
+  --surface-2:#EDEFF3;
+  --line:#D8DEE5;
+  --line-soft:#E7EAEE;
+  --text:#1A1F27;
+  --text-dim:#4B5563;
+  --text-faint:#6B7280;
+  --ingreso:#1FA47A;
+  --fijo:#B5810A;
+  --variable:#8B4FD1;
+  --dolar:#2B6FCB;
+  --inversion:#C23D6B;
+  --neg:#D93A3D;
+}
+html.theme-light body{background:var(--bg);}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{
@@ -74,28 +92,24 @@ a{color:inherit;}
   }
   .sidebar.mobile-open{transform:translateX(0);}
   .sidebar .brand{display:flex;}
-  .sidebar nav{display:flex;flex-direction:column;gap:2px;width:100%;}
-  .nav-btn{white-space:normal;flex-shrink:0;}
+  /* En mobile el cajón sólo trae lo que no está ya en la barra inferior:
+     ejercicio, tema, backup/restauración. La navegación de vistas y el
+     buscador se ocultan para no repetir lo que ya está abajo. */
+  .sidebar .search-trigger{display:none;}
+  .sidebar nav{display:none;}
   .sidebar .side-footer{display:flex;}
+  .theme-toggle-btn{display:block;}
 
   .mobile-sidebar-backdrop{
     display:none;position:fixed;inset:0;background:rgba(6,9,13,.6);z-index:240;
   }
   .mobile-sidebar-backdrop.open{display:block;}
 
-  .mobile-menu-btn{
-    display:flex;position:fixed;top:12px;left:12px;z-index:230;
-    width:36px;height:36px;border-radius:9px;background:var(--surface);
-    border:1px solid var(--line);align-items:center;justify-content:center;
-    color:var(--text-dim);cursor:pointer;padding:0;
-  }
-  .mobile-menu-btn:hover{border-color:var(--text-dim);color:var(--text);}
-
-  /* Espacio para el botón de menú flotante y la barra inferior fija */
-  main{padding-top:56px;padding-bottom:78px;}
+  /* Espacio para la barra inferior fija */
+  main{padding-bottom:78px;}
 }
 @media (min-width:861px){
-  .mobile-menu-btn,.mobile-sidebar-backdrop{display:none !important;}
+  .mobile-sidebar-backdrop{display:none !important;}
 }
 
 /* ===== Bottom nav (mobile) ===== */
@@ -353,6 +367,8 @@ nav{display:flex;flex-direction:column;gap:2px;}
   cursor:pointer;text-align:left;transition:border-color .15s,color .15s;
 }
 .ghost-btn:hover{border-color:var(--text-dim);color:var(--text);}
+
+.theme-toggle-btn{display:none;width:100%;margin:14px 0 4px;}
 
 main{
   padding:28px 40px 80px;
@@ -658,7 +674,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
   }
   @page{ size:landscape; margin:12mm; }
   body{background:#fff;color:#111418;}
-  .sidebar,.bottom-nav,.mobile-menu-btn,.mobile-sidebar-backdrop,.search-overlay,.account-overlay,.auth-gate,.auth-loading,
+  .sidebar,.bottom-nav,.mobile-sidebar-backdrop,.search-overlay,.account-overlay,.auth-gate,.auth-loading,
   #toast,.form-card,.filters-row,.no-print{display:none !important;}
   .app{display:block;}
   main{padding:0;max-width:100%;}
@@ -681,8 +697,8 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 </style>
 </head>
 <body>
+<script>(function(){try{if(localStorage.getItem('libroGastos_theme')==='light'){document.documentElement.classList.add('theme-light');}}catch(e){}})();</script>
 <div class="app">
-  <button class="mobile-menu-btn" id="btnMobileMenu" aria-label="Abrir menú" aria-expanded="false">☰</button>
   <div class="mobile-sidebar-backdrop" id="mobileSidebarBackdrop"></div>
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span>Libro de Gastos</div>
@@ -690,6 +706,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
       <select id="ejercicioSelect" class="ejercicio-select" title="Ejercicio activo"></select>
       <button id="btnNuevoEjercicio" class="ejercicio-add" title="Nuevo ejercicio" aria-label="Nuevo ejercicio">+</button>
     </div>
+    <button class="ghost-btn theme-toggle-btn" id="btnThemeToggle">☀️ Modo claro</button>
     <button class="search-trigger" id="btnOpenSearch" aria-label="Buscar">
       <span>🔍 Buscar…</span><span class="search-kbd">Ctrl K</span>
     </button>
@@ -721,6 +738,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
     <button class="nav-btn" data-tab="ingresos"><span class="bn-icon">💵</span><span class="bn-label">Ingresos</span></button>
     <button class="nav-btn" data-tab="gastos"><span class="bn-icon">🧾</span><span class="bn-label">Gastos</span></button>
     <button class="nav-btn" data-tab="graficos"><span class="bn-icon">📈</span><span class="bn-label">Gráficos</span></button>
+    <button class="nav-btn" id="btnMobileMenu" aria-label="Abrir menú" aria-expanded="false"><span class="bn-icon">☰</span><span class="bn-label">Menú</span></button>
   </nav>
 
   <main>
@@ -1349,10 +1367,10 @@ function toast(msg){
 }
 
 /* ===================== NAV ===================== */
-document.querySelectorAll('.nav-btn').forEach(function(btn){
+document.querySelectorAll('.nav-btn[data-tab]').forEach(function(btn){
   btn.addEventListener('click', function(){
     var tab = btn.dataset.tab;
-    document.querySelectorAll('.nav-btn').forEach(function(b){
+    document.querySelectorAll('.nav-btn[data-tab]').forEach(function(b){
       b.classList.toggle('active', b.dataset.tab === tab);
     });
     document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
@@ -1364,22 +1382,6 @@ document.querySelectorAll('.nav-btn').forEach(function(btn){
     }
   });
 });
-
-/* Indicadores de "hay más tabs" en el nav horizontal del sidebar (mobile) */
-(function(){
-  var sb = document.querySelector('.sidebar');
-  if(!sb) return;
-  function updateScrollFades(){
-    var max = sb.scrollWidth - sb.clientWidth;
-    sb.classList.toggle('scroll-start', sb.scrollLeft > 4);
-    sb.classList.toggle('scroll-more', sb.scrollLeft < max - 4);
-  }
-  sb.addEventListener('scroll', updateScrollFades, {passive:true});
-  window.addEventListener('resize', updateScrollFades);
-  updateScrollFades();
-  // Recalcular una vez cargado todo (fuentes/anchos pueden cambiar el scrollWidth)
-  window.addEventListener('load', updateScrollFades);
-})();
 
 /* ===================== MENÚ MOBILE (cajón lateral) ===================== */
 (function(){
@@ -1405,9 +1407,31 @@ document.querySelectorAll('.nav-btn').forEach(function(btn){
     if(e.key==='Escape') close();
   });
   // Al elegir una vista desde el cajón, cerrarlo
-  sidebar.querySelectorAll('.nav-btn').forEach(function(b){
+  sidebar.querySelectorAll('.nav-btn[data-tab]').forEach(function(b){
     b.addEventListener('click', close);
   });
+})();
+
+/* ===================== TEMA CLARO / OSCURO ===================== */
+var THEME_KEY = 'libroGastos_theme';
+function applyTheme(theme){
+  document.documentElement.classList.toggle('theme-light', theme==='light');
+  var btnTheme = document.getElementById('btnThemeToggle');
+  if(btnTheme) btnTheme.textContent = theme==='light' ? '🌙 Modo oscuro' : '☀️ Modo claro';
+  try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
+}
+(function(){
+  var saved = null;
+  try{ saved = localStorage.getItem(THEME_KEY); }catch(e){}
+  applyTheme(saved==='light' ? 'light' : 'dark');
+  var btnTheme = document.getElementById('btnThemeToggle');
+  if(btnTheme){
+    btnTheme.addEventListener('click', function(){
+      var isLight = document.documentElement.classList.contains('theme-light');
+      applyTheme(isLight ? 'dark' : 'light');
+      renderGraficos(); // los charts SVG usan colores fijos que hay que releer del nuevo tema
+    });
+  }
 })();
 
 /* ===================== SELECT POPULATION ===================== */
@@ -2468,7 +2492,24 @@ function renderHormiga(){
   container.innerHTML = summary+list;
 }
 
+function refreshChartThemeColors(){
+  // Los charts se dibujan como SVG con colores fijos en JS; los releemos
+  // de las variables CSS activas para que respeten el tema claro/oscuro.
+  var cs = getComputedStyle(document.documentElement);
+  function v(name, fallback){ var val = cs.getPropertyValue(name).trim(); return val || fallback; }
+  CHART_COLORS.ingreso = v('--ingreso', CHART_COLORS.ingreso);
+  CHART_COLORS.fijo = v('--fijo', CHART_COLORS.fijo);
+  CHART_COLORS.variable = v('--variable', CHART_COLORS.variable);
+  CHART_COLORS.dolar = v('--dolar', CHART_COLORS.dolar);
+  CHART_COLORS.inversion = v('--inversion', CHART_COLORS.inversion);
+  CHART_COLORS.neg = v('--neg', CHART_COLORS.neg);
+  CHART_COLORS.grid = v('--line', CHART_COLORS.grid);
+  CHART_COLORS.textDim = v('--text-dim', CHART_COLORS.textDim);
+  CHART_COLORS.textFaint = v('--text-faint', CHART_COLORS.textFaint);
+}
+
 function renderGraficos(){
+  refreshChartThemeColors();
   var months = MESES.map(computeMonth);
   var enUsd = document.getElementById('toggleUsdEquiv').checked;
   var valores = dolarValorMensual();
