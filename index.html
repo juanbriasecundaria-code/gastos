@@ -215,6 +215,56 @@ a{color:inherit;}
   font-family:var(--font-body);text-decoration:underline;
 }
 .user-badge .ub-logout:hover{color:var(--neg);}
+.user-badge .ub-account{
+  flex-shrink:0;background:none;border:1px solid var(--line);border-radius:6px;color:var(--text-faint);
+  cursor:pointer;font-size:11px;width:22px;height:22px;line-height:1;padding:0;
+  display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s;
+}
+.user-badge .ub-account:hover{border-color:var(--dolar);color:var(--dolar);}
+
+/* ===== Account modal ===== */
+.account-overlay{
+  position:fixed;inset:0;background:rgba(6,9,13,.7);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;padding:20px;z-index:300;
+}
+.account-overlay.open{display:flex;}
+.account-box{
+  width:400px;max-width:100%;max-height:88vh;overflow-y:auto;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px 22px;
+}
+.account-box h3{
+  font-family:var(--font-display);font-size:15px;font-weight:700;margin:0 0 4px;
+}
+.account-current-email{
+  font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);margin:0 0 18px;
+  word-break:break-all;
+}
+.account-close{
+  position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-faint);
+  font-size:18px;cursor:pointer;line-height:1;
+}
+.account-close:hover{color:var(--text);}
+.account-box{position:relative;}
+.account-section{border-top:1px solid var(--line);padding-top:16px;margin-top:16px;}
+.account-section:first-of-type{border-top:none;padding-top:0;margin-top:0;}
+.account-section h4{
+  font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.04em;margin:0 0 12px;
+}
+.account-section .field{margin-bottom:10px;}
+.account-section input{
+  width:100%;background:var(--bg);border:1px solid var(--line);border-radius:7px;
+  color:var(--text);padding:9px 10px;font-size:13px;font-family:var(--font-body);outline:none;
+}
+.account-section input:focus{border-color:var(--dolar);}
+.account-section .btn{width:100%;padding:10px;font-size:13px;}
+.account-msg{
+  font-size:11.5px;border-radius:7px;padding:7px 9px;margin-bottom:10px;display:none;line-height:1.4;
+}
+.account-msg.err{color:var(--neg);background:rgba(242,105,107,.1);border:1px solid rgba(242,105,107,.25);display:block;}
+.account-msg.ok{color:var(--ingreso);background:rgba(79,209,165,.1);border:1px solid rgba(79,209,165,.25);display:block;}
+.account-section.danger h4{color:var(--neg);}
+.btn-danger{background:var(--neg);color:#2A0707;}
 .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);flex-shrink:0;transition:background .2s;}
 .sync-dot.ok{background:var(--ingreso);}
 .sync-dot.syncing{background:var(--dolar);animation:pulseDot 1s ease infinite;}
@@ -537,6 +587,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
       <div class="user-badge" id="userBadge" style="display:none;">
         <span class="sync-dot" id="syncDot" title="Estado de sincronización"></span>
         <span class="ub-email" id="ubEmail"></span>
+        <button class="ub-account" id="btnAccount" title="Cuenta">⚙</button>
         <button class="ub-logout" id="btnLogout">Salir</button>
       </div>
       <button class="ghost-btn" id="btnExport">↓ Exportar backup (.json)</button>
@@ -751,6 +802,44 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
       <button type="submit" class="btn btn-accent-ingreso" id="authSubmitBtn">Iniciar sesión</button>
     </form>
     <button type="button" class="auth-forgot" id="authForgotBtn">¿Olvidaste tu contraseña?</button>
+  </div>
+</div>
+
+<div class="account-overlay" id="accountOverlay">
+  <div class="account-box">
+    <button class="account-close" id="accountClose" title="Cerrar (Esc)">✕</button>
+    <h3>Cuenta</h3>
+    <p class="account-current-email" id="accCurrentEmail"></p>
+
+    <div class="account-section">
+      <h4>Cambiar contraseña</h4>
+      <div class="account-msg" id="accPassMsg"></div>
+      <form id="accPassForm">
+        <div class="field"><input type="password" id="accPassCurrent" placeholder="Contraseña actual" required autocomplete="current-password"></div>
+        <div class="field"><input type="password" id="accPassNew" placeholder="Contraseña nueva (mín. 6 caracteres)" required minlength="6" autocomplete="new-password"></div>
+        <button type="submit" class="btn">Actualizar contraseña</button>
+      </form>
+    </div>
+
+    <div class="account-section">
+      <h4>Cambiar email</h4>
+      <div class="account-msg" id="accEmailMsg"></div>
+      <form id="accEmailForm">
+        <div class="field"><input type="email" id="accEmailNew" placeholder="Nuevo email" required autocomplete="email"></div>
+        <div class="field"><input type="password" id="accEmailPass" placeholder="Contraseña actual" required autocomplete="current-password"></div>
+        <button type="submit" class="btn">Actualizar email</button>
+      </form>
+    </div>
+
+    <div class="account-section danger">
+      <h4>Eliminar cuenta</h4>
+      <div class="account-msg" id="accDelMsg"></div>
+      <form id="accDelForm">
+        <div class="field"><input type="password" id="accDelPass" placeholder="Contraseña actual" required autocomplete="current-password"></div>
+        <div class="field"><input type="text" id="accDelConfirm" placeholder="Escribí tu email para confirmar" required autocomplete="off"></div>
+        <button type="submit" class="btn btn-danger">Eliminar mi cuenta y todos mis datos</button>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -2263,11 +2352,27 @@ document.addEventListener('keydown', function(e){
   var ubEmail = document.getElementById('ubEmail');
   var syncDot = document.getElementById('syncDot');
   var btnLogout = document.getElementById('btnLogout');
+  var btnAccount = document.getElementById('btnAccount');
+  var accountOverlay = document.getElementById('accountOverlay');
+  var accountClose = document.getElementById('accountClose');
+  var accCurrentEmail = document.getElementById('accCurrentEmail');
+  var accPassForm = document.getElementById('accPassForm');
+  var accPassCurrent = document.getElementById('accPassCurrent');
+  var accPassNew = document.getElementById('accPassNew');
+  var accPassMsg = document.getElementById('accPassMsg');
+  var accEmailForm = document.getElementById('accEmailForm');
+  var accEmailNew = document.getElementById('accEmailNew');
+  var accEmailPass = document.getElementById('accEmailPass');
+  var accEmailMsg = document.getElementById('accEmailMsg');
+  var accDelForm = document.getElementById('accDelForm');
+  var accDelPass = document.getElementById('accDelPass');
+  var accDelConfirm = document.getElementById('accDelConfirm');
+  var accDelMsg = document.getElementById('accDelMsg');
 
   // 'username' = la persona escribe un nombre de usuario (sin @); por dentro se arma
   //              una cuenta con un email interno inventado, invisible para el usuario.
   // 'email'    = login tradicional con email real (habilita recuperar contraseña).
-  var AUTH_MODE = (window.AUTH_MODE === 'email') ? 'email' : 'username';
+  var AUTH_MODE = (window.AUTH_MODE === 'username') ? 'username' : 'email';
   var USERNAME_DOMAIN = '@gastosapp.local';
 
   if(AUTH_MODE === 'username'){
@@ -2453,6 +2558,118 @@ document.addEventListener('keydown', function(e){
     if(!confirm('¿Cerrar sesión?')) return;
     auth.signOut().then(function(){
       location.reload();
+    });
+  });
+
+  // ---- Modal de Cuenta (cambiar contraseña / email / eliminar cuenta) ----
+  function clearAccountMsgs(){
+    [accPassMsg, accEmailMsg, accDelMsg].forEach(function(el){
+      el.className = 'account-msg';
+      el.textContent = '';
+    });
+  }
+  function openAccountModal(){
+    if(!auth.currentUser) return;
+    accCurrentEmail.textContent = auth.currentUser.email || '';
+    accPassForm.reset();
+    accEmailForm.reset();
+    accDelForm.reset();
+    clearAccountMsgs();
+    accountOverlay.classList.add('open');
+  }
+  function closeAccountModal(){
+    accountOverlay.classList.remove('open');
+  }
+  btnAccount.addEventListener('click', openAccountModal);
+  accountClose.addEventListener('click', closeAccountModal);
+  accountOverlay.addEventListener('click', function(e){ if(e.target===accountOverlay) closeAccountModal(); });
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape' && accountOverlay.classList.contains('open')) closeAccountModal();
+  });
+
+  // Handlers de los formularios: se completan en los próximos pasos
+  // (cambiar contraseña, cambiar email, eliminar cuenta).
+  accPassForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var user = auth.currentUser;
+    if(!user) return;
+    var current = accPassCurrent.value;
+    var nueva = accPassNew.value;
+    accPassMsg.className = 'account-msg';
+    accPassMsg.textContent = '';
+    var submitBtn = accPassForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    var cred = firebase.auth.EmailAuthProvider.credential(user.email, current);
+    user.reauthenticateWithCredential(cred).then(function(){
+      return user.updatePassword(nueva);
+    }).then(function(){
+      accPassMsg.className = 'account-msg ok';
+      accPassMsg.textContent = 'Contraseña actualizada correctamente.';
+      accPassForm.reset();
+    }).catch(function(err){
+      accPassMsg.className = 'account-msg err';
+      accPassMsg.textContent = friendlyError(err);
+    }).finally(function(){
+      submitBtn.disabled = false;
+    });
+  });
+  accEmailForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var user = auth.currentUser;
+    if(!user) return;
+    var nuevoEmail = accEmailNew.value.trim();
+    var current = accEmailPass.value;
+    accEmailMsg.className = 'account-msg';
+    accEmailMsg.textContent = '';
+    if(nuevoEmail.toLowerCase() === (user.email||'').toLowerCase()){
+      accEmailMsg.className = 'account-msg err';
+      accEmailMsg.textContent = 'Ese ya es tu email actual.';
+      return;
+    }
+    var submitBtn = accEmailForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    var cred = firebase.auth.EmailAuthProvider.credential(user.email, current);
+    user.reauthenticateWithCredential(cred).then(function(){
+      return user.verifyBeforeUpdateEmail(nuevoEmail);
+    }).then(function(){
+      accEmailMsg.className = 'account-msg ok';
+      accEmailMsg.textContent = 'Te enviamos un link de confirmación a '+nuevoEmail+'. El email de tu cuenta cambia recién cuando lo confirmes desde ese correo.';
+      accEmailForm.reset();
+    }).catch(function(err){
+      accEmailMsg.className = 'account-msg err';
+      accEmailMsg.textContent = friendlyError(err);
+    }).finally(function(){
+      submitBtn.disabled = false;
+    });
+  });
+  accDelForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var user = auth.currentUser;
+    if(!user) return;
+    var current = accDelPass.value;
+    var confirmEmail = accDelConfirm.value.trim();
+    accDelMsg.className = 'account-msg';
+    accDelMsg.textContent = '';
+    if(confirmEmail.toLowerCase() !== (user.email||'').toLowerCase()){
+      accDelMsg.className = 'account-msg err';
+      accDelMsg.textContent = 'El email escrito no coincide con el de tu cuenta.';
+      return;
+    }
+    if(!confirm('Esto borra tu cuenta y todos tus datos guardados en la nube, sin vuelta atrás. ¿Confirmás?')) return;
+    var submitBtn = accDelForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    var cred = firebase.auth.EmailAuthProvider.credential(user.email, current);
+    var uid = user.uid;
+    user.reauthenticateWithCredential(cred).then(function(){
+      return docRef(uid).delete();
+    }).then(function(){
+      return user.delete();
+    }).then(function(){
+      location.reload();
+    }).catch(function(err){
+      accDelMsg.className = 'account-msg err';
+      accDelMsg.textContent = friendlyError(err);
+      submitBtn.disabled = false;
     });
   });
 
