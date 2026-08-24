@@ -98,7 +98,7 @@ a{color:inherit;}
 .bottom-nav{display:none;}
 @media (max-width:860px){
   .bottom-nav{
-    display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;
+    display:flex;flex-direction:row;position:fixed;left:0;right:0;bottom:0;z-index:30;
     background:var(--surface);border-top:1px solid var(--line);
     padding:6px 4px calc(6px + env(safe-area-inset-bottom));
   }
@@ -479,6 +479,15 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 }
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end;}
 .field{display:flex;flex-direction:column;gap:5px;position:relative;}
+.field-checkbox{grid-column:1/-1;flex-direction:row;}
+.field-checkbox label{
+  display:flex;align-items:center;gap:8px;cursor:pointer;
+  font-size:12.5px;color:var(--text-dim);
+}
+.field-checkbox input[type="checkbox"]{
+  width:16px;height:16px;accent-color:var(--fijo);cursor:pointer;flex-shrink:0;margin:0;
+}
+.recur-badge{font-size:11px;margin-right:5px;opacity:.85;}
 .money-preview{
   display:none;position:absolute;top:100%;left:0;margin-top:3px;
   font-family:var(--font-mono);font-size:11px;color:var(--ingreso);
@@ -600,6 +609,39 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 @media (max-width:860px){ #toast{bottom:calc(20px + 64px + env(safe-area-inset-bottom));} }
 
+/* ===== Encabezado solo-impresión ===== */
+.print-header{display:none;}
+.print-title{font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:2px;}
+.print-sub{font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim);margin-bottom:16px;}
+
+/* ===== Modo impresión / exportar a PDF =====
+   Convierte el tema oscuro a uno claro apto para papel y muestra
+   solo el contenido de la vista activa (pensado para "Resumen"). */
+@media print{
+  :root{
+    --bg:#ffffff; --surface:#ffffff; --surface-2:#f3f3f3;
+    --line:#c9c9c9; --line-soft:#dedede;
+    --text:#111418; --text-dim:#3a4048; --text-faint:#6b7178;
+  }
+  @page{ size:landscape; margin:12mm; }
+  body{background:#fff;color:#111418;}
+  .sidebar,.bottom-nav,.search-overlay,.account-overlay,.auth-gate,.auth-loading,
+  #toast,.form-card,.filters-row,.no-print{display:none !important;}
+  .app{display:block;}
+  main{padding:0;max-width:100%;}
+  .view{display:none !important;}
+  .view.active{display:block !important;}
+  .print-header{display:block !important;}
+  .view-header .view-desc{display:none !important;}
+  .view-header{margin-bottom:4px;}
+  .kpi{border:1px solid #b8b8b8;break-inside:avoid;}
+  .table-wrap{border:none;overflow:visible;background:#fff;}
+  table{min-width:0;font-size:10.5px;}
+  .pivot thead th{position:static;}
+  .pivot th:first-child, .pivot td:first-child{position:static;}
+  .entry-edit,.entry-del,.month-group-head .chev{display:none !important;}
+}
+
 @media (prefers-reduced-motion:reduce){
   *{animation:none !important;transition:none !important;}
 }
@@ -611,9 +653,9 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
     <div class="brand"><span class="dot"></span>Libro de Gastos</div>
     <div class="ejercicio-switch">
       <select id="ejercicioSelect" class="ejercicio-select" title="Ejercicio activo"></select>
-      <button id="btnNuevoEjercicio" class="ejercicio-add" title="Nuevo ejercicio">+</button>
+      <button id="btnNuevoEjercicio" class="ejercicio-add" title="Nuevo ejercicio" aria-label="Nuevo ejercicio">+</button>
     </div>
-    <button class="search-trigger" id="btnOpenSearch">
+    <button class="search-trigger" id="btnOpenSearch" aria-label="Buscar">
       <span>🔍 Buscar…</span><span class="search-kbd">Ctrl K</span>
     </button>
     <nav>
@@ -628,7 +670,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
       <div class="user-badge" id="userBadge" style="display:none;">
         <span class="sync-dot" id="syncDot" title="Estado de sincronización"></span>
         <span class="ub-email" id="ubEmail"></span>
-        <button class="ub-account" id="btnAccount" title="Cuenta">⚙</button>
+        <button class="ub-account" id="btnAccount" title="Cuenta" aria-label="Cuenta">⚙</button>
         <button class="ub-logout" id="btnLogout">Salir</button>
       </div>
       <button class="ghost-btn" id="btnExport">↓ Exportar backup (.json)</button>
@@ -654,7 +696,9 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
           <h1 class="view-title">Resumen</h1>
           <p class="view-desc">Ingresos, gastos y compra de dólares — vista mensual del año.</p>
         </div>
+        <button class="ghost-btn no-print" id="btnPrintResumen" title="Exportar el resumen como PDF o imprimirlo">🖨 Exportar / Imprimir</button>
       </div>
+      <div class="print-header" id="printHeader"></div>
       <div class="kpi-row" id="kpiRow"></div>
       <div class="ledger-rule"></div>
       <div class="table-wrap"><table class="pivot" id="pivotTable"></table></div>
@@ -751,6 +795,9 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
             <div id="gasDescSuggest" class="suggest-list"></div>
           </div>
           <div class="field"><label>Monto</label><input type="text" inputmode="decimal" name="monto" id="gasMonto" class="money-input" placeholder="0, o 1500+2300+800" required><div class="money-preview" id="gasMontoPreview"></div></div>
+          <div class="field field-checkbox" id="gasRepeatWrap">
+            <label><input type="checkbox" name="repetir" id="gasRepeat"> Repetir este gasto en los próximos meses del año</label>
+          </div>
           <button type="submit" class="btn btn-accent-fijo" id="gasSubmitBtn">Agregar</button>
           <button type="button" class="btn btn-cancel-edit" id="gasCancelEdit" style="display:none;">Cancelar</button>
         </form>
@@ -825,7 +872,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
     <div class="search-input-wrap">
       <span class="search-icon">🔍</span>
       <input type="text" id="searchInput" class="search-input" placeholder="Buscar por descripción, categoría, mes, monto…" autocomplete="off">
-      <button class="search-close" id="btnCloseSearch" title="Cerrar (Esc)">Esc</button>
+      <button class="search-close" id="btnCloseSearch" title="Cerrar (Esc)" aria-label="Cerrar búsqueda">Esc</button>
     </div>
     <div class="search-results" id="searchResults"></div>
   </div>
@@ -856,7 +903,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 
 <div class="account-overlay" id="accountOverlay">
   <div class="account-box">
-    <button class="account-close" id="accountClose" title="Cerrar (Esc)">✕</button>
+    <button class="account-close" id="accountClose" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>
     <h3>Cuenta</h3>
     <p class="account-current-email" id="accCurrentEmail"></p>
 
@@ -1635,7 +1682,7 @@ function renderIngresos(){
     items.forEach(function(it){
       var tagClass = it.tipo==='Sueldo' ? 'tag-sueldo' : 'tag-extra';
       var isEd = editingId.ingresos===it.id;
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc"></span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+it.id+'" title="Editar">✎</button><button class="entry-del" data-kind="ingresos" data-id="'+it.id+'" title="Eliminar">×</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc"></span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="ingresos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -1671,7 +1718,7 @@ function renderGastos(){
     items.forEach(function(it){
       var tagClass = it.tipo==='Fijo' ? 'tag-fijo' : 'tag-variable';
       var isEd = editingId.gastos===it.id;
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+it.tipo+'</span><span class="entry-desc">'+escapeHtml(it.cat)+(it.desc?('<small>'+escapeHtml(it.desc)+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="gastos" data-id="'+it.id+'" title="Editar">✎</button><button class="entry-del" data-kind="gastos" data-id="'+it.id+'" title="Eliminar">×</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+it.tipo+'</span><span class="entry-desc">'+(it.recurrente?'<span class="recur-badge" title="Gasto recurrente">🔁</span>':'')+escapeHtml(it.cat)+(it.desc?('<small>'+escapeHtml(it.desc)+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="gastos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="gastos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -1695,7 +1742,7 @@ function renderDolar(){
     items.forEach(function(it){
       var detail = (it.cant!==null && it.cant!==undefined) ? (money(it.cant)+' @ '+fmtDec.format(it.valor||0)) : 'Carga manual';
       var isEd = editingId.dolar===it.id;
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag" style="background:rgba(91,159,237,.14);color:var(--dolar);">USD</span><span class="entry-desc">'+detail+'</span><span class="entry-amt">'+usd(it.total)+'</span><button class="entry-edit" data-kind="dolar" data-id="'+it.id+'" title="Editar">✎</button><button class="entry-del" data-kind="dolar" data-id="'+it.id+'" title="Eliminar">×</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag" style="background:rgba(91,159,237,.14);color:var(--dolar);">USD</span><span class="entry-desc">'+detail+'</span><span class="entry-amt">'+usd(it.total)+'</span><button class="entry-edit" data-kind="dolar" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="dolar" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -1750,7 +1797,7 @@ function renderInversion(){
       var isEd = editingId.inversion===it.id;
       var tieneValor = (it.valorActual!==null && it.valorActual!==undefined && it.valorActual!=='');
       var descTxt = 'de '+money(t.totalIngresos)+(tieneValor?(' · valor decl. '+money(+it.valorActual)):'');
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag" style="background:rgba(79,209,165,.14);color:var(--ingreso);">'+(it.pct||0)+'%</span><span class="entry-desc">'+descTxt+'</span><span class="entry-amt">'+money(t.totalIngresos*((it.pct||0)/100))+'</span><button class="entry-edit" data-kind="inversion" data-id="'+it.id+'" title="Editar">✎</button><button class="entry-del" data-kind="inversion" data-id="'+it.id+'" title="Eliminar">×</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag" style="background:rgba(79,209,165,.14);color:var(--ingreso);">'+(it.pct||0)+'%</span><span class="entry-desc">'+descTxt+'</span><span class="entry-amt">'+money(t.totalIngresos*((it.pct||0)/100))+'</span><button class="entry-edit" data-kind="inversion" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="inversion" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -1778,6 +1825,10 @@ function setFormEditMode(kind, isEditing){
   document.getElementById(cfg.submitId).textContent = isEditing ? cfg.editBtn : cfg.addBtn;
   document.getElementById(cfg.cancelId).style.display = isEditing ? 'inline-flex' : 'none';
   document.getElementById(cfg.formId).closest('.form-card').classList.toggle('is-editing', isEditing);
+  if(kind==='gastos'){
+    var repeatWrap = document.getElementById('gasRepeatWrap');
+    if(repeatWrap) repeatWrap.style.display = isEditing ? 'none' : '';
+  }
 }
 
 function hideMoneyPreview(id){
@@ -1910,12 +1961,32 @@ document.getElementById('formGasto').addEventListener('submit', function(e){
     setFormEditMode('gastos', false);
     toast('Gasto actualizado');
   } else {
-    DATA.gastos.push({id:uid('gas'), mes:fd.get('mes'), tipo:fd.get('tipo'), cat:cat, desc:fd.get('desc')||'', monto:monto});
-    toast('Gasto agregado');
+    var mes = fd.get('mes');
+    var tipo = fd.get('tipo');
+    var desc = fd.get('desc')||'';
+    var repetir = fd.get('repetir') === 'on';
+    if(repetir){
+      var startIdx = MESES.indexOf(mes);
+      var creados = 0;
+      MESES.forEach(function(m, i){
+        if(i < startIdx) return; // no tocar meses anteriores al elegido
+        var yaExiste = DATA.gastos.some(function(x){
+          return x.mes===m && x.tipo===tipo && x.cat===cat && (x.desc||'')===desc;
+        });
+        if(yaExiste) return; // evitar duplicar si ya había un gasto igual cargado ese mes
+        DATA.gastos.push({id:uid('gas'), mes:m, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true});
+        creados++;
+      });
+      toast(creados>1 ? 'Gasto agregado y repetido en '+(creados-1)+' mes(es) más' : 'Gasto agregado');
+    } else {
+      DATA.gastos.push({id:uid('gas'), mes:mes, tipo:tipo, cat:cat, desc:desc, monto:monto});
+      toast('Gasto agregado');
+    }
   }
   saveData(); updateDescDatalist(); renderAll();
   document.getElementById('gasDesc').value='';
   document.getElementById('gasMonto').value='';
+  document.getElementById('gasRepeat').checked = false;
   hideMoneyPreview('gasMontoPreview');
 });
 
@@ -1990,6 +2061,20 @@ document.getElementById('formInversion').addEventListener('submit', function(e){
 });
 document.getElementById('filtUsdMes').addEventListener('change', renderDolar);
 document.getElementById('filtInvMes').addEventListener('change', renderInversion);
+
+/* ===================== EXPORTAR / IMPRIMIR RESUMEN ===================== */
+document.getElementById('btnPrintResumen').addEventListener('click', function(){
+  var resumenBtn = document.querySelector('.nav-btn[data-tab="resumen"]');
+  if(resumenBtn && !resumenBtn.classList.contains('active')) resumenBtn.click();
+  var printHeader = document.getElementById('printHeader');
+  var ahora = new Date();
+  var fechaTxt = ahora.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric'});
+  var horaTxt = ahora.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+  printHeader.innerHTML =
+    '<div class="print-title">Ejercicio '+escapeHtml(STORE.activeEjercicio)+'</div>'+
+    '<div class="print-sub">Generado el '+fechaTxt+' a las '+horaTxt+'</div>';
+  setTimeout(function(){ window.print(); }, 60);
+});
 
 /* ===================== BACKUP ===================== */
 document.getElementById('btnExport').addEventListener('click', function(){
