@@ -876,7 +876,7 @@ window.FIREBASE_CONFIG = {
 
 // AUTH_MODE: 'username' = login con nombre de usuario (sin recuperar contraseña por email).
 //            'email'    = login con email real (permite "olvidé mi contraseña").
-window.AUTH_MODE = 'username';
+window.AUTH_MODE = 'email';
 
 </script>
 <script>
@@ -2455,7 +2455,7 @@ document.addEventListener('keydown', function(e){
       return;
     }
     auth.sendPasswordResetEmail(email).then(function(){
-      showAuthError('Te enviamos un email para restablecer tu contraseña.');
+      showAuthError('Te enviamos un email para restablecer tu contraseña. Si no lo ves en unos minutos, revisá la carpeta de spam/promociones.');
     }).catch(function(err){
       showAuthError(friendlyError(err));
     });
@@ -2633,7 +2633,7 @@ document.addEventListener('keydown', function(e){
       return user.verifyBeforeUpdateEmail(nuevoEmail);
     }).then(function(){
       accEmailMsg.className = 'account-msg ok';
-      accEmailMsg.textContent = 'Te enviamos un link de confirmación a '+nuevoEmail+'. El email de tu cuenta cambia recién cuando lo confirmes desde ese correo.';
+      accEmailMsg.textContent = 'Te enviamos un link de confirmación a '+nuevoEmail+'. El email de tu cuenta cambia recién cuando lo confirmes desde ese correo. Si no lo ves en unos minutos, revisá la carpeta de spam/promociones.';
       accEmailForm.reset();
     }).catch(function(err){
       accEmailMsg.className = 'account-msg err';
