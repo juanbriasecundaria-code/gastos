@@ -62,36 +62,40 @@ a{color:inherit;}
 @media (max-width:860px){
   .app{grid-template-columns:minmax(0,1fr);}
   .sidebar{
-    position:sticky;top:0;z-index:20;
-    display:flex;flex-direction:row;
-    height:auto;
-    border-right:none;border-bottom:1px solid var(--line);
-    padding:10px 12px;overflow-x:auto;gap:6px;
-    background:var(--bg);
+    position:fixed;top:0;left:0;z-index:250;
+    display:flex;flex-direction:column;
+    width:82vw;max-width:300px;height:100vh;
+    border-right:1px solid var(--line);border-bottom:none;
+    padding:22px 14px;overflow-x:hidden;overflow-y:auto;gap:0;
+    background:var(--surface);
+    transform:translateX(-100%);
+    transition:transform .25s ease;
+    box-shadow:0 0 40px rgba(0,0,0,.5);
   }
-  .sidebar .brand{display:none;}
-  .sidebar nav{display:flex;flex-direction:row;gap:6px;width:auto;}
-  .nav-btn{white-space:nowrap;flex-shrink:0;}
-  .sidebar .side-footer{display:none;}
+  .sidebar.mobile-open{transform:translateX(0);}
+  .sidebar .brand{display:flex;}
+  .sidebar nav{display:flex;flex-direction:column;gap:2px;width:100%;}
+  .nav-btn{white-space:normal;flex-shrink:0;}
+  .sidebar .side-footer{display:flex;}
 
-  /* Indicadores de scroll horizontal (hay más tabs a la izq/der) */
-  .sidebar::before,.sidebar::after{
-    content:'';position:sticky;top:0;bottom:0;width:26px;flex-shrink:0;
-    pointer-events:none;opacity:0;transition:opacity .15s;z-index:2;
+  .mobile-sidebar-backdrop{
+    display:none;position:fixed;inset:0;background:rgba(6,9,13,.6);z-index:240;
   }
-  .sidebar::before{
-    order:-1;margin-left:-12px;left:0;
-    background:linear-gradient(to right, var(--bg), transparent);
-  }
-  .sidebar::after{
-    order:999;margin-right:-12px;right:0;
-    background:linear-gradient(to left, var(--bg), transparent);
-  }
-  .sidebar.scroll-start::before{opacity:1;}
-  .sidebar.scroll-more::after{opacity:1;}
+  .mobile-sidebar-backdrop.open{display:block;}
 
-  /* Espacio para la barra inferior fija */
-  main{padding-bottom:78px;}
+  .mobile-menu-btn{
+    display:flex;position:fixed;top:12px;left:12px;z-index:230;
+    width:36px;height:36px;border-radius:9px;background:var(--surface);
+    border:1px solid var(--line);align-items:center;justify-content:center;
+    color:var(--text-dim);cursor:pointer;padding:0;
+  }
+  .mobile-menu-btn:hover{border-color:var(--text-dim);color:var(--text);}
+
+  /* Espacio para el botón de menú flotante y la barra inferior fija */
+  main{padding-top:56px;padding-bottom:78px;}
+}
+@media (min-width:861px){
+  .mobile-menu-btn,.mobile-sidebar-backdrop{display:none !important;}
 }
 
 /* ===== Bottom nav (mobile) ===== */
@@ -426,6 +430,35 @@ main{
   color:var(--text-dim);
 }
 .chart-card svg text{font-family:var(--font-mono);}
+.chart-card-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap;
+}
+.chart-card-head h3{margin:0;}
+.chart-toggle{
+  display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);cursor:pointer;user-select:none;
+}
+.chart-toggle input{width:14px;height:14px;accent-color:var(--dolar);cursor:pointer;}
+.hormiga-controls{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.hormiga-controls select, .hormiga-controls input{
+  background:var(--bg);border:1px solid var(--line);border-radius:6px;
+  color:var(--text);font-family:var(--font-mono);font-size:11.5px;padding:4px 8px;
+}
+.hormiga-summary{
+  font-size:13px;color:var(--text);background:rgba(240,180,58,.08);border:1px solid rgba(240,180,58,.25);
+  border-radius:8px;padding:10px 12px;margin-bottom:12px;line-height:1.5;
+}
+.hormiga-summary b{color:var(--fijo);font-family:var(--font-mono);}
+.hormiga-list{display:flex;flex-direction:column;gap:0;}
+.hormiga-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;
+}
+.hormiga-row:last-child{border-bottom:none;}
+.hormiga-row .hr-name{color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hormiga-row .hr-count{color:var(--text-faint);font-family:var(--font-mono);font-size:11px;flex-shrink:0;}
+.hormiga-row .hr-total{color:var(--variable);font-family:var(--font-mono);font-weight:600;flex-shrink:0;}
 
 /* ===== Collapsible month groups ===== */
 .month-group-head{cursor:pointer;user-select:none;transition:color .15s;}
@@ -625,7 +658,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
   }
   @page{ size:landscape; margin:12mm; }
   body{background:#fff;color:#111418;}
-  .sidebar,.bottom-nav,.search-overlay,.account-overlay,.auth-gate,.auth-loading,
+  .sidebar,.bottom-nav,.mobile-menu-btn,.mobile-sidebar-backdrop,.search-overlay,.account-overlay,.auth-gate,.auth-loading,
   #toast,.form-card,.filters-row,.no-print{display:none !important;}
   .app{display:block;}
   main{padding:0;max-width:100%;}
@@ -649,6 +682,8 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 </head>
 <body>
 <div class="app">
+  <button class="mobile-menu-btn" id="btnMobileMenu" aria-label="Abrir menú" aria-expanded="false">☰</button>
+  <div class="mobile-sidebar-backdrop" id="mobileSidebarBackdrop"></div>
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span>Libro de Gastos</div>
     <div class="ejercicio-switch">
@@ -714,7 +749,10 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
       </div>
       <div class="chart-grid">
         <div class="chart-card chart-card-wide">
-          <h3>Ingresos vs. Gastos por mes</h3>
+          <div class="chart-card-head">
+            <h3>Ingresos vs. Gastos por mes</h3>
+            <label class="chart-toggle"><input type="checkbox" id="toggleUsdEquiv"> Ver en USD equivalente</label>
+          </div>
           <div id="chartIngGas"></div>
         </div>
         <div class="chart-card chart-card-wide">
@@ -728,6 +766,21 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
         <div class="chart-card">
           <h3>Evolución del restante mensual</h3>
           <div id="chartRestante"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Evolución del dólar (referencia)</h3>
+          <div id="chartDolarRef"></div>
+        </div>
+        <div class="chart-card chart-card-wide">
+          <div class="chart-card-head">
+            <h3>Gasto hormiga</h3>
+            <div class="hormiga-controls">
+              <select id="hormigaMes"></select>
+              <input type="text" inputmode="decimal" id="hormigaUmbral" value="10.000" placeholder="Umbral $" title="Considerar 'chico' todo gasto por debajo de este monto">
+              <input type="number" min="2" id="hormigaMinOcurrencias" value="3" placeholder="Mín. veces" title="Mínimo de repeticiones para considerarlo hormiga" style="width:70px;">
+            </div>
+          </div>
+          <div id="hormigaContent"></div>
         </div>
       </div>
     </section>
@@ -1328,6 +1381,35 @@ document.querySelectorAll('.nav-btn').forEach(function(btn){
   window.addEventListener('load', updateScrollFades);
 })();
 
+/* ===================== MENÚ MOBILE (cajón lateral) ===================== */
+(function(){
+  var btn = document.getElementById('btnMobileMenu');
+  var sidebar = document.querySelector('.sidebar');
+  var backdrop = document.getElementById('mobileSidebarBackdrop');
+  if(!btn || !sidebar || !backdrop) return;
+  function open(){
+    sidebar.classList.add('mobile-open');
+    backdrop.classList.add('open');
+    btn.setAttribute('aria-expanded','true');
+  }
+  function close(){
+    sidebar.classList.remove('mobile-open');
+    backdrop.classList.remove('open');
+    btn.setAttribute('aria-expanded','false');
+  }
+  btn.addEventListener('click', function(){
+    sidebar.classList.contains('mobile-open') ? close() : open();
+  });
+  backdrop.addEventListener('click', close);
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape') close();
+  });
+  // Al elegir una vista desde el cajón, cerrarlo
+  sidebar.querySelectorAll('.nav-btn').forEach(function(b){
+    b.addEventListener('click', close);
+  });
+})();
+
 /* ===================== SELECT POPULATION ===================== */
 function fillMonthSelect(sel, withAll){
   sel.innerHTML = "";
@@ -1349,10 +1431,12 @@ fillMonthSelect(document.getElementById('filtMes'), true);
 fillMonthSelect(document.getElementById('filtIngMes'), true);
 fillMonthSelect(document.getElementById('filtUsdMes'), true);
 fillMonthSelect(document.getElementById('filtInvMes'), true);
+fillMonthSelect(document.getElementById('hormigaMes'), true);
 
 ['usdCant','usdValor','usdTotal','invValorActual'].forEach(function(id){
   attachMoneyInput(document.getElementById(id));
 });
+attachMoneyInput(document.getElementById('hormigaUmbral'));
 attachMoneyInput(document.getElementById('ingMonto'), document.getElementById('ingMontoPreview'));
 attachMoneyInput(document.getElementById('gasMonto'), document.getElementById('gasMontoPreview'));
 
@@ -2061,6 +2145,11 @@ document.getElementById('formInversion').addEventListener('submit', function(e){
 });
 document.getElementById('filtUsdMes').addEventListener('change', renderDolar);
 document.getElementById('filtInvMes').addEventListener('change', renderInversion);
+document.getElementById('toggleUsdEquiv').addEventListener('change', renderGraficos);
+['hormigaMes','hormigaUmbral','hormigaMinOcurrencias'].forEach(function(id){
+  document.getElementById(id).addEventListener('input', renderHormiga);
+  document.getElementById(id).addEventListener('change', renderHormiga);
+});
 
 /* ===================== EXPORTAR / IMPRIMIR RESUMEN ===================== */
 document.getElementById('btnPrintResumen').addEventListener('click', function(){
@@ -2157,8 +2246,17 @@ function compactMoney(v){
   if(v>=1e3) return sign+'$'+Math.round(v/1e3)+'K';
   return sign+'$'+Math.round(v);
 }
+function compactUsd(v){
+  var sign = v<0 ? '-' : '';
+  v = Math.abs(v);
+  if(v>=1e3) return sign+'US$'+(v/1e3).toFixed(1)+'K';
+  return sign+'US$'+fmtDec.format(v);
+}
 
-function buildBarChart(series, mode){
+function buildBarChart(series, mode, opts){
+  opts = opts || {};
+  var axisFmt = opts.usd ? compactUsd : compactMoney;
+  var tipFmt = opts.usd ? usd : money;
   var W=860, H=300, padL=58, padR=14, padT=14, padB=40;
   var innerW=W-padL-padR, innerH=H-padT-padB;
   var n=MESES.length;
@@ -2177,7 +2275,7 @@ function buildBarChart(series, mode){
     var v=niceMax*t/ticks;
     var y=padT+innerH-innerH*t/ticks;
     gridLines += '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="'+CHART_COLORS.grid+'" stroke-width="1"/>';
-    yLabels += '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+compactMoney(v)+'</text>';
+    yLabels += '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+axisFmt(v)+'</text>';
   }
   var groupW = innerW/n, bars='', xlabels='';
   var curIdx = currentMonthIdxForDisplay();
@@ -2193,7 +2291,7 @@ function buildBarChart(series, mode){
         if(v<=0) return;
         var bh = innerH*v/niceMax;
         yBase -= bh;
-        bars += '<rect x="'+(cx-barW/2)+'" y="'+yBase+'" width="'+barW+'" height="'+bh+'" fill="'+se.color+'" rx="2"><title>'+mes+' · '+escapeHtml(se.label)+': '+money(v)+'</title></rect>';
+        bars += '<rect x="'+(cx-barW/2)+'" y="'+yBase+'" width="'+barW+'" height="'+bh+'" fill="'+se.color+'" rx="2"><title>'+mes+' · '+escapeHtml(se.label)+': '+tipFmt(v)+'</title></rect>';
       });
     } else {
       var count = series.length, barW = Math.min(14, groupW*0.28), gap=4;
@@ -2202,7 +2300,7 @@ function buildBarChart(series, mode){
         var v = se.data[i]||0;
         var bh = innerH*v/niceMax;
         var x = startX+si*(barW+gap), y=padT+innerH-bh;
-        bars += '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+Math.max(bh,0)+'" fill="'+se.color+'" rx="2"><title>'+mes+' · '+escapeHtml(se.label)+': '+money(v)+'</title></rect>';
+        bars += '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+Math.max(bh,0)+'" fill="'+se.color+'" rx="2"><title>'+mes+' · '+escapeHtml(se.label)+': '+tipFmt(v)+'</title></rect>';
       });
     }
   });
@@ -2279,12 +2377,111 @@ function buildLineChart(data){
     dots+xlabels+'</svg>';
 }
 
+/* ----- Referencia dólar / conversión USD equivalente ----- */
+function dolarValorMensual(){
+  // Valor promedio de cambio registrado en "Compra Dólar" para cada mes (null si no hay datos)
+  return MESES.map(function(mes){
+    var ops = DATA.dolar.filter(function(x){return x.mes===mes && (+x.valor||0)>0;});
+    if(!ops.length) return null;
+    var sum = ops.reduce(function(s,x){return s+(+x.valor||0);},0);
+    return sum/ops.length;
+  });
+}
+function dolarValorConCarry(valores){
+  // Para poder convertir meses sin cotización propia, arrastra la última conocida
+  var last=null;
+  return valores.map(function(v){ if(v!==null && v!==undefined){ last=v; return v; } return last; });
+}
+function buildDolarRefChart(valores){
+  var known = valores.filter(function(v){return v!==null && v!==undefined;});
+  if(!known.length){
+    return '<div class="empty-state">Todavía no registraste compras de dólares.</div>';
+  }
+  var W=860,H=260,padL=58,padR=14,padT=14,padB=40;
+  var innerW=W-padL-padR, innerH=H-padT-padB;
+  var maxVal=Math.max.apply(null, known), minVal=Math.min.apply(null, known);
+  if(maxVal===minVal){ maxVal+=maxVal*0.1+1; minVal-=minVal*0.1; }
+  var range=(maxVal-minVal)||1, n=valores.length;
+  var stepX=innerW/(n-1);
+  function xFor(i){return padL+stepX*i;}
+  function yFor(v){return padT+innerH-(v-minVal)/range*innerH;}
+  var ticks=4, gridLines='', yLabels='';
+  for(var t=0;t<=ticks;t++){
+    var v=minVal+range*t/ticks;
+    var y=yFor(v);
+    gridLines += '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="'+CHART_COLORS.grid+'" stroke-width="1"/>';
+    yLabels += '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+money(v)+'</text>';
+  }
+  var segs=[], curSeg=[];
+  valores.forEach(function(v,i){
+    if(v===null || v===undefined){ if(curSeg.length){segs.push(curSeg); curSeg=[];} return; }
+    curSeg.push(xFor(i)+','+yFor(v));
+  });
+  if(curSeg.length) segs.push(curSeg);
+  var lines = segs.map(function(seg){
+    return '<polyline points="'+seg.join(' ')+'" fill="none" stroke="'+CHART_COLORS.dolar+'" stroke-width="2"/>';
+  }).join('');
+  var dots = valores.map(function(v,i){
+    if(v===null||v===undefined) return '';
+    return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'"><title>'+MESES[i]+': '+money(v)+' /USD</title></circle>';
+  }).join('');
+  var xlabels=MESES.map(function(m,i){
+    return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+m.slice(0,3)+'</text>';
+  }).join('');
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">'+gridLines+yLabels+lines+dots+xlabels+'</svg>';
+}
+
+/* ----- Gasto hormiga ----- */
+function renderHormiga(){
+  var mesSel = document.getElementById('hormigaMes').value;
+  var umbral = parseMoneyValue(document.getElementById('hormigaUmbral').value);
+  if(isNaN(umbral) || umbral<=0) umbral = 10000;
+  var minOc = parseInt(document.getElementById('hormigaMinOcurrencias').value, 10);
+  if(isNaN(minOc) || minOc<2) minOc = 3;
+
+  var arr = DATA.gastos.filter(function(g){
+    return (!mesSel || g.mes===mesSel) && (+g.monto||0) > 0 && (+g.monto||0) < umbral;
+  });
+
+  var groups = {};
+  arr.forEach(function(g){
+    var key = (g.desc && g.desc.trim()) ? (g.cat+' · '+g.desc.trim()) : g.cat;
+    if(!groups[key]) groups[key] = {name:key, count:0, total:0};
+    groups[key].count += 1;
+    groups[key].total += (+g.monto||0);
+  });
+  var hormigas = Object.keys(groups).map(function(k){return groups[k];}).filter(function(g){return g.count>=minOc;});
+  hormigas.sort(function(a,b){return b.total-a.total;});
+
+  var container = document.getElementById('hormigaContent');
+  if(!hormigas.length){
+    container.innerHTML = '<div class="empty-state">No se detectaron gastos hormiga con estos filtros ('+money(umbral)+', mín. '+minOc+' veces).</div>';
+    return;
+  }
+  var totalGastado = hormigas.reduce(function(s,g){return s+g.total;},0);
+  var totalOcurrencias = hormigas.reduce(function(s,g){return s+g.count;},0);
+  var periodo = mesSel ? mesSel : 'el año';
+  var summary = '<div class="hormiga-summary">Gastaste <b>'+money(totalGastado)+'</b> en <b>'+totalOcurrencias+'</b> compras chicas durante '+periodo+' — repartidas en '+hormigas.length+' '+(hormigas.length===1?'concepto':'conceptos')+' recurrentes.</div>';
+  var list = '<div class="hormiga-list">'+hormigas.map(function(g){
+    return '<div class="hormiga-row"><span class="hr-name">'+escapeHtml(g.name)+'</span><span class="hr-count">×'+g.count+'</span><span class="hr-total">'+money(g.total)+'</span></div>';
+  }).join('')+'</div>';
+  container.innerHTML = summary+list;
+}
+
 function renderGraficos(){
   var months = MESES.map(computeMonth);
+  var enUsd = document.getElementById('toggleUsdEquiv').checked;
+  var valores = dolarValorMensual();
+  var valoresConv = dolarValorConCarry(valores);
+  function conv(v,i){
+    if(!enUsd) return v;
+    var rate = valoresConv[i];
+    return rate ? v/rate : 0;
+  }
   document.getElementById('chartIngGas').innerHTML = buildBarChart([
-    {label:'Ingresos', color:CHART_COLORS.ingreso, data:months.map(function(m){return m.totalIngresos;})},
-    {label:'Gastos', color:CHART_COLORS.neg, data:months.map(function(m){return m.totalGastos;})}
-  ], 'grouped');
+    {label:'Ingresos', color:CHART_COLORS.ingreso, data:months.map(function(m,i){return conv(m.totalIngresos,i);})},
+    {label:'Gastos', color:CHART_COLORS.neg, data:months.map(function(m,i){return conv(m.totalGastos,i);})}
+  ], 'grouped', {usd:enUsd});
 
   document.getElementById('chartFijoVar').innerHTML = buildBarChart([
     {label:'Fijos', color:CHART_COLORS.fijo, data:months.map(function(m){return m.totalFijos;})},
@@ -2298,6 +2495,8 @@ function renderGraficos(){
   });
   document.getElementById('chartDonut').innerHTML = buildDonutChart(catTotals);
   document.getElementById('chartRestante').innerHTML = buildLineChart(months.map(function(m){return m.totalRestante;}));
+  document.getElementById('chartDolarRef').innerHTML = buildDolarRefChart(valores);
+  renderHormiga();
 }
 
 /* ===================== RENDER ALL ===================== */
