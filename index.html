@@ -112,6 +112,23 @@ a{color:inherit;}
   .mobile-sidebar-backdrop{display:none !important;}
 }
 
+/* ===== Botón flotante "Compartir" (mobile) =====
+   Siempre visible, sin depender del cajón ni de scrollear la barra
+   inferior — así el código de invitación es alcanzable en un toque. */
+.share-float-btn{display:none;}
+@media (max-width:860px){
+  main{padding-top:70px;}
+  .share-float-btn{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;top:14px;right:14px;z-index:35;
+    width:42px;height:42px;border-radius:50%;
+    background:var(--surface);border:1px solid var(--line);
+    color:var(--text-dim);font-size:17px;cursor:pointer;
+    box-shadow:0 2px 12px rgba(0,0,0,.4);
+  }
+  .share-float-btn:active{border-color:var(--ingreso);}
+}
+
 /* ===== Bottom nav (mobile) ===== */
 .bottom-nav{display:none;}
 @media (max-width:860px){
@@ -164,6 +181,12 @@ a{color:inherit;}
   display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s;
 }
 .ejercicio-add:hover{border-color:var(--ingreso);color:var(--ingreso);}
+#btnShareTop{position:relative;font-size:13px;}
+.share-badge{
+  position:absolute;top:-5px;right:-5px;min-width:15px;height:15px;padding:0 3px;
+  border-radius:8px;background:var(--ingreso);color:#0F1419;
+  font-family:var(--font-mono);font-size:9.5px;font-weight:700;line-height:15px;text-align:center;
+}
 
 /* ===== Search trigger + modal ===== */
 .search-trigger{
@@ -695,7 +718,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
   @page{ size:landscape; margin:12mm; }
   body{background:#fff;color:#111418;}
   .sidebar,.bottom-nav,.mobile-sidebar-backdrop,.search-overlay,.account-overlay,.auth-gate,.auth-loading,
-  #toast,.form-card,.filters-row,.no-print{display:none !important;}
+  #toast,.form-card,.filters-row,.no-print,.share-float-btn,.invite-banner{display:none !important;}
   .app{display:block;}
   main{padding:0;max-width:100%;}
   .view{display:none !important;}
@@ -721,11 +744,17 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 <div class="app">
   <div id="inviteBanner" class="invite-banner" style="display:none;"></div>
   <div class="mobile-sidebar-backdrop" id="mobileSidebarBackdrop"></div>
+  <button id="btnShareFloat" class="share-float-btn share-trigger-btn" title="Compartir este libro" aria-label="Compartir este libro">
+    👥<span class="share-badge" id="shareFloatBadge" style="display:none;"></span>
+  </button>
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span>Libro de Gastos</div>
     <div class="ejercicio-switch">
       <select id="ejercicioSelect" class="ejercicio-select" title="Ejercicio activo"></select>
       <button id="btnNuevoEjercicio" class="ejercicio-add" title="Nuevo ejercicio" aria-label="Nuevo ejercicio">+</button>
+      <button id="btnShareTop" class="ejercicio-add share-trigger-btn" title="Compartir este libro" aria-label="Compartir este libro">
+        👥<span class="share-badge" id="shareTopBadge" style="display:none;"></span>
+      </button>
     </div>
     <button class="ghost-btn theme-toggle-btn" id="btnThemeToggle">☀️ Modo claro</button>
     <button class="search-trigger" id="btnOpenSearch" aria-label="Buscar">
@@ -746,7 +775,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
         <button class="ub-account" id="btnAccount" title="Cuenta" aria-label="Cuenta">⚙</button>
         <button class="ub-logout" id="btnLogout">Salir</button>
       </div>
-      <button class="ghost-btn" id="btnShare">👥 Compartir este libro</button>
+      <button class="ghost-btn share-trigger-btn" id="btnShare">👥 Compartir este libro</button>
       <button class="ghost-btn" id="btnExport">↓ Exportar backup (.json)</button>
       <button class="ghost-btn" id="btnImport">↑ Importar backup</button>
       <input type="file" id="fileImport" accept="application/json" style="display:none;">
@@ -3269,6 +3298,7 @@ window.__gastosApplyRemoteStore = function(json){
         if(window.__gastosApplyRemoteStore) window.__gastosApplyRemoteStore(data.store);
       }
       if(shareOverlay.classList.contains('open')) renderShareMembers(data);
+      updateShareBadges(miembros);
     }, function(err){
       console.error('Error escuchando cambios del libro compartido:', err);
     });
@@ -3320,6 +3350,15 @@ window.__gastosApplyRemoteStore = function(json){
     unirseALibro(inv.libroId, inv.rol, invitacionId);
   }
 
+  // ---- Badge de "cuántas personas más" en los botones de compartir ----
+  function updateShareBadges(miembros){
+    var otros = Math.max(0, Object.keys(miembros||{}).length - 1);
+    document.querySelectorAll('.share-badge').forEach(function(b){
+      if(otros > 0){ b.textContent = otros; b.style.display = 'block'; }
+      else { b.style.display = 'none'; }
+    });
+  }
+
   // ---- Modal "Compartir este libro" ----
   function renderShareMembers(libroData){
     var miembros = libroData.miembros || {};
@@ -3358,7 +3397,9 @@ window.__gastosApplyRemoteStore = function(json){
     shareOverlay.classList.add('open');
   }
   function closeShareModal(){ shareOverlay.classList.remove('open'); }
-  if(btnShare){ btnShare.addEventListener('click', openShareModal); }
+  document.querySelectorAll('.share-trigger-btn').forEach(function(b){
+    b.addEventListener('click', openShareModal);
+  });
   shareClose.addEventListener('click', closeShareModal);
   shareOverlay.addEventListener('click', function(e){ if(e.target===shareOverlay) closeShareModal(); });
   document.addEventListener('keydown', function(e){
