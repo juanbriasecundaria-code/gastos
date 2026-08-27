@@ -3077,6 +3077,13 @@ window.__gastosApplyRemoteStore = function(json){
   function docRef(uid){
     return db.collection('gastosUsuarios').doc(uid);
   }
+  // escapeHtml propio: la función homónima de arriba vive dentro de startApp()
+  // y no es visible desde este bloque de autenticación/compartir.
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
   function libroRef(libroId){
     return db.collection('libros').doc(libroId);
   }
