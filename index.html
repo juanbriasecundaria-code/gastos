@@ -3191,6 +3191,17 @@ window.__gastosApplyRemoteStore = function(json){
               var miembros = libroData.miembros || {};
               currentRol = (miembros[user.uid] && miembros[user.uid].rol) || 'owner';
               window.__gastosCurrentRol = currentRol;
+              // Auto-reparo: libros creados antes de la función "Compartir" no tienen
+              // el campo miembros, lo que hace que las reglas de Firestore les nieguen
+              // el acceso a su propio libro. Si sos el dueño y falta, lo completamos una vez.
+              if(libroId === user.uid && !miembros[user.uid]){
+                var fix = {};
+                fix['miembros.'+user.uid] = { username: resolvedUsername || null, rol: 'owner' };
+                if(!libroData.ownerUid) fix.ownerUid = user.uid;
+                libroRef(libroId).set(fix, { merge: true }).catch(function(err){
+                  console.error('No se pudo reparar el campo miembros del libro:', err);
+                });
+              }
               var preloaded = libroData.store || null;
               lastAppliedStoreJson = preloaded;
               authLoading.style.display = 'none';
@@ -3391,8 +3402,14 @@ window.__gastosApplyRemoteStore = function(json){
     shareMsg.className = 'account-msg';
     shareMsg.textContent = '';
     shareCodeResult.style.display = 'none';
+    shareMembersList.innerHTML = '<div class="empty-state">Cargando…</div>';
     libroRef(currentLibroId).get().then(function(doc){
       renderShareMembers(doc.exists ? doc.data() : {});
+    }).catch(function(err){
+      console.error('No se pudo abrir "Compartir este libro":', err);
+      shareMembersList.innerHTML = '';
+      shareMsg.className = 'account-msg err';
+      shareMsg.textContent = 'No se pudo cargar la información para compartir (' + (err.message || err) + '). Si el problema persiste, puede ser un tema de permisos en Firestore.';
     });
     shareOverlay.classList.add('open');
   }
