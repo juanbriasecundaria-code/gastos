@@ -181,7 +181,6 @@ a{color:inherit;}
   display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s;
 }
 .ejercicio-add:hover{border-color:var(--ingreso);color:var(--ingreso);}
-#btnShareTop{position:relative;font-size:13px;}
 .share-badge{
   position:absolute;top:-5px;right:-5px;min-width:15px;height:15px;padding:0 3px;
   border-radius:8px;background:var(--ingreso);color:#0F1419;
@@ -752,9 +751,6 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
     <div class="ejercicio-switch">
       <select id="ejercicioSelect" class="ejercicio-select" title="Ejercicio activo"></select>
       <button id="btnNuevoEjercicio" class="ejercicio-add" title="Nuevo ejercicio" aria-label="Nuevo ejercicio">+</button>
-      <button id="btnShareTop" class="ejercicio-add share-trigger-btn" title="Compartir este libro" aria-label="Compartir este libro">
-        👥<span class="share-badge" id="shareTopBadge" style="display:none;"></span>
-      </button>
     </div>
     <button class="ghost-btn theme-toggle-btn" id="btnThemeToggle">☀️ Modo claro</button>
     <button class="search-trigger" id="btnOpenSearch" aria-label="Buscar">
@@ -869,6 +865,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
         <h3 id="ingFormTitle">Agregar ingreso</h3>
         <form id="formIngreso" class="form-grid">
           <div class="field"><label>Mes</label><select name="mes" id="ingMes" required></select></div>
+          <div class="field"><label>Fecha (opcional)</label><input type="date" name="fecha" id="ingFecha"></div>
           <div class="field"><label>Tipo</label>
             <select name="tipo" id="ingTipo" required>
               <option>Sueldo</option><option>Extra</option>
@@ -902,6 +899,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
         <h3 id="gasFormTitle">Agregar gasto</h3>
         <form id="formGasto" class="form-grid">
           <div class="field"><label>Mes</label><select name="mes" id="gasMes" required></select></div>
+          <div class="field"><label>Fecha (opcional)</label><input type="date" name="fecha" id="gasFecha"></div>
           <div class="field"><label>Tipo</label>
             <select name="tipo" id="gasTipo" required>
               <option value="Fijo">Fijo</option>
@@ -922,6 +920,17 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
           <div class="field"><label>Monto</label><input type="text" inputmode="decimal" name="monto" id="gasMonto" class="money-input" placeholder="0, o 1500+2300+800" required><div class="money-preview" id="gasMontoPreview"></div></div>
           <div class="field field-checkbox" id="gasRepeatWrap">
             <label><input type="checkbox" name="repetir" id="gasRepeat"> Repetir este gasto en los próximos meses del año</label>
+          </div>
+          <div class="field" id="gasRepeatOptions" style="display:none;">
+            <label>Frecuencia de repetición</label>
+            <select id="gasRepeatFreq" name="repetirFreq">
+              <option value="mensual">Mensual (un registro por mes, como hasta ahora)</option>
+              <option value="semanal">Semanal (cada 7 días)</option>
+              <option value="quincenal">Quincenal (cada 15 días)</option>
+              <option value="personalizado">Cada N días</option>
+            </select>
+            <input type="number" min="1" step="1" id="gasRepeatDias" placeholder="¿Cada cuántos días?" style="display:none;margin-top:6px;">
+            <small id="gasRepeatHint" style="display:block;color:var(--text-faint);margin-top:6px;">Se repite hasta fin del ejercicio actual. Para semanal/quincenal/cada N días, completá la Fecha de arriba: ahí arranca la repetición.</small>
           </div>
           <button type="submit" class="btn btn-accent-fijo" id="gasSubmitBtn">Agregar</button>
           <button type="button" class="btn btn-cancel-edit" id="gasCancelEdit" style="display:none;">Cancelar</button>
@@ -1203,6 +1212,29 @@ function usd(n){
 function uid(prefix){ return prefix + "_" + Math.random().toString(36).slice(2,9); }
 function currentAutor(){ return window.__gastosCurrentUsername || null; }
 function esSoloLectura(){ return window.__gastosCurrentRol === 'lector'; }
+
+/* ===================== FECHAS (helpers) ===================== */
+// Parsea un string "YYYY-MM-DD" (el que devuelve un <input type="date">) como fecha
+// LOCAL, evitando el corrimiento de un día que da "new Date('YYYY-MM-DD')" por UTC.
+function parseFechaLocal(str){
+  if(!str) return null;
+  var partes = str.split('-');
+  if(partes.length !== 3) return null;
+  var y = parseInt(partes[0],10), m = parseInt(partes[1],10), d = parseInt(partes[2],10);
+  if(isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  return new Date(y, m-1, d);
+}
+function formatFechaISO(date){
+  var y = date.getFullYear();
+  var m = String(date.getMonth()+1).padStart(2,'0');
+  var d = String(date.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+d;
+}
+function formatFechaCorta(str){
+  var d = parseFechaLocal(str);
+  if(!d) return '';
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');
+}
 
 /* ===================== MONEY INPUT (formato de miles + fórmulas de suma) ===================== */
 function formatSingleMoneyTerm(raw){
@@ -1895,7 +1927,8 @@ function renderIngresos(){
     items.forEach(function(it){
       var tagClass = it.tipo==='Sueldo' ? 'tag-sueldo' : 'tag-extra';
       var isEd = editingId.ingresos===it.id;
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+(it.autor?('<small>'+escapeHtml(it.autor)+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="ingresos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
+      var ingSub = [it.fecha?formatFechaCorta(it.fecha):null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+(ingSub?('<small>'+ingSub+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="ingresos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -1931,7 +1964,7 @@ function renderGastos(){
     items.forEach(function(it){
       var tagClass = it.tipo==='Fijo' ? 'tag-fijo' : 'tag-variable';
       var isEd = editingId.gastos===it.id;
-      var subLine = [it.desc?escapeHtml(it.desc):null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
+      var subLine = [it.fecha?formatFechaCorta(it.fecha):null, it.desc?escapeHtml(it.desc):null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
       html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+it.tipo+'</span><span class="entry-desc">'+(it.recurrente?'<span class="recur-badge" title="Gasto recurrente">🔁</span>':'')+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="gastos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="gastos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
@@ -2042,6 +2075,8 @@ function setFormEditMode(kind, isEditing){
   if(kind==='gastos'){
     var repeatWrap = document.getElementById('gasRepeatWrap');
     if(repeatWrap) repeatWrap.style.display = isEditing ? 'none' : '';
+    var repeatOptions = document.getElementById('gasRepeatOptions');
+    if(repeatOptions) repeatOptions.style.display = isEditing ? 'none' : (document.getElementById('gasRepeat').checked ? '' : 'none');
   }
 }
 
@@ -2054,7 +2089,13 @@ function resetFormDefaults(kind){
   document.getElementById(cfg.formId).reset();
   var idx = new Date().getMonth();
   document.getElementById(cfg.mesId).value = MESES[idx] || 'Enero';
-  if(kind==='gastos'){ fillCatSelect(false); updateDescDatalist(); }
+  if(kind==='gastos'){
+    fillCatSelect(false); updateDescDatalist();
+    var ro = document.getElementById('gasRepeatOptions');
+    var rd = document.getElementById('gasRepeatDias');
+    if(ro) ro.style.display = 'none';
+    if(rd) rd.style.display = 'none';
+  }
   if(kind==='ingresos') hideMoneyPreview('ingMontoPreview');
   if(kind==='gastos') hideMoneyPreview('gasMontoPreview');
 }
@@ -2069,11 +2110,13 @@ function cancelEdit(kind){
 function populateFormForEdit(kind, item){
   if(kind==='ingresos'){
     document.getElementById('ingMes').value = item.mes;
+    document.getElementById('ingFecha').value = item.fecha || '';
     document.getElementById('ingTipo').value = item.tipo;
     setMoneyInputValue(document.getElementById('ingMonto'), item.monto);
     hideMoneyPreview('ingMontoPreview');
   } else if(kind==='gastos'){
     document.getElementById('gasMes').value = item.mes;
+    document.getElementById('gasFecha').value = item.fecha || '';
     document.getElementById('gasTipo').value = item.tipo;
     fillCatSelect(false);
     document.getElementById('gasCat').value = item.cat;
@@ -2148,18 +2191,20 @@ document.getElementById('formIngreso').addEventListener('submit', function(e){
   var fd = new FormData(e.target);
   var monto = parseMoneyValue(fd.get('monto'));
   if(isNaN(monto)) return;
+  var ingFecha = fd.get('fecha') || '';
   if(editingId.ingresos){
     var item = DATA.ingresos.filter(function(x){return x.id===editingId.ingresos;})[0];
-    if(item){ item.mes=fd.get('mes'); item.tipo=fd.get('tipo'); item.monto=monto; item.autor=currentAutor(); }
+    if(item){ item.mes=fd.get('mes'); item.fecha=ingFecha; item.tipo=fd.get('tipo'); item.monto=monto; item.autor=currentAutor(); }
     editingId.ingresos = null;
     setFormEditMode('ingresos', false);
     toast('Ingreso actualizado');
   } else {
-    DATA.ingresos.push({id:uid('ing'), mes:fd.get('mes'), tipo:fd.get('tipo'), monto:monto, autor:currentAutor()});
+    DATA.ingresos.push({id:uid('ing'), mes:fd.get('mes'), fecha:ingFecha, tipo:fd.get('tipo'), monto:monto, autor:currentAutor()});
     toast('Ingreso agregado');
   }
   saveData(); renderAll();
   document.getElementById('ingMonto').value = '';
+  document.getElementById('ingFecha').value = '';
   hideMoneyPreview('ingMontoPreview');
 });
 
@@ -2171,9 +2216,10 @@ document.getElementById('formGasto').addEventListener('submit', function(e){
   if(isNaN(monto)) return;
   var cat = fd.get('cat');
   if(cat==='__new__') return;
+  var gasFechaVal = fd.get('fecha') || '';
   if(editingId.gastos){
     var item = DATA.gastos.filter(function(x){return x.id===editingId.gastos;})[0];
-    if(item){ item.mes=fd.get('mes'); item.tipo=fd.get('tipo'); item.cat=cat; item.desc=fd.get('desc')||''; item.monto=monto; item.autor=currentAutor(); }
+    if(item){ item.mes=fd.get('mes'); item.fecha=gasFechaVal; item.tipo=fd.get('tipo'); item.cat=cat; item.desc=fd.get('desc')||''; item.monto=monto; item.autor=currentAutor(); }
     editingId.gastos = null;
     setFormEditMode('gastos', false);
     toast('Gasto actualizado');
@@ -2183,29 +2229,79 @@ document.getElementById('formGasto').addEventListener('submit', function(e){
     var desc = fd.get('desc')||'';
     var repetir = fd.get('repetir') === 'on';
     if(repetir){
-      var startIdx = MESES.indexOf(mes);
+      var freq = document.getElementById('gasRepeatFreq').value || 'mensual';
       var creados = 0;
-      MESES.forEach(function(m, i){
-        if(i < startIdx) return; // no tocar meses anteriores al elegido
-        var yaExiste = DATA.gastos.some(function(x){
-          return x.mes===m && x.tipo===tipo && x.cat===cat && (x.desc||'')===desc;
+      if(freq === 'mensual'){
+        // Comportamiento clásico: un registro por mes hasta fin de año, conservando
+        // el mismo día del mes en cada ocurrencia si se cargó una fecha.
+        var startIdx = MESES.indexOf(mes);
+        var fechaBase = gasFechaVal ? parseFechaLocal(gasFechaVal) : null;
+        MESES.forEach(function(m, i){
+          if(i < startIdx) return; // no tocar meses anteriores al elegido
+          var yaExiste = DATA.gastos.some(function(x){
+            return x.mes===m && x.tipo===tipo && x.cat===cat && (x.desc||'')===desc;
+          });
+          if(yaExiste) return; // evitar duplicar si ya había un gasto igual cargado ese mes
+          var fechaOcurrencia = '';
+          if(fechaBase) fechaOcurrencia = formatFechaISO(new Date(fechaBase.getFullYear(), i, fechaBase.getDate()));
+          DATA.gastos.push({id:uid('gas'), mes:m, fecha:fechaOcurrencia, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, autor:currentAutor()});
+          creados++;
         });
-        if(yaExiste) return; // evitar duplicar si ya había un gasto igual cargado ese mes
-        DATA.gastos.push({id:uid('gas'), mes:m, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, autor:currentAutor()});
-        creados++;
-      });
-      toast(creados>1 ? 'Gasto agregado y repetido en '+(creados-1)+' mes(es) más' : 'Gasto agregado');
+        toast(creados>1 ? 'Gasto agregado y repetido en '+(creados-1)+' mes(es) más' : 'Gasto agregado');
+      } else if(!gasFechaVal){
+        toast('Para repetir de forma semanal, quincenal o cada N días, completá la Fecha.');
+        return;
+      } else {
+        var intervalo = freq==='semanal' ? 7 : freq==='quincenal' ? 15 : Math.max(1, parseInt(document.getElementById('gasRepeatDias').value,10) || 1);
+        var yearNum = parseInt(STORE.activeEjercicio, 10);
+        var finEjercicio = new Date(yearNum, 11, 31);
+        var cursor = parseFechaLocal(gasFechaVal);
+        if(!cursor){ toast('Fecha inválida.'); return; }
+        var salvaguarda = 0;
+        while(cursor.getTime() <= finEjercicio.getTime() && salvaguarda < 500){
+          salvaguarda++;
+          var fechaIso = formatFechaISO(cursor);
+          var mesOcurrencia = MESES[cursor.getMonth()];
+          var yaExiste = DATA.gastos.some(function(x){
+            return x.fecha===fechaIso && x.tipo===tipo && x.cat===cat && (x.desc||'')===desc;
+          });
+          if(!yaExiste){
+            DATA.gastos.push({id:uid('gas'), mes:mesOcurrencia, fecha:fechaIso, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, recurrenciaFreq:freq, autor:currentAutor()});
+            creados++;
+          }
+          cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()+intervalo);
+        }
+        toast(creados>1 ? 'Gasto agregado y repetido '+(creados-1)+' vez(es) más' : 'Gasto agregado');
+      }
     } else {
-      DATA.gastos.push({id:uid('gas'), mes:mes, tipo:tipo, cat:cat, desc:desc, monto:monto, autor:currentAutor()});
+      DATA.gastos.push({id:uid('gas'), mes:mes, fecha:gasFechaVal, tipo:tipo, cat:cat, desc:desc, monto:monto, autor:currentAutor()});
       toast('Gasto agregado');
     }
   }
   saveData(); updateDescDatalist(); renderAll();
   document.getElementById('gasDesc').value='';
   document.getElementById('gasMonto').value='';
+  document.getElementById('gasFecha').value='';
   document.getElementById('gasRepeat').checked = false;
+  document.getElementById('gasRepeatOptions').style.display = 'none';
+  document.getElementById('gasRepeatDias').style.display = 'none';
   hideMoneyPreview('gasMontoPreview');
 });
+
+/* Mostrar/ocultar las opciones de frecuencia según el checkbox y el select */
+(function(){
+  var chk = document.getElementById('gasRepeat');
+  var opts = document.getElementById('gasRepeatOptions');
+  var freqSel = document.getElementById('gasRepeatFreq');
+  var diasInput = document.getElementById('gasRepeatDias');
+  function sync(){
+    opts.style.display = chk.checked ? '' : 'none';
+    diasInput.style.display = (chk.checked && freqSel.value==='personalizado') ? '' : 'none';
+  }
+  chk.addEventListener('change', sync);
+  freqSel.addEventListener('change', sync);
+  sync();
+})();
 
 var usdCant = document.getElementById('usdCant');
 var usdValor = document.getElementById('usdValor');
@@ -2677,12 +2773,12 @@ function buildSearchIndex(){
   DATA.ingresos.forEach(function(x){
     idx.push({kind:'ingresos', id:x.id, mes:x.mes, title:x.tipo, sub:'Ingreso',
       amountText:money(x.monto),
-      searchText:normalizeSearchText(x.mes+' '+x.tipo+' ingreso '+x.monto)});
+      searchText:normalizeSearchText(x.mes+' '+x.tipo+' ingreso '+x.monto+' '+(x.fecha||''))});
   });
   DATA.gastos.forEach(function(x){
     idx.push({kind:'gastos', id:x.id, mes:x.mes, title:x.cat, sub:(x.desc?x.desc+' · ':'')+x.tipo,
       amountText:money(x.monto),
-      searchText:normalizeSearchText(x.mes+' '+x.cat+' '+(x.desc||'')+' '+x.tipo+' gasto '+x.monto)});
+      searchText:normalizeSearchText(x.mes+' '+x.cat+' '+(x.desc||'')+' '+x.tipo+' gasto '+x.monto+' '+(x.fecha||''))});
   });
   DATA.dolar.forEach(function(x){
     var subtxt = (x.cant!==null && x.cant!==undefined) ? (money(x.cant)+' @ '+fmtDec.format(x.valor||0)) : 'Carga manual';
