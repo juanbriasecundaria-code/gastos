@@ -1010,8 +1010,17 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
           <div class="chart-card-body"><div id="chartIngGas"></div></div>
         </div>
         <div class="chart-card chart-card-wide">
-          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Composición de gastos: Fijos vs. Variables</h3></div>
-          <div class="chart-card-body"><div id="chartFijoVar"></div></div>
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron">▾</span>Composición de gastos</h3>
+            <div class="chart-toggle-group" onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:12px;">
+              <select id="fijoVarChartMode" title="Forma del gráfico">
+                <option value="fijovar">Fijos vs. Variables</option>
+                <option value="usdoficial">Pesos vs. USD oficial</option>
+              </select>
+              <label class="chart-toggle" id="fijoVarUsdLabel"><input type="checkbox" id="toggleUsdFijoVar"> Ver en USD equivalente</label>
+            </div>
+          </div>
+          <div class="chart-card-body"><div id="chartFijoVar"></div><div class="usd-oficial-note" id="usdOficialNote"></div></div>
         </div>
         <div class="chart-card">
           <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Top categorías de gasto (año)</h3></div>
@@ -1042,10 +1051,6 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
             </div>
           </div>
           <div class="chart-card-body"><div id="chartAhorro"></div></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Gasto mensual en USD (dólar oficial histórico)</h3></div>
-          <div class="chart-card-body"><div id="chartUsdOficial"></div><div class="usd-oficial-note" id="usdOficialNote"></div></div>
         </div>
         <div class="chart-card chart-card-wide">
           <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Mapa de calor: gasto por categoría y mes</h3></div>
@@ -2748,6 +2753,8 @@ document.getElementById('formInversion').addEventListener('submit', function(e){
 document.getElementById('filtUsdMes').addEventListener('change', renderDolar);
 document.getElementById('filtInvMes').addEventListener('change', renderInversion);
 document.getElementById('toggleUsdEquiv').addEventListener('change', renderGraficos);
+document.getElementById('toggleUsdFijoVar').addEventListener('change', renderGraficos);
+document.getElementById('fijoVarChartMode').addEventListener('change', renderGraficos);
 ['hormigaMes','hormigaUmbral','hormigaMinOcurrencias'].forEach(function(id){
   document.getElementById(id).addEventListener('input', renderHormiga);
   document.getElementById(id).addEventListener('change', renderHormiga);
@@ -3465,24 +3472,53 @@ function renderGraficos(){
   var anioActivo = STORE.activeEjercicio;
   var valores = dolarValorMensual();
   var valoresConv = dolarValorConCarry(valores);
-  function conv(v,i){
-    if(!enUsd) return v;
-    // Siempre preferimos el promedio oficial de ese mes (API ArgentinaDatos);
-    // solo si todavía no lo tenemos, usamos como respaldo la cotización de
-    // compra propia (con arrastre) para no dejar el mes en cero.
+  // Siempre preferimos el promedio oficial de ese mes (API ArgentinaDatos);
+  // solo si todavía no lo tenemos, usamos como respaldo la cotización de
+  // compra propia (con arrastre) para no dejar el mes en cero.
+  function convUsd(v, i, on){
+    if(!on) return v;
     var rate = usdOficialPromedioMes(anioActivo, i);
     if(rate===null || rate===undefined) rate = valoresConv[i];
     return rate ? v/rate : 0;
   }
   document.getElementById('chartIngGas').innerHTML = buildBarChart([
-    {label:'Ingresos', color:CHART_COLORS.ingreso, data:months.map(function(m,i){return conv(m.totalIngresos,i);})},
-    {label:'Gastos', color:CHART_COLORS.neg, data:months.map(function(m,i){return conv(m.totalGastos,i);})}
+    {label:'Ingresos', color:CHART_COLORS.ingreso, data:months.map(function(m,i){return convUsd(m.totalIngresos,i,enUsd);})},
+    {label:'Gastos', color:CHART_COLORS.neg, data:months.map(function(m,i){return convUsd(m.totalGastos,i,enUsd);})}
   ], 'grouped', {usd:enUsd});
 
-  document.getElementById('chartFijoVar').innerHTML = buildBarChart([
-    {label:'Fijos', color:CHART_COLORS.fijo, data:months.map(function(m){return m.totalFijos;})},
-    {label:'Variables', color:CHART_COLORS.variable, data:months.map(function(m){return m.totalVariables;})}
-  ], 'stacked');
+  var fijoVarMode = document.getElementById('fijoVarChartMode').value;
+  var fijoVarUsdLabel = document.getElementById('fijoVarUsdLabel');
+  var noteEl = document.getElementById('usdOficialNote');
+  if(fijoVarMode==='usdoficial'){
+    fijoVarUsdLabel.style.display = 'none';
+    var usdOfEquivArr = months.map(function(m,i){
+      var rate = usdOficialPromedioMes(anioActivo, i);
+      return rate ? (m.totalGastos/rate) : null;
+    });
+    document.getElementById('chartFijoVar').innerHTML = buildUsdOficialChart(
+      months.map(function(m){return m.totalGastos;}), usdOfEquivArr
+    );
+    var hasAnyUsdOf = usdOfEquivArr.some(function(v){return v!==null;});
+    if(usdOficialFetchState==='loading'){
+      noteEl.textContent = 'Actualizando cotización histórica del dólar oficial...';
+    } else if(usdOficialFetchState==='error' && !hasAnyUsdOf){
+      noteEl.textContent = 'No se pudo traer la cotización (sin conexión) y todavía no hay datos guardados.';
+    } else if(usdOficialFetchState==='error'){
+      noteEl.textContent = 'No se pudo actualizar recién (sin conexión) — mostrando la última cotización guardada.';
+    } else if(!hasAnyUsdOf){
+      noteEl.textContent = 'Necesitás conexión a internet al menos una vez para traer la cotización histórica.';
+    } else {
+      noteEl.textContent = 'Fuente: promedio mensual del dólar oficial (venta), vía ArgentinaDatos.';
+    }
+  } else {
+    fijoVarUsdLabel.style.display = '';
+    var enUsdFijoVar = document.getElementById('toggleUsdFijoVar').checked;
+    noteEl.textContent = '';
+    document.getElementById('chartFijoVar').innerHTML = buildBarChart([
+      {label:'Fijos', color:CHART_COLORS.fijo, data:months.map(function(m,i){return convUsd(m.totalFijos,i,enUsdFijoVar);})},
+      {label:'Variables', color:CHART_COLORS.variable, data:months.map(function(m,i){return convUsd(m.totalVariables,i,enUsdFijoVar);})}
+    ], 'stacked', {usd:enUsdFijoVar});
+  }
 
   var catTotals = {};
   months.forEach(function(m){
@@ -3512,26 +3548,6 @@ function renderGraficos(){
   renderAhorroChart();
   document.getElementById('chartHeatmap').innerHTML = buildHeatmapChart(months);
 
-  var usdOfEquivArr = months.map(function(m,i){
-    var rate = usdOficialPromedioMes(anioActivo, i);
-    return rate ? (m.totalGastos/rate) : null;
-  });
-  document.getElementById('chartUsdOficial').innerHTML = buildUsdOficialChart(
-    months.map(function(m){return m.totalGastos;}), usdOfEquivArr
-  );
-  var hasAnyUsdOf = usdOfEquivArr.some(function(v){return v!==null;});
-  var noteEl = document.getElementById('usdOficialNote');
-  if(usdOficialFetchState==='loading'){
-    noteEl.textContent = 'Actualizando cotización histórica del dólar oficial...';
-  } else if(usdOficialFetchState==='error' && !hasAnyUsdOf){
-    noteEl.textContent = 'No se pudo traer la cotización (sin conexión) y todavía no hay datos guardados.';
-  } else if(usdOficialFetchState==='error'){
-    noteEl.textContent = 'No se pudo actualizar recién (sin conexión) — mostrando la última cotización guardada.';
-  } else if(!hasAnyUsdOf){
-    noteEl.textContent = 'Necesitás conexión a internet al menos una vez para traer la cotización histórica.';
-  } else {
-    noteEl.textContent = 'Fuente: promedio mensual del dólar oficial (venta), vía ArgentinaDatos.';
-  }
   if(usdOficialFetchState==='idle'){
     fetchUsdOficialHistorico(function(){ renderGraficos(); });
   }
