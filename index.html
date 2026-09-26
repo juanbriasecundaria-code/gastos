@@ -604,7 +604,8 @@ main{
 .heatmap-table th{color:var(--text-faint);font-weight:500;font-size:10px;}
 .heatmap-table td:first-child,.heatmap-table th:first-child{
   text-align:left;font-family:var(--font-body);color:var(--text-dim);position:sticky;left:0;
-  background:var(--surface);padding-right:16px;min-width:0;
+  background:var(--surface);padding-right:8px;min-width:0;
+  max-width:108px;white-space:normal;line-height:1.25;word-break:break-word;
 }
 .heatmap-cell{border-radius:3px;color:var(--text);}
 .heatmap-empty{color:var(--text-faint);}
@@ -3303,18 +3304,37 @@ function buildSavingsRateChart(months, metaPct){
   var W=860,H=280,padL=50,padR=14,padT=14,padB=40;
   var innerW=W-padL-padR, innerH=H-padT-padB;
   var known = data.filter(function(v){return v!==null;});
-  var maxAbs = Math.max.apply(null, known.map(Math.abs).concat([metaPct, 10]));
-  var niceMax = niceCeil(maxAbs*1.15);
-  function yFor(v){ return padT+innerH/2 - (v/niceMax)*(innerH/2); }
-  var zeroY = yFor(0);
-  var metaY = yFor(metaPct);
-  var ticks=4, gridLines='', yLabels='';
-  for(var t=-ticks;t<=ticks;t+=2){
-    var v = niceMax*t/ticks;
-    var y = yFor(v);
-    gridLines += '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="'+CHART_COLORS.grid+'" stroke-width="1"/>';
-    yLabels += '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+Math.round(v)+'%</text>';
+  var hasNeg = known.some(function(v){return v<0;});
+  var yFor, zeroY, niceMax, metaOffScale, ticks=4, gridLines='', yLabels='';
+  if(!hasNeg){
+    // Sin meses negativos: usamos escala de 0 hacia arriba basada en los datos reales
+    // (ignorando la meta), así un ahorro chico se sigue viendo con buena altura de barra.
+    var maxKnown = known.length ? Math.max.apply(null, known) : 0;
+    niceMax = niceCeil(Math.max(maxKnown*1.35, 3));
+    metaOffScale = metaPct > niceMax;
+    yFor = function(v){ return padT+innerH - (v/niceMax)*innerH; };
+    zeroY = yFor(0);
+    for(var t=0;t<=ticks;t++){
+      var v = niceMax*t/ticks;
+      var y = yFor(v);
+      gridLines += '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="'+CHART_COLORS.grid+'" stroke-width="1"/>';
+      yLabels += '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+Math.round(v)+'%</text>';
+    }
+  } else {
+    // Hay algún mes negativo: mantenemos la escala simétrica alrededor de 0.
+    var maxAbs = Math.max.apply(null, known.map(Math.abs).concat([metaPct, 10]));
+    niceMax = niceCeil(maxAbs*1.15);
+    metaOffScale = false;
+    yFor = function(v){ return padT+innerH/2 - (v/niceMax)*(innerH/2); };
+    zeroY = yFor(0);
+    for(var t=-ticks;t<=ticks;t+=2){
+      var v = niceMax*t/ticks;
+      var y = yFor(v);
+      gridLines += '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="'+CHART_COLORS.grid+'" stroke-width="1"/>';
+      yLabels += '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+Math.round(v)+'%</text>';
+    }
   }
+  var metaY = metaOffScale ? padT : yFor(metaPct);
   var n=MESES.length, groupW=innerW/n, bars='', xlabels='';
   var curIdx = currentMonthIdxForDisplay();
   MESES.forEach(function(mes,i){
@@ -3328,8 +3348,9 @@ function buildSavingsRateChart(months, metaPct){
     var color = v<0 ? CHART_COLORS.neg : (v>=metaPct ? CHART_COLORS.ingreso : CHART_COLORS.fijo);
     bars += '<rect x="'+(cx-barW/2)+'" y="'+y0+'" width="'+barW+'" height="'+h+'" fill="'+color+'" rx="3" data-tip="'+escapeHtml(mes+': '+v.toFixed(1)+'% ahorrado sobre el ingreso')+'"/>';
   });
+  var metaLabel = metaOffScale ? ('Meta '+metaPct+'% ↑ (fuera de escala)') : ('Meta '+metaPct+'%');
   var metaLine = '<line x1="'+padL+'" y1="'+metaY+'" x2="'+(W-padR)+'" y2="'+metaY+'" stroke="'+CHART_COLORS.dolar+'" stroke-width="1.4" stroke-dasharray="5,4"/>'+
-    '<text x="'+(W-padR)+'" y="'+(metaY-5)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.dolar+'">Meta '+metaPct+'%</text>';
+    '<text x="'+(W-padR)+'" y="'+(metaY-5)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.dolar+'">'+metaLabel+'</text>';
   var zeroLine = '<line x1="'+padL+'" y1="'+zeroY+'" x2="'+(W-padR)+'" y2="'+zeroY+'" stroke="'+CHART_COLORS.textFaint+'" stroke-width="1"/>';
   var svg = '<svg viewBox="0 0 '+W+' '+(H+8)+'" style="width:100%;height:auto">'+gridLines+yLabels+zeroLine+bars+metaLine+xlabels+'</svg>';
   var legend = '<div class="chart-legend-row">'+
