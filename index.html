@@ -2044,13 +2044,11 @@ function renderResumen(){
     var maxTot = rows.reduce(function(m,r){return Math.max(m,r.tot);},0) || 1;
     return rows.map(function(r){
       var pct = Math.max(4, Math.round((r.tot/maxTot)*100));
-      var rowMax = Math.max.apply(null, r.vals) || 1;
       var cells = '<td>'+catIconSvg(r.cat)+'<span class="cat-label"><span class="cat-name">'+r.cat+'</span>'+
         '<span class="cat-bar-wrap"><span class="cat-bar" style="width:'+pct+'%"></span></span></span></td>';
       r.vals.forEach(function(v){
         if(v===0){ cells += '<td class="zero">–</td>'; return; }
-        var alpha = Math.round((v/rowMax)*32);
-        cells += '<td style="background:color-mix(in srgb, var(--'+groupKey+') '+alpha+'%, transparent)">'+money(v)+'</td>';
+        cells += '<td>'+money(v)+'</td>';
       });
       cells += '<td class="col-total">'+money(r.tot)+'</td>';
       return '<tr class="cat-row cat-'+groupKey+(collapsed?' row-collapsed':'')+'" data-group="'+groupKey+'"'+delayAttr()+'>'+cells+'</tr>';
