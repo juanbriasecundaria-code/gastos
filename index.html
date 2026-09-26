@@ -142,27 +142,23 @@ a{color:inherit;}
   .bottom-nav{
     display:flex;flex-direction:row;position:fixed;left:0;right:0;bottom:0;z-index:30;
     background:var(--surface);border-top:1px solid var(--line);
-    padding:4px 2px calc(4px + env(safe-area-inset-bottom));
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+    overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;
+    background-image:
+      linear-gradient(to right, transparent, var(--surface) calc(100% - 22px), var(--surface));
+    background-position:right;background-repeat:no-repeat;background-size:44px 100%;
   }
   .bottom-nav .nav-btn{
-    flex:1 1 0;min-width:0;
+    flex:0 0 auto;min-width:64px;scroll-snap-align:start;
     flex-direction:column;align-items:center;justify-content:center;
-    gap:2px;padding:5px 1px;border-radius:8px;
-    font-size:9.5px;font-weight:500;color:var(--text-faint);
-    background:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    gap:3px;padding:7px 6px;border-radius:8px;
+    font-size:10.5px;font-weight:500;color:var(--text-faint);
+    background:none;white-space:nowrap;
   }
-  .bottom-nav .nav-btn .bn-icon{font-size:16px;line-height:1;}
-  .bottom-nav .nav-btn .bn-icon svg{width:18px;height:18px;}
+  .bottom-nav .nav-btn .bn-icon{font-size:18px;line-height:1;}
+  .bottom-nav .nav-btn .bn-icon svg{width:19px;height:19px;}
   .bottom-nav .nav-btn:hover{background:var(--surface-2);color:var(--text-dim);}
   .bottom-nav .nav-btn.active{background:none;color:var(--ingreso);}
-}
-@media (max-width:400px){
-  .bottom-nav .nav-btn{font-size:8.6px;}
-  .bottom-nav .nav-btn .bn-icon svg{width:17px;height:17px;}
-}
-@media (max-width:360px){
-  .bottom-nav .bn-label{display:none;}
-  .bottom-nav .nav-btn{padding:8px 1px;}
 }
 
 .brand{
@@ -361,6 +357,18 @@ a{color:inherit;}
 .account-msg.err{color:var(--neg);background:rgba(242,105,107,.1);border:1px solid rgba(242,105,107,.25);display:block;}
 .account-msg.ok{color:var(--ingreso);background:rgba(79,209,165,.1);border:1px solid rgba(79,209,165,.25);display:block;}
 .account-section.danger h4{color:var(--neg);}
+.presu-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;}
+.presu-row .presu-name{flex:1;min-width:0;font-size:12.5px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.presu-row input{
+  width:118px;flex-shrink:0;background:var(--bg);border:1px solid var(--line);border-radius:7px;
+  color:var(--text);padding:7px 8px;font-size:12px;font-family:var(--font-mono);outline:none;text-align:right;
+}
+.presu-row input:focus{border-color:var(--dolar);}
+.presu-badge{
+  display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:700;
+  padding:1px 5px;border-radius:999px;margin-left:6px;font-family:var(--font-mono);
+  color:var(--neg);background:rgba(242,105,107,.14);vertical-align:middle;white-space:nowrap;
+}
 .invite-banner{
   display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
   background:rgba(91,159,237,.12);border-bottom:1px solid rgba(91,159,237,.35);
@@ -927,6 +935,7 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
           <p class="view-desc">Ingresos, gastos y compra de dólares — vista mensual del año.</p>
         </div>
         <div class="view-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="ghost-btn no-print" id="btnPresupuestos" title="Definir un tope de gasto mensual por categoría"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Presupuestos</button>
           <button class="ghost-btn no-print" id="btnExportCsv" title="Descargar el resumen del año como CSV"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 21h16"/></svg> Exportar CSV</button>
           <button class="ghost-btn no-print" id="btnPrintResumen" title="Exportar el resumen como PDF o imprimirlo"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Exportar / Imprimir</button>
         </div>
@@ -1162,6 +1171,22 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
       <button type="submit" class="btn btn-accent-ingreso" id="authSubmitBtn">Iniciar sesión</button>
     </form>
     <button type="button" class="auth-forgot" id="authForgotBtn">¿Olvidaste tu contraseña?</button>
+  </div>
+</div>
+
+<div class="account-overlay" id="presupuestosOverlay">
+  <div class="account-box">
+    <button class="account-close" id="presupuestosClose" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>
+    <h3>Presupuestos mensuales</h3>
+    <p class="account-current-email" style="word-break:normal;">Fijá un tope por categoría. Cuando el gasto del mes en curso lo supere, la barra se pone roja en el Resumen. Dejá vacío para no controlar esa categoría.</p>
+    <div class="account-section">
+      <h4>Gastos fijos</h4>
+      <div id="presupuestosFijoList"></div>
+    </div>
+    <div class="account-section">
+      <h4>Gastos variables</h4>
+      <div id="presupuestosVariableList"></div>
+    </div>
   </div>
 </div>
 
@@ -1468,6 +1493,7 @@ function normalizeExercise(data){
   if(!data.deletedBaseCategorias) data.deletedBaseCategorias = {Fijo:[], Variable:[]};
   if(!data.deletedBaseCategorias.Fijo) data.deletedBaseCategorias.Fijo = [];
   if(!data.deletedBaseCategorias.Variable) data.deletedBaseCategorias.Variable = [];
+  if(!data.presupuestos) data.presupuestos = {};
   return data;
 }
 
@@ -2035,6 +2061,8 @@ function renderResumen(){
   // Filas de categoría: ordenadas por influencia (mayor a menor), con ícono, barra relativa y heatmap por celda
   function catRowsHtml(cats, valuesFn, groupKey){
     var collapsed = !!pivotCollapsed[groupKey];
+    var tipo = groupKey==='fijo' ? 'Fijo' : 'Variable';
+    var curIdx = currentMonthIdxForDisplay();
     var rows = cats.map(function(cat){
       var vals = months.map(function(m){ return valuesFn(m, cat); });
       var tot = vals.reduce(function(a,b){return a+b;},0);
@@ -2043,9 +2071,23 @@ function renderResumen(){
     rows.sort(function(a,b){ return b.tot - a.tot; });
     var maxTot = rows.reduce(function(m,r){return Math.max(m,r.tot);},0) || 1;
     return rows.map(function(r){
-      var pct = Math.max(4, Math.round((r.tot/maxTot)*100));
-      var cells = '<td>'+catIconSvg(r.cat)+'<span class="cat-label"><span class="cat-name">'+r.cat+'</span>'+
-        '<span class="cat-bar-wrap"><span class="cat-bar" style="width:'+pct+'%"></span></span></span></td>';
+      var presupuesto = DATA.presupuestos[presuKey(tipo, r.cat)];
+      var barStyle, badge = '';
+      if(presupuesto && curIdx>=0){
+        var gastadoMes = r.vals[curIdx];
+        var pctBudget = (gastadoMes/presupuesto)*100;
+        var w = Math.min(100, Math.max(4, Math.round(pctBudget)));
+        var color = pctBudget>=100 ? 'var(--neg)' : (pctBudget>=80 ? '#F0B43A' : 'var(--'+groupKey+')');
+        barStyle = 'width:'+w+'%;background:'+color+';';
+        if(pctBudget>=100){
+          badge = '<span class="presu-badge" title="Superaste el presupuesto de '+money(presupuesto)+' para '+MESES[curIdx]+'">+'+Math.round(pctBudget-100)+'%</span>';
+        }
+      } else {
+        var pct = Math.max(4, Math.round((r.tot/maxTot)*100));
+        barStyle = 'width:'+pct+'%;';
+      }
+      var cells = '<td>'+catIconSvg(r.cat)+'<span class="cat-label"><span class="cat-name">'+r.cat+badge+'</span>'+
+        '<span class="cat-bar-wrap"><span class="cat-bar" style="'+barStyle+'"'+(presupuesto?' title="'+money(r.vals[curIdx]||0)+' de '+money(presupuesto)+' este mes"':'')+'></span></span></span></td>';
       r.vals.forEach(function(v){
         if(v===0){ cells += '<td class="zero">–</td>'; return; }
         cells += '<td>'+money(v)+'</td>';
@@ -2681,6 +2723,46 @@ document.getElementById('btnPrintResumen').addEventListener('click', function(){
     '<div class="print-title">Ejercicio '+escapeHtml(STORE.activeEjercicio)+'</div>'+
     '<div class="print-sub">Generado el '+fechaTxt+' a las '+horaTxt+'</div>';
   setTimeout(function(){ window.print(); }, 60);
+});
+
+/* ===================== PRESUPUESTOS POR CATEGORÍA ===================== */
+function presuKey(tipo, cat){ return tipo+'|'+cat; }
+var presupuestosOverlay = document.getElementById('presupuestosOverlay');
+function renderPresupuestosModal(){
+  function listHtml(tipo){
+    return catsFor(tipo).map(function(cat){
+      var key = presuKey(tipo, cat);
+      var val = DATA.presupuestos[key];
+      return '<div class="presu-row">'+
+        '<span class="presu-name">'+escapeHtml(cat)+'</span>'+
+        '<input type="text" inputmode="decimal" class="money-input presu-input" data-key="'+escapeHtml(key)+'" placeholder="Sin tope" value="'+(val?fmt.format(val):'')+'">'+
+      '</div>';
+    }).join('');
+  }
+  document.getElementById('presupuestosFijoList').innerHTML = listHtml('Fijo');
+  document.getElementById('presupuestosVariableList').innerHTML = listHtml('Variable');
+  presupuestosOverlay.querySelectorAll('.presu-input').forEach(function(inp){
+    attachMoneyInput(inp);
+    inp.addEventListener('change', function(){
+      var key = inp.getAttribute('data-key');
+      var num = parseMoneyValue(inp.value);
+      if(!inp.value.trim() || isNaN(num) || num<=0){
+        delete DATA.presupuestos[key];
+      } else {
+        DATA.presupuestos[key] = num;
+      }
+      saveData();
+      renderAll();
+    });
+  });
+}
+function openPresupuestosModal(){ renderPresupuestosModal(); presupuestosOverlay.classList.add('open'); }
+function closePresupuestosModal(){ presupuestosOverlay.classList.remove('open'); }
+document.getElementById('btnPresupuestos').addEventListener('click', openPresupuestosModal);
+document.getElementById('presupuestosClose').addEventListener('click', closePresupuestosModal);
+presupuestosOverlay.addEventListener('click', function(e){ if(e.target===presupuestosOverlay) closePresupuestosModal(); });
+document.addEventListener('keydown', function(e){
+  if(e.key==='Escape' && presupuestosOverlay.classList.contains('open')) closePresupuestosModal();
 });
 
 /* ===================== BACKUP ===================== */
