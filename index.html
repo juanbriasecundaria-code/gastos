@@ -12,11 +12,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <style>
 :root{
-  --bg:#0F1419;
-  --surface:#161D27;
-  --surface-2:#1C242F;
-  --line:#26303B;
-  --line-soft:#1F2830;
+  --bg:#14161B;
+  --surface:#1B1F26;
+  --surface-2:#22272F;
+  --line:#2C333C;
+  --line-soft:#232A32;
   --text:#E8ECEF;
   --text-dim:#8B98A5;
   --text-faint:#5B6874;
@@ -469,7 +469,7 @@ main{
 .kpi.k-gasto{--accent:var(--fijo);}
 .kpi.k-restante{--accent:#5B9FED;}
 .kpi.k-usd{--accent:var(--dolar);}
-.kpi-label{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;font-family:var(--font-mono);}
+.kpi-label{font-size:12px;color:var(--text-dim);margin-bottom:8px;font-family:var(--font-body);font-weight:500;}
 .kpi-value{font-family:var(--font-mono);font-size:22px;font-weight:600;letter-spacing:-0.01em;}
 .kpi-value.neg{color:var(--neg);}
 .kpi-sub{font-size:11.5px;color:var(--text-faint);margin-top:4px;}
@@ -588,8 +588,8 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
   padding:18px;margin-bottom:22px;box-shadow:var(--shadow-card);
 }
 .form-card h3{
-  font-family:var(--font-display);font-size:14px;font-weight:600;margin:0 0 14px;
-  color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;font-size:11px;
+  font-family:var(--font-display);font-size:14.5px;font-weight:600;margin:0 0 14px;
+  color:var(--text);
 }
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end;}
 .field{display:flex;flex-direction:column;gap:5px;position:relative;}
@@ -674,8 +674,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 .month-group{margin-bottom:18px;}
 .month-group-head{
   display:flex;justify-content:space-between;align-items:center;
-  padding:8px 2px;color:var(--text-dim);font-family:var(--font-mono);font-size:11.5px;
-  text-transform:uppercase;letter-spacing:.04em;
+  padding:8px 2px;color:var(--text);font-family:var(--font-body);font-size:13px;font-weight:600;
   border-bottom:1px solid var(--line);margin-bottom:6px;
 }
 .entry-list{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);overflow:hidden;}
@@ -1893,21 +1892,21 @@ function renderResumen(){
     var vals = months.map(valuesFn);
     var tot = vals.reduce(function(a,b){return a+b;},0);
     var r = '<tr class="'+(cls||'')+'"><td>'+label+'</td>';
-    vals.forEach(function(v){ r += '<td class="'+(v===0?'zero':'')+'">'+money(v)+'</td>'; });
+    vals.forEach(function(v){ r += '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':money(v))+'</td>'; });
     r += '<td class="col-total">'+money(tot)+'</td></tr>';
     return r;
   }
 
-  html += '<tr class="grp-row"><td>INGRESOS</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+  html += '<tr class="grp-row"><td>Ingresos</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
   html += rowFor('Total Ingresos', function(m){return m.totalIngresos;});
 
-  html += '<tr class="grp-row"><td>GASTOS FIJOS</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+  html += '<tr class="grp-row"><td>Gastos fijos</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
   catsFor('Fijo').forEach(function(cat){
     html += rowFor(cat, function(m){return m.fijosPorCat[cat]||0;}, 'cat-row');
   });
   html += rowFor('Total Gastos Fijos', function(m){return m.totalFijos;}, 'total-row');
 
-  html += '<tr class="grp-row"><td>GASTOS VARIABLES</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+  html += '<tr class="grp-row"><td>Gastos variables</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
   catsFor('Variable').forEach(function(cat){
     html += rowFor(cat, function(m){return m.variablesPorCat[cat]||0;}, 'cat-row');
   });
@@ -1915,18 +1914,18 @@ function renderResumen(){
 
   html += rowFor('Gastos Totales', function(m){return m.totalGastos;}, 'total-row');
 
-  html += '<tr class="grp-row"><td>COMPRA DÓLAR</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+  html += '<tr class="grp-row"><td>Compra dólar</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
   html += rowFor('$ Gastados', function(m){return m.pesosGastadosUsd;});
   var dolarRowVals = months.map(function(m){return m.totalUsd;});
   var dolarTot = dolarRowVals.reduce(function(a,b){return a+b;},0);
-  html += '<tr><td>USD Totales</td>'+dolarRowVals.map(function(v){return '<td class="'+(v===0?'zero':'')+'">'+usd(v)+'</td>';}).join('')+'<td class="col-total">'+usd(dolarTot)+'</td></tr>';
+  html += '<tr><td>USD Totales</td>'+dolarRowVals.map(function(v){return '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':usd(v))+'</td>';}).join('')+'<td class="col-total">'+usd(dolarTot)+'</td></tr>';
 
   if(DATA.inversion.length){
-    html += '<tr class="grp-row"><td>INVERSIÓN</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+    html += '<tr class="grp-row"><td>Inversión</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
     html += rowFor('Monto Invertido', function(m){return m.montoInversion;});
   }
 
-  html += '<tr class="grp-row"><td>RESUMEN</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+  html += '<tr class="grp-row"><td>Resumen</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
   html += rowFor('Total Gastado', function(m){return m.totalGastado;});
   html += rowFor('Total Restante', function(m){return m.totalRestante;}, 'total-row');
 
@@ -2507,7 +2506,7 @@ document.getElementById('btnReset').addEventListener('click', function(){
 /* ===================== CHARTS ===================== */
 var CHART_COLORS = {
   ingreso:'#4FD1A5', fijo:'#F0B43A', variable:'#B47EF5', dolar:'#5B9FED',
-  inversion:'#F2679A', neg:'#F2696B', grid:'#26303B', textDim:'#8B98A5', textFaint:'#5B6874'
+  inversion:'#F2679A', neg:'#F2696B', grid:'#2C333C', textDim:'#8B98A5', textFaint:'#5B6874'
 };
 var DONUT_PALETTE = ['#F0B43A','#B47EF5','#5B9FED','#4FD1A5','#F2679A','#FF8B5E','#8B98A5'];
 
