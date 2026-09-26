@@ -572,6 +572,12 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 .pivot thead th:first-child{z-index:3;}
 .pivot tbody tr:not(.grp-row) td{border-bottom:1px solid var(--line-soft);}
 .pivot tbody tr:hover td{background:var(--surface-2);}
+.pivot tbody tr td{transition:background .2s ease;}
+
+/* Entrada escalonada y sutil de las filas (estilo Plausible/Copilot) */
+@keyframes pivotRowIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+.pivot tbody tr{animation:pivotRowIn .35s ease both;}
+@media (prefers-reduced-motion: reduce){.pivot tbody tr{animation:none;}}
 
 .pivot .grp-row td{
   font-family:var(--font-body);font-weight:600;color:var(--text);
@@ -581,7 +587,17 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 .pivot .grp-row:hover td{background:var(--surface-2);}
 .pivot .grp-row td:first-child::before{
   content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  border-radius:0 3px 3px 0;
 }
+.pivot .grp-row[data-toggle]{cursor:pointer;user-select:none;}
+.pivot .grp-row[data-toggle]:hover td:first-child{color:var(--text);}
+.grp-chevron{
+  display:inline-block;margin-right:6px;font-size:10px;color:var(--text-faint);
+  transition:transform .2s ease;transform:rotate(0deg);
+}
+.grp-chevron.is-collapsed{transform:rotate(-90deg);}
+.pivot .cat-row.row-collapsed{display:none;}
+
 .pivot .grp-ingreso td:first-child::before{background:var(--ingreso);}
 .pivot .grp-fijo td:first-child::before{background:var(--fijo);}
 .pivot .grp-variable td:first-child::before{background:var(--variable);}
@@ -589,13 +605,22 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 .pivot .grp-inversion td:first-child::before{background:var(--inversion);}
 .pivot .grp-resumen td:first-child::before{background:var(--text-faint);}
 
-.pivot .cat-row td:first-child{padding-left:26px;color:var(--text-dim);font-family:var(--font-body);font-weight:400;}
+.pivot .cat-row td:first-child{padding-left:24px;color:var(--text-dim);font-family:var(--font-body);font-weight:400;padding-top:8px;padding-bottom:8px;}
 .pivot .cat-fijo td:first-child::before, .pivot .cat-variable td:first-child::before{
-  content:'';position:absolute;left:13px;top:50%;transform:translateY(-50%);
-  width:5px;height:5px;border-radius:50%;opacity:.75;
+  content:'';position:absolute;left:9px;top:7px;bottom:7px;width:2px;border-radius:1px;opacity:.6;
 }
 .pivot .cat-fijo td:first-child::before{background:var(--fijo);}
 .pivot .cat-variable td:first-child::before{background:var(--variable);}
+
+/* Barra de peso relativo por categoría (estilo Monarch), sin necesitar un presupuesto definido */
+.cat-label{display:block;line-height:1.3;}
+.cat-bar-wrap{
+  display:block;margin-top:5px;height:3px;width:84px;max-width:100%;
+  background:var(--line-soft);border-radius:2px;overflow:hidden;
+}
+.cat-bar{display:block;height:100%;border-radius:2px;transition:width .4s ease;}
+.pivot .cat-fijo .cat-bar{background:var(--fijo);}
+.pivot .cat-variable .cat-bar{background:var(--variable);}
 
 .pivot .total-row td{font-weight:700;border-top:1px solid var(--line);border-bottom:none;color:var(--text);}
 .pivot .zero{color:var(--text-faint);}
@@ -1888,6 +1913,7 @@ function computeMonth(mes){
 }
 
 /* ===================== RESUMEN VIEW ===================== */
+var pivotCollapsed = {}; // recuerda qué grupos (fijo/variable) están colapsados entre renders
 function renderResumen(){
   var months = MESES.map(computeMonth);
   var yearIngresos = months.reduce(function(s,m){return s+m.totalIngresos;},0);
@@ -1907,49 +1933,100 @@ function renderResumen(){
   MESES.forEach(function(m){ html += '<th>'+m.slice(0,3)+'</th>'; });
   html += '<th class="col-total">Total</th></tr></thead><tbody>';
 
+  var rowIdx = 0;
+  function delayAttr(){
+    var d = Math.min(rowIdx*22, 260);
+    rowIdx++;
+    return ' style="animation-delay:'+d+'ms"';
+  }
+
   function rowFor(label, valuesFn, cls){
     var vals = months.map(valuesFn);
     var tot = vals.reduce(function(a,b){return a+b;},0);
-    var r = '<tr class="'+(cls||'')+'"><td>'+label+'</td>';
+    var r = '<tr class="'+(cls||'')+'"'+delayAttr()+'><td>'+label+'</td>';
     vals.forEach(function(v){ r += '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':money(v))+'</td>'; });
     r += '<td class="col-total">'+money(tot)+'</td></tr>';
     return r;
   }
 
-  html += '<tr class="grp-row grp-ingreso"><td>Ingresos</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+  // Filas de categoría con barra de peso relativo dentro de su grupo (estilo Monarch)
+  function catRowsHtml(cats, valuesFn, groupKey){
+    var collapsed = !!pivotCollapsed[groupKey];
+    var rows = cats.map(function(cat){
+      var vals = months.map(function(m){ return valuesFn(m, cat); });
+      var tot = vals.reduce(function(a,b){return a+b;},0);
+      return {cat:cat, vals:vals, tot:tot};
+    });
+    var maxTot = rows.reduce(function(m,r){return Math.max(m,r.tot);},0) || 1;
+    return rows.map(function(r){
+      var pct = Math.max(4, Math.round((r.tot/maxTot)*100));
+      var cells = '<td><span class="cat-label">'+r.cat+'</span>'+
+        '<span class="cat-bar-wrap"><span class="cat-bar" style="width:'+pct+'%"></span></span></td>';
+      r.vals.forEach(function(v){ cells += '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':money(v))+'</td>'; });
+      cells += '<td class="col-total">'+money(r.tot)+'</td>';
+      return '<tr class="cat-row cat-'+groupKey+(collapsed?' row-collapsed':'')+'" data-group="'+groupKey+'"'+delayAttr()+'>'+cells+'</tr>';
+    }).join('');
+  }
+
+  // Encabezado de grupo colapsable (fijo/variable, que suelen tener muchas categorías)
+  function grpRowHtml(label, key, collapsible){
+    var collapsed = collapsible && !!pivotCollapsed[key];
+    var chevron = collapsible ? '<span class="grp-chevron'+(collapsed?' is-collapsed':'')+'">▾</span>' : '';
+    var attrs = collapsible ? ' data-toggle="'+key+'" role="button" tabindex="0"' : '';
+    return '<tr class="grp-row grp-'+key+'"'+attrs+delayAttr()+'><td>'+chevron+label+'</td>'+
+      MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+  }
+
+  html += grpRowHtml('Ingresos', 'ingreso', false);
   html += rowFor('Total Ingresos', function(m){return m.totalIngresos;});
 
-  html += '<tr class="grp-row grp-fijo"><td>Gastos fijos</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
-  catsFor('Fijo').forEach(function(cat){
-    html += rowFor(cat, function(m){return m.fijosPorCat[cat]||0;}, 'cat-row cat-fijo');
-  });
+  html += grpRowHtml('Gastos fijos', 'fijo', true);
+  html += catRowsHtml(catsFor('Fijo'), function(m,cat){return m.fijosPorCat[cat]||0;}, 'fijo');
   html += rowFor('Total Gastos Fijos', function(m){return m.totalFijos;}, 'total-row');
 
-  html += '<tr class="grp-row grp-variable"><td>Gastos variables</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
-  catsFor('Variable').forEach(function(cat){
-    html += rowFor(cat, function(m){return m.variablesPorCat[cat]||0;}, 'cat-row cat-variable');
-  });
+  html += grpRowHtml('Gastos variables', 'variable', true);
+  html += catRowsHtml(catsFor('Variable'), function(m,cat){return m.variablesPorCat[cat]||0;}, 'variable');
   html += rowFor('Total Gastos Variables', function(m){return m.totalVariables;}, 'total-row');
 
   html += rowFor('Gastos Totales', function(m){return m.totalGastos;}, 'total-row');
 
-  html += '<tr class="grp-row grp-dolar"><td>Compra dólar</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+  html += grpRowHtml('Compra dólar', 'dolar', false);
   html += rowFor('$ Gastados', function(m){return m.pesosGastadosUsd;});
   var dolarRowVals = months.map(function(m){return m.totalUsd;});
   var dolarTot = dolarRowVals.reduce(function(a,b){return a+b;},0);
-  html += '<tr><td>USD Totales</td>'+dolarRowVals.map(function(v){return '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':usd(v))+'</td>';}).join('')+'<td class="col-total">'+usd(dolarTot)+'</td></tr>';
+  html += '<tr'+delayAttr()+'><td>USD Totales</td>'+dolarRowVals.map(function(v){return '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':usd(v))+'</td>';}).join('')+'<td class="col-total">'+usd(dolarTot)+'</td></tr>';
 
   if(DATA.inversion.length){
-    html += '<tr class="grp-row grp-inversion"><td>Inversión</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+    html += grpRowHtml('Inversión', 'inversion', false);
     html += rowFor('Monto Invertido', function(m){return m.montoInversion;});
   }
 
-  html += '<tr class="grp-row grp-resumen"><td>Resumen</td>'+MESES.map(function(){return '<td></td>';}).join('')+'<td class="col-total"></td></tr>';
+  html += grpRowHtml('Resumen', 'resumen', false);
   html += rowFor('Total Gastado', function(m){return m.totalGastado;});
   html += rowFor('Total Restante', function(m){return m.totalRestante;}, 'total-row');
 
   html += '</tbody>';
   table.innerHTML = html;
+
+  if(!table.dataset.toggleBound){
+    table.dataset.toggleBound = '1';
+    table.addEventListener('click', function(e){
+      var trigger = e.target.closest('[data-toggle]');
+      if(!trigger) return;
+      var key = trigger.getAttribute('data-toggle');
+      pivotCollapsed[key] = !pivotCollapsed[key];
+      renderResumen();
+    });
+    table.addEventListener('keydown', function(e){
+      if(e.key !== 'Enter' && e.key !== ' ') return;
+      var trigger = e.target.closest('[data-toggle]');
+      if(!trigger) return;
+      e.preventDefault();
+      var key = trigger.getAttribute('data-toggle');
+      pivotCollapsed[key] = !pivotCollapsed[key];
+      renderResumen();
+    });
+  }
 }
 
 /* ===================== ENTRY LISTS (generic) ===================== */
