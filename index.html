@@ -539,6 +539,29 @@ main{
   display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);cursor:pointer;user-select:none;
 }
 .chart-toggle input{width:14px;height:14px;accent-color:var(--dolar);cursor:pointer;}
+.usd-oficial-note{font-size:11px;color:var(--text-faint);margin-top:10px;}
+
+/* Presupuesto vs. Real */
+.pchart-row{padding:9px 0;border-bottom:1px solid var(--line-soft);}
+.pchart-row:last-child{border-bottom:none;}
+.pchart-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12.5px;margin-bottom:6px;}
+.pchart-cat{color:var(--text-dim);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pchart-vals{font-family:var(--font-mono);color:var(--text-faint);font-size:11px;white-space:nowrap;flex-shrink:0;}
+.pchart-track{position:relative;height:8px;border-radius:4px;background:var(--line-soft);}
+.pchart-fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;transition:width .4s ease;}
+.pchart-marker{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text-faint);border-radius:1px;}
+
+/* Mapa de calor mes x categoría */
+.heatmap-wrap{overflow-x:auto;}
+.heatmap-table{border-collapse:collapse;width:100%;font-size:10.5px;font-family:var(--font-mono);}
+.heatmap-table th,.heatmap-table td{padding:5px 7px;text-align:center;white-space:nowrap;}
+.heatmap-table th{color:var(--text-faint);font-weight:500;font-size:10px;}
+.heatmap-table td:first-child,.heatmap-table th:first-child{
+  text-align:left;font-family:var(--font-body);color:var(--text-dim);position:sticky;left:0;
+  background:var(--surface);padding-right:14px;
+}
+.heatmap-cell{border-radius:3px;color:var(--text);}
+.heatmap-empty{color:var(--text-faint);}
 .chart-tooltip{
   position:fixed;z-index:400;pointer-events:none;
   background:var(--surface-2);border:1px solid var(--line);border-radius:7px;
@@ -993,6 +1016,32 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
         <div class="chart-card">
           <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Evolución del dólar (referencia)</h3></div>
           <div class="chart-card-body"><div id="chartDolarRef"></div></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron">▾</span>Presupuesto vs. Real por categoría</h3>
+            <div class="hormiga-controls" onclick="event.stopPropagation()">
+              <select id="presuChartMes"></select>
+            </div>
+          </div>
+          <div class="chart-card-body"><div id="chartPresupuesto"></div></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron">▾</span>Tasa de ahorro mensual</h3>
+            <div class="hormiga-controls" onclick="event.stopPropagation()">
+              <input type="number" min="0" max="100" id="ahorroMeta" value="20" placeholder="Meta %" title="Meta de tasa de ahorro (%), se dibuja como línea de referencia" style="width:64px;">
+            </div>
+          </div>
+          <div class="chart-card-body"><div id="chartAhorro"></div></div>
+        </div>
+        <div class="chart-card chart-card-wide">
+          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Mapa de calor: gasto por categoría y mes</h3></div>
+          <div class="chart-card-body"><div id="chartHeatmap"></div></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Gasto mensual en USD (dólar oficial histórico)</h3></div>
+          <div class="chart-card-body"><div id="chartUsdOficial"></div><div class="usd-oficial-note" id="usdOficialNote"></div></div>
         </div>
         <div class="chart-card chart-card-wide">
           <div class="chart-card-head" data-chart-toggle>
@@ -1820,6 +1869,7 @@ fillMonthSelect(document.getElementById('filtIngMes'), true);
 fillMonthSelect(document.getElementById('filtUsdMes'), true);
 fillMonthSelect(document.getElementById('filtInvMes'), true);
 fillMonthSelect(document.getElementById('hormigaMes'), true);
+fillMonthSelect(document.getElementById('presuChartMes'), false);
 
 ['usdCant','usdValor','usdTotal','invValorActual'].forEach(function(id){
   attachMoneyInput(document.getElementById(id));
@@ -1996,7 +2046,7 @@ updateDescSuggestSource();
 (function setDefaultMonths(){
   var idx = new Date().getMonth();
   var m = MESES[idx] || "Enero";
-  ["ingMes","gasMes","usdMes","invMes"].forEach(function(id){
+  ["ingMes","gasMes","usdMes","invMes","presuChartMes"].forEach(function(id){
     document.getElementById(id).value = m;
   });
 })();
@@ -2694,6 +2744,10 @@ document.getElementById('toggleUsdEquiv').addEventListener('change', renderGrafi
   document.getElementById(id).addEventListener('input', renderHormiga);
   document.getElementById(id).addEventListener('change', renderHormiga);
 });
+document.getElementById('presuChartMes').addEventListener('change', renderPresupuestoChart);
+['input','change'].forEach(function(ev){
+  document.getElementById('ahorroMeta').addEventListener(ev, renderAhorroChart);
+});
 
 /* ===================== EXPORTAR / IMPRIMIR RESUMEN ===================== */
 /* ===================== EXPORTAR CSV (Resumen) ===================== */
@@ -2870,6 +2924,7 @@ var CHART_COLORS = {
   inversion:'#F2679A', neg:'#F2696B', grid:'#2C333C', textDim:'#8B98A5', textFaint:'#5B6874'
 };
 var DONUT_PALETTE = ['#F0B43A','#B47EF5','#5B9FED','#4FD1A5','#F2679A','#FF8B5E','#8B98A5'];
+cargarUsdOficialCache();
 
 function niceCeil(v){
   if(v<=0) return 1;
@@ -3098,6 +3153,218 @@ function buildDolarRefChart(valores){
     gridLines+yLabels+areas+lines+dots+xlabels+'</svg>';
 }
 
+/* ----- Presupuesto vs. Real por categoría ----- */
+function buildPresupuestoChart(mesSel){
+  var m = computeMonth(mesSel);
+  var rows = [];
+  function collect(tipo, porCat){
+    Object.keys(porCat).forEach(function(cat){
+      var presu = DATA.presupuestos[presuKey(tipo, cat)];
+      if(!presu || presu<=0) return;
+      rows.push({tipo:tipo, cat:cat, real:porCat[cat]||0, presu:presu});
+    });
+  }
+  collect('Fijo', m.fijosPorCat);
+  collect('Variable', m.variablesPorCat);
+  if(!rows.length){
+    return '<div class="empty-state">No hay presupuestos definidos todavía (configuralos desde "Presupuestos" en Gastos).</div>';
+  }
+  rows.sort(function(a,b){ return (b.real/b.presu) - (a.real/a.presu); });
+  return rows.map(function(r){
+    var pct = r.presu>0 ? (r.real/r.presu*100) : 0;
+    var barMax = Math.max(r.real, r.presu, 1);
+    var wReal = Math.min(100, r.real/barMax*100);
+    var wPresu = Math.min(100, r.presu/barMax*100);
+    var color = pct>100 ? CHART_COLORS.neg : (pct>=80 ? CHART_COLORS.fijo : CHART_COLORS.ingreso);
+    var badgeClass = pct>100 ? 'var-bad' : 'var-good';
+    var badgeTxt = (pct>100?'+':'') + Math.round(pct-100) + '%';
+    return '<div class="pchart-row">'+
+      '<div class="pchart-top"><span class="pchart-cat">'+escapeHtml(r.cat)+' <span style="opacity:.55;font-size:10px;">('+r.tipo+')</span></span>'+
+      '<span class="pchart-vals">'+money(r.real)+' / '+money(r.presu)+' <span class="var-badge '+badgeClass+'">'+badgeTxt+'</span></span></div>'+
+      '<div class="pchart-track" data-tip="'+escapeHtml(r.cat+': '+money(r.real)+' de '+money(r.presu)+' presupuestados ('+Math.round(pct)+'%)')+'">'+
+        '<div class="pchart-fill" style="width:'+wReal+'%;background:'+color+';"></div>'+
+        '<div class="pchart-marker" style="left:'+wPresu+'%;"></div>'+
+      '</div></div>';
+  }).join('');
+}
+function renderPresupuestoChart(){
+  var sel = document.getElementById('presuChartMes');
+  document.getElementById('chartPresupuesto').innerHTML = buildPresupuestoChart(sel.value || MESES[0]);
+}
+
+/* ----- Tasa de ahorro mensual ----- */
+function buildSavingsRateChart(months, metaPct){
+  var data = months.map(function(m){
+    return m.totalIngresos>0 ? (m.totalRestante/m.totalIngresos*100) : null;
+  });
+  var W=860,H=280,padL=50,padR=14,padT=14,padB=40;
+  var innerW=W-padL-padR, innerH=H-padT-padB;
+  var known = data.filter(function(v){return v!==null;});
+  var maxAbs = Math.max.apply(null, known.map(Math.abs).concat([metaPct, 10]));
+  var niceMax = niceCeil(maxAbs*1.15);
+  function yFor(v){ return padT+innerH/2 - (v/niceMax)*(innerH/2); }
+  var zeroY = yFor(0);
+  var metaY = yFor(metaPct);
+  var ticks=4, gridLines='', yLabels='';
+  for(var t=-ticks;t<=ticks;t+=2){
+    var v = niceMax*t/ticks;
+    var y = yFor(v);
+    gridLines += '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="'+CHART_COLORS.grid+'" stroke-width="1"/>';
+    yLabels += '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+Math.round(v)+'%</text>';
+  }
+  var n=MESES.length, groupW=innerW/n, bars='', xlabels='';
+  var curIdx = currentMonthIdxForDisplay();
+  MESES.forEach(function(mes,i){
+    var cx = padL+groupW*i+groupW/2;
+    xlabels += '<text x="'+cx+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="'+(i===curIdx?CHART_COLORS.textDim:CHART_COLORS.textFaint)+'">'+mes.slice(0,3)+'</text>';
+    var v = data[i];
+    if(v===null) return;
+    var barW = Math.min(26, groupW*0.5);
+    var y0 = yFor(Math.max(v,0)), y1 = yFor(Math.min(v,0));
+    var h = Math.max(1, y1-y0);
+    var color = v<0 ? CHART_COLORS.neg : (v>=metaPct ? CHART_COLORS.ingreso : CHART_COLORS.fijo);
+    bars += '<rect x="'+(cx-barW/2)+'" y="'+y0+'" width="'+barW+'" height="'+h+'" fill="'+color+'" rx="3" data-tip="'+escapeHtml(mes+': '+v.toFixed(1)+'% ahorrado sobre el ingreso')+'"/>';
+  });
+  var metaLine = '<line x1="'+padL+'" y1="'+metaY+'" x2="'+(W-padR)+'" y2="'+metaY+'" stroke="'+CHART_COLORS.dolar+'" stroke-width="1.4" stroke-dasharray="5,4"/>'+
+    '<text x="'+(W-padR)+'" y="'+(metaY-5)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.dolar+'">Meta '+metaPct+'%</text>';
+  var zeroLine = '<line x1="'+padL+'" y1="'+zeroY+'" x2="'+(W-padR)+'" y2="'+zeroY+'" stroke="'+CHART_COLORS.textFaint+'" stroke-width="1"/>';
+  return '<svg viewBox="0 0 '+W+' '+(H+8)+'" style="width:100%;height:auto">'+gridLines+yLabels+zeroLine+bars+metaLine+xlabels+'</svg>';
+}
+function renderAhorroChart(){
+  var months = MESES.map(computeMonth);
+  var meta = parseFloat(document.getElementById('ahorroMeta').value);
+  if(isNaN(meta)) meta = 20;
+  document.getElementById('chartAhorro').innerHTML = buildSavingsRateChart(months, meta);
+}
+
+/* ----- Mapa de calor: gasto por categoría y mes ----- */
+function buildHeatmapChart(months){
+  var cats = [];
+  CAT_FIJAS.forEach(function(c){ cats.push({cat:c, tipo:'Fijo'}); });
+  CAT_VARIABLES.forEach(function(c){ cats.push({cat:c, tipo:'Variable'}); });
+  var rows = cats.map(function(c){
+    var vals = months.map(function(m){
+      return c.tipo==='Fijo' ? (m.fijosPorCat[c.cat]||0) : (m.variablesPorCat[c.cat]||0);
+    });
+    var total = vals.reduce(function(s,v){return s+v;},0);
+    return {cat:c.cat, tipo:c.tipo, vals:vals, total:total};
+  }).filter(function(r){ return r.total>0; });
+  if(!rows.length){
+    return '<div class="empty-state">Todavía no hay gastos cargados.</div>';
+  }
+  rows.sort(function(a,b){ return b.total-a.total; });
+  var globalMax = Math.max.apply(null, rows.reduce(function(acc,r){return acc.concat(r.vals);},[]).concat([1]));
+  var head = '<tr><th></th>'+MESES.map(function(mes){return '<th>'+mes.slice(0,3)+'</th>';}).join('')+'</tr>';
+  var body = rows.map(function(r){
+    var baseColor = r.tipo==='Fijo' ? CHART_COLORS.fijo : CHART_COLORS.variable;
+    var cells = r.vals.map(function(v,i){
+      if(v<=0) return '<td class="heatmap-empty">·</td>';
+      var intensity = Math.min(1, v/globalMax);
+      var opacityPct = Math.round(12 + intensity*78);
+      return '<td class="heatmap-cell" style="background:color-mix(in srgb, '+baseColor+' '+opacityPct+'%, transparent);" data-tip="'+escapeHtml(r.cat+' · '+MESES[i]+': '+money(v))+'">'+compactMoney(v)+'</td>';
+    }).join('');
+    return '<tr><td>'+escapeHtml(r.cat)+'</td>'+cells+'</tr>';
+  }).join('');
+  return '<div class="heatmap-wrap"><table class="heatmap-table">'+head+body+'</table></div>';
+}
+
+/* ----- Gasto mensual en USD equivalente, con dólar OFICIAL histórico (ArgentinaDatos) -----
+   A diferencia de "Evolución del dólar (referencia)" (que usa TU precio de compra cargado
+   a mano), esto usa la cotización de mercado real de cada mes, así que sirve para ver si
+   perdiste o ganaste poder adquisitivo en dólares, más allá de a cuánto compraste vos. */
+var USD_OFICIAL_CACHE_KEY = 'libroGastos_usdOficialCache_v1';
+var usdOficialCache = {}; // {"2026-03": 1032.5, ...} promedio mensual del dólar oficial (venta)
+var usdOficialFetchState = 'idle'; // idle | loading | done | error
+function cargarUsdOficialCache(){
+  try{
+    var raw = localStorage.getItem(USD_OFICIAL_CACHE_KEY);
+    if(raw) usdOficialCache = JSON.parse(raw) || {};
+  }catch(e){ usdOficialCache = {}; }
+}
+function guardarUsdOficialCache(){
+  try{ localStorage.setItem(USD_OFICIAL_CACHE_KEY, JSON.stringify(usdOficialCache)); }catch(e){}
+}
+function usdOficialKey(anio, mesIdx){ return anio+'-'+String(mesIdx+1).padStart(2,'0'); }
+function usdOficialPromedioMes(anio, mesIdx){
+  var v = usdOficialCache[usdOficialKey(anio, mesIdx)];
+  return (v===undefined) ? null : v;
+}
+function fetchUsdOficialHistorico(onDone){
+  if(usdOficialFetchState==='loading') return;
+  usdOficialFetchState = 'loading';
+  fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial')
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(rows){
+      var sums={}, counts={};
+      (rows||[]).forEach(function(r){
+        if(!r || !r.fecha || !(+r.venta>0)) return;
+        var key = String(r.fecha).slice(0,7); // "YYYY-MM"
+        sums[key] = (sums[key]||0) + (+r.venta);
+        counts[key] = (counts[key]||0) + 1;
+      });
+      Object.keys(sums).forEach(function(key){
+        usdOficialCache[key] = sums[key]/counts[key];
+      });
+      guardarUsdOficialCache();
+      usdOficialFetchState = 'done';
+      if(onDone) onDone(null);
+    })
+    .catch(function(err){
+      usdOficialFetchState = 'error';
+      if(onDone) onDone(err);
+    });
+}
+function buildUsdOficialChart(gastosPesos, usdEquivArr){
+  var known = usdEquivArr.filter(function(v){return v!==null && v!==undefined;});
+  if(!known.length){
+    return '<div class="empty-state">Todavía no se pudo traer la cotización histórica (necesitás conexión a internet al menos una vez).</div>';
+  }
+  var W=860,H=260,padL=58,padR=64,padT=14,padB=40;
+  var innerW=W-padL-padR, innerH=H-padT-padB;
+  var n=MESES.length;
+  var maxPesos = Math.max.apply(null, gastosPesos.concat([1]));
+  var maxUsd = Math.max.apply(null, known.concat([1]));
+  var stepX = innerW/(n-1);
+  function xFor(i){return padL+stepX*i;}
+  function yForPesos(v){return padT+innerH-(v/maxPesos)*innerH;}
+  function yForUsd(v){return padT+innerH-(v/maxUsd)*innerH;}
+  var ticks=4, gridLines='', yLabelsL='', yLabelsR='';
+  for(var t=0;t<=ticks;t++){
+    var y = padT+innerH-innerH*t/ticks;
+    gridLines += '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="'+CHART_COLORS.grid+'" stroke-width="1"/>';
+    yLabelsL += '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+compactMoney(maxPesos*t/ticks)+'</text>';
+    yLabelsR += '<text x="'+(W-padR+8)+'" y="'+(y+4)+'" text-anchor="start" font-size="10" fill="'+CHART_COLORS.dolar+'">'+compactUsd(maxUsd*t/ticks)+'</text>';
+  }
+  var pesosPts = gastosPesos.map(function(v,i){return xFor(i)+','+yForPesos(v);}).join(' ');
+  var pesosDots = gastosPesos.map(function(v,i){
+    return '<circle cx="'+xFor(i)+'" cy="'+yForPesos(v)+'" r="3" fill="'+CHART_COLORS.neg+'" data-tip="'+escapeHtml(MESES[i]+': '+money(v)+' de gasto')+'"/>';
+  }).join('');
+  var segs=[], curSeg=[];
+  usdEquivArr.forEach(function(v,i){
+    if(v===null||v===undefined){ if(curSeg.length){segs.push(curSeg); curSeg=[];} return; }
+    curSeg.push(xFor(i)+','+yForUsd(v));
+  });
+  if(curSeg.length) segs.push(curSeg);
+  var usdLines = segs.map(function(seg){
+    return '<polyline points="'+seg.join(' ')+'" fill="none" stroke="'+CHART_COLORS.dolar+'" stroke-width="2"/>';
+  }).join('');
+  var usdDots = usdEquivArr.map(function(v,i){
+    if(v===null||v===undefined) return '';
+    return '<circle cx="'+xFor(i)+'" cy="'+yForUsd(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'" data-tip="'+escapeHtml(MESES[i]+': '+usd(v)+' equivalentes (dólar oficial)')+'"/>';
+  }).join('');
+  var xlabels = MESES.map(function(mes,i){
+    return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+mes.slice(0,3)+'</text>';
+  }).join('');
+  var legend = '<g transform="translate('+padL+','+(H-8)+')">'+
+      '<rect width="10" height="10" fill="'+CHART_COLORS.neg+'" rx="2"/><text x="14" y="9" font-size="10" fill="'+CHART_COLORS.textDim+'">Gasto en pesos</text>'+
+    '</g><g transform="translate('+(padL+150)+','+(H-8)+')">'+
+      '<rect width="10" height="10" fill="'+CHART_COLORS.dolar+'" rx="2"/><text x="14" y="9" font-size="10" fill="'+CHART_COLORS.textDim+'">Gasto en USD oficial (eje der.)</text>'+
+    '</g>';
+  return '<svg viewBox="0 0 '+W+' '+(H+8)+'" style="width:100%;height:auto">'+gridLines+yLabelsL+yLabelsR+
+    '<polyline points="'+pesosPts+'" fill="none" stroke="'+CHART_COLORS.neg+'" stroke-width="2"/>'+
+    usdLines+pesosDots+usdDots+xlabels+legend+'</svg>';
+}
+
 /* ----- Gasto hormiga ----- */
 function renderHormiga(){
   var mesSel = document.getElementById('hormigaMes').value;
@@ -3180,6 +3447,36 @@ function renderGraficos(){
   document.getElementById('chartDonut').innerHTML = buildDonutChart(catTotals);
   document.getElementById('chartRestante').innerHTML = buildLineChart(months.map(function(m){return m.totalRestante;}));
   document.getElementById('chartDolarRef').innerHTML = buildDolarRefChart(valores);
+
+  renderPresupuestoChart();
+  renderAhorroChart();
+  document.getElementById('chartHeatmap').innerHTML = buildHeatmapChart(months);
+
+  var anioActivo = STORE.activeEjercicio;
+  var usdOfEquivArr = months.map(function(m,i){
+    var rate = usdOficialPromedioMes(anioActivo, i);
+    return rate ? (m.totalGastos/rate) : null;
+  });
+  document.getElementById('chartUsdOficial').innerHTML = buildUsdOficialChart(
+    months.map(function(m){return m.totalGastos;}), usdOfEquivArr
+  );
+  var hasAnyUsdOf = usdOfEquivArr.some(function(v){return v!==null;});
+  var noteEl = document.getElementById('usdOficialNote');
+  if(usdOficialFetchState==='loading'){
+    noteEl.textContent = 'Actualizando cotización histórica del dólar oficial...';
+  } else if(usdOficialFetchState==='error' && !hasAnyUsdOf){
+    noteEl.textContent = 'No se pudo traer la cotización (sin conexión) y todavía no hay datos guardados.';
+  } else if(usdOficialFetchState==='error'){
+    noteEl.textContent = 'No se pudo actualizar recién (sin conexión) — mostrando la última cotización guardada.';
+  } else if(!hasAnyUsdOf){
+    noteEl.textContent = 'Necesitás conexión a internet al menos una vez para traer la cotización histórica.';
+  } else {
+    noteEl.textContent = 'Fuente: promedio mensual del dólar oficial (venta), vía ArgentinaDatos.';
+  }
+  if(usdOficialFetchState==='idle'){
+    fetchUsdOficialHistorico(function(){ renderGraficos(); });
+  }
+
   renderHormiga();
 }
 

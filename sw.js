@@ -7,7 +7,7 @@
    cambió y descargue la versión nueva en vez de seguir usando la vieja para
    siempre (clave en la app instalada desde Safari en el celular).
 */
-var CACHE_NAME = 'libro-gastos-v5';
+var CACHE_NAME = 'libro-gastos-v6';
 
 var PRECACHE_URLS = [
   'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap',
@@ -56,6 +56,24 @@ self.addEventListener('fetch', function(event){
         return caches.match(req).then(function(cached){
           return cached || caches.match('./');
         });
+      })
+    );
+    return;
+  }
+
+  // La API de cotización histórica (ArgentinaDatos) siempre trae la misma URL
+  // pero su contenido cambia día a día: acá SÍ priorizamos la red (para no
+  // quedarnos con datos viejos) y solo caemos al caché si no hay conexión.
+  var url;
+  try{ url = new URL(req.url); }catch(e){ url = null; }
+  if(url && url.hostname === 'api.argentinadatos.com'){
+    event.respondWith(
+      fetch(req).then(function(res){
+        var copy = res.clone();
+        caches.open(CACHE_NAME).then(function(cache){ cache.put(req, copy); });
+        return res;
+      }).catch(function(){
+        return caches.match(req);
       })
     );
     return;
