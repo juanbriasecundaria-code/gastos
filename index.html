@@ -535,6 +535,18 @@ main{
   display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);cursor:pointer;user-select:none;
 }
 .chart-toggle input{width:14px;height:14px;accent-color:var(--dolar);cursor:pointer;}
+.chart-tooltip{
+  position:fixed;z-index:400;pointer-events:none;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:7px;
+  padding:7px 10px;font-size:11.5px;color:var(--text);font-family:var(--font-mono);
+  box-shadow:var(--shadow-pop);white-space:nowrap;
+  opacity:0;transform:translate(-50%,-100%);transition:opacity .1s;
+}
+.chart-tooltip.show{opacity:1;}
+.donut-slice{cursor:pointer;transition:opacity .15s;}
+.donut-slice:hover{opacity:.82;}
+.donut-legend-row.clickable{cursor:pointer;border-radius:6px;margin:0 -6px;padding-left:6px;padding-right:6px;transition:background .15s;}
+.donut-legend-row.clickable:hover{background:var(--surface-2);}
 .hormiga-controls{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
 }
@@ -2923,7 +2935,7 @@ function buildBarChart(series, mode, opts){
         if(v<=0) return;
         var bh = innerH*v/niceMax;
         yBase -= bh;
-        bars += '<rect x="'+(cx-barW/2)+'" y="'+yBase+'" width="'+barW+'" height="'+bh+'" fill="url(#'+gradId(se.color)+')" rx="3"><title>'+mes+' · '+escapeHtml(se.label)+': '+tipFmt(v)+'</title></rect>';
+        bars += '<rect x="'+(cx-barW/2)+'" y="'+yBase+'" width="'+barW+'" height="'+bh+'" fill="url(#'+gradId(se.color)+')" rx="3" data-tip="'+escapeHtml(mes+' · '+se.label+': '+tipFmt(v))+'"/>';
       });
     } else {
       var count = series.length, barW = Math.min(14, groupW*0.28), gap=4;
@@ -2932,7 +2944,7 @@ function buildBarChart(series, mode, opts){
         var v = se.data[i]||0;
         var bh = innerH*v/niceMax;
         var x = startX+si*(barW+gap), y=padT+innerH-bh;
-        bars += '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+Math.max(bh,0)+'" fill="url(#'+gradId(se.color)+')" rx="3"><title>'+mes+' · '+escapeHtml(se.label)+': '+tipFmt(v)+'</title></rect>';
+        bars += '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+Math.max(bh,0)+'" fill="url(#'+gradId(se.color)+')" rx="3" data-tip="'+escapeHtml(mes+' · '+se.label+': '+tipFmt(v))+'"/>';
       });
     }
   });
@@ -2946,14 +2958,16 @@ function polarXY(cx,cy,r,deg){
   var rad = deg*Math.PI/180;
   return {x: cx+r*Math.cos(rad), y: cy+r*Math.sin(rad)};
 }
-function donutSlice(cx,cy,rOut,rIn,a0,a1,color,label,val,total){
+function donutSlice(cx,cy,rOut,rIn,a0,a1,color,label,val,total,clickable){
   if(a1-a0>=359.99) a1=a0+359.98;
   var largeArc = (a1-a0)>180 ? 1 : 0;
   var p1=polarXY(cx,cy,rOut,a0), p2=polarXY(cx,cy,rOut,a1);
   var p3=polarXY(cx,cy,rIn,a1), p4=polarXY(cx,cy,rIn,a0);
   var d = ['M',p1.x,p1.y,'A',rOut,rOut,0,largeArc,1,p2.x,p2.y,'L',p3.x,p3.y,'A',rIn,rIn,0,largeArc,0,p4.x,p4.y,'Z'].join(' ');
   var pct = total>0 ? (val/total*100).toFixed(1) : 0;
-  return '<path d="'+d+'" fill="'+color+'"><title>'+escapeHtml(label)+': '+money(val)+' ('+pct+'%)</title></path>';
+  var tip = escapeHtml(label+': '+money(val)+' ('+pct+'%)');
+  var extra = clickable ? ' class="donut-slice" data-cat="'+escapeHtml(label)+'"' : '';
+  return '<path d="'+d+'"'+extra+' data-tip="'+tip+'" fill="'+color+'"/>';
 }
 function buildDonutChart(catTotals){
   var entries = Object.keys(catTotals).map(function(c){return {cat:c, val:catTotals[c]};}).filter(function(e){return e.val>0;});
@@ -2968,12 +2982,14 @@ function buildDonutChart(catTotals){
   var cx=110, cy=110, rOut=94, rIn=56, start=-90, arcs='';
   top.forEach(function(e,i){
     var angle = e.val/total*360, end=start+angle;
-    arcs += donutSlice(cx,cy,rOut,rIn,start,end,DONUT_PALETTE[i%DONUT_PALETTE.length],e.cat,e.val,total);
+    var clickable = e.cat!=='Otras categorías';
+    arcs += donutSlice(cx,cy,rOut,rIn,start,end,DONUT_PALETTE[i%DONUT_PALETTE.length],e.cat,e.val,total,clickable);
     start = end;
   });
   var legend = top.map(function(e,i){
     var pct=(e.val/total*100).toFixed(1);
-    return '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);padding:4px 0;">'+
+    var clickable = e.cat!=='Otras categorías';
+    return '<div class="donut-legend-row'+(clickable?' clickable':'')+'"'+(clickable?' data-cat="'+escapeHtml(e.cat)+'"':'')+' style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);padding:4px 0;">'+
       '<span style="width:10px;height:10px;border-radius:3px;background:'+DONUT_PALETTE[i%DONUT_PALETTE.length]+';flex-shrink:0;"></span>'+
       '<span style="flex:1;">'+escapeHtml(e.cat)+'</span>'+
       '<span style="font-family:var(--font-mono);color:var(--text);">'+pct+'%</span></div>';
@@ -2997,7 +3013,7 @@ function buildLineChart(data){
   var points=data.map(function(v,i){return xFor(i)+','+yFor(v);}).join(' ');
   var areaPts = 'M'+xFor(0)+','+zeroY+' '+data.map(function(v,i){return 'L'+xFor(i)+','+yFor(v);}).join(' ')+' L'+xFor(n-1)+','+zeroY+' Z';
   var dots=data.map(function(v,i){
-    return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+(v>=0?CHART_COLORS.ingreso:CHART_COLORS.neg)+'"><title>'+MESES[i]+': '+money(v)+'</title></circle>';
+    return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+(v>=0?CHART_COLORS.ingreso:CHART_COLORS.neg)+'" data-tip="'+escapeHtml(MESES[i]+': '+money(v))+'"/>';
   }).join('');
   var xlabels=MESES.map(function(m,i){
     return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+m.slice(0,3)+'</text>';
@@ -3065,7 +3081,7 @@ function buildDolarRefChart(valores){
   }).join('');
   var dots = valores.map(function(v,i){
     if(v===null||v===undefined) return '';
-    return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'"><title>'+MESES[i]+': '+money(v)+' /USD</title></circle>';
+    return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'" data-tip="'+escapeHtml(MESES[i]+': '+money(v)+' /USD')+'"/>';
   }).join('');
   var xlabels=MESES.map(function(m,i){
     return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+m.slice(0,3)+'</text>';
@@ -3162,6 +3178,52 @@ function renderGraficos(){
   document.getElementById('chartDolarRef').innerHTML = buildDolarRefChart(valores);
   renderHormiga();
 }
+
+/* ----- Tooltip propio para los gráficos (reemplaza el title nativo del navegador) ----- */
+(function setupChartTooltips(){
+  var tipEl = document.createElement('div');
+  tipEl.className = 'chart-tooltip';
+  document.body.appendChild(tipEl);
+  function showTip(x, y, text){
+    tipEl.textContent = text;
+    tipEl.style.left = x+'px';
+    tipEl.style.top = (y-10)+'px';
+    tipEl.classList.add('show');
+  }
+  function hideTip(){ tipEl.classList.remove('show'); }
+  var graficosView = document.getElementById('view-graficos');
+  if(!graficosView) return;
+  graficosView.addEventListener('pointermove', function(e){
+    var target = e.target.closest('[data-tip]');
+    if(target) showTip(e.clientX, e.clientY, target.getAttribute('data-tip'));
+    else hideTip();
+  });
+  graficosView.addEventListener('pointerdown', function(e){
+    var target = e.target.closest('[data-tip]');
+    if(target) showTip(e.clientX, e.clientY, target.getAttribute('data-tip'));
+  });
+  graficosView.addEventListener('pointerleave', hideTip);
+  document.addEventListener('pointerdown', function(e){
+    if(!e.target.closest('[data-tip]')) hideTip();
+  });
+})();
+
+/* ----- Click en el donut (porción o leyenda): abre la búsqueda filtrada por esa categoría ----- */
+function openCategorySearch(cat){
+  openSearch();
+  searchInput.value = cat;
+  renderSearchResults();
+  setTimeout(function(){ searchInput.focus(); searchInput.select(); }, 10);
+}
+(function setupDonutClick(){
+  var chartDonut = document.getElementById('chartDonut');
+  if(!chartDonut) return;
+  chartDonut.addEventListener('click', function(e){
+    var target = e.target.closest('[data-cat]');
+    if(!target) return;
+    openCategorySearch(target.getAttribute('data-cat'));
+  });
+})();
 
 /* ===================== RENDER ALL ===================== */
 function renderAll(){
