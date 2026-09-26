@@ -4127,14 +4127,25 @@ window.__gastosApplyRemoteStore = function(json){
   var authGate = document.getElementById('authGate');
   var authLoading = document.getElementById('authLoading');
   var splashMsgEl = document.getElementById('splashMsg');
+  var SPLASH_MIN_MS = 900;
+  var splashShownAt = null;
   function showSplash(msg){
     if(splashMsgEl && msg) splashMsgEl.textContent = msg;
+    if(splashShownAt === null) splashShownAt = Date.now();
     authLoading.classList.remove('fade-out');
     authLoading.style.display = 'flex';
   }
-  function hideSplash(){
-    authLoading.classList.add('fade-out');
-    setTimeout(function(){ authLoading.style.display = 'none'; }, 350);
+  function hideSplash(cb){
+    var elapsed = splashShownAt ? (Date.now() - splashShownAt) : SPLASH_MIN_MS;
+    var wait = Math.max(0, SPLASH_MIN_MS - elapsed);
+    setTimeout(function(){
+      authLoading.classList.add('fade-out');
+      setTimeout(function(){
+        authLoading.style.display = 'none';
+        splashShownAt = null;
+        if(cb) cb();
+      }, 350);
+    }, wait);
   }
   var authForm = document.getElementById('authForm');
   var authEmail = document.getElementById('authEmail');
@@ -4586,12 +4597,13 @@ window.__gastosApplyRemoteStore = function(json){
       if(libroUnsub){ libroUnsub(); libroUnsub = null; }
       window.__gastosCloudSync = null;
       userBadge.style.display = 'none';
-      hideSplash();
       if(inviteBanner){ inviteBanner.style.display = 'none'; }
-      if(!appStarted){
-        authGate.classList.add('show');
-        setTimeout(function(){ authEmail.focus(); }, 50);
-      }
+      hideSplash(function(){
+        if(!appStarted){
+          authGate.classList.add('show');
+          setTimeout(function(){ authEmail.focus(); }, 50);
+        }
+      });
     }
   });
 
