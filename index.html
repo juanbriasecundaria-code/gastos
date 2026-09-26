@@ -539,6 +539,12 @@ main{
   display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);cursor:pointer;user-select:none;
 }
 .chart-toggle input{width:14px;height:14px;accent-color:var(--dolar);cursor:pointer;}
+.chart-toggle-group{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.chart-toggle-group select{
+  background:var(--bg);border:1px solid var(--line);border-radius:6px;
+  color:var(--text);font-family:var(--font-mono);font-size:11.5px;padding:4px 8px;cursor:pointer;
+}
+.chart-toggle-group select:focus{outline:none;border-color:var(--dolar);}
 .usd-oficial-note{font-size:11px;color:var(--text-faint);margin-top:10px;}
 
 /* Presupuesto vs. Real */
@@ -1012,7 +1018,7 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
         <div class="chart-card chart-card-wide">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron">▾</span>Composición de gastos</h3>
-            <div class="chart-toggle-group" onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:12px;">
+            <div class="chart-toggle-group" onclick="event.stopPropagation()">
               <select id="fijoVarChartMode" title="Forma del gráfico">
                 <option value="fijovar">Fijos vs. Variables</option>
                 <option value="usdoficial">Pesos vs. USD oficial</option>
@@ -1023,11 +1029,17 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
           <div class="chart-card-body"><div id="chartFijoVar"></div><div class="usd-oficial-note" id="usdOficialNote"></div></div>
         </div>
         <div class="chart-card">
-          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Top categorías de gasto (año)</h3></div>
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron">▾</span>Top categorías de gasto (año)</h3>
+            <label class="chart-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="toggleUsdDonut"> Ver en USD equivalente</label>
+          </div>
           <div class="chart-card-body"><div id="chartDonut"></div></div>
         </div>
         <div class="chart-card">
-          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Evolución del restante mensual</h3></div>
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron">▾</span>Evolución del restante mensual</h3>
+            <label class="chart-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="toggleUsdRestante"> Ver en USD equivalente</label>
+          </div>
           <div class="chart-card-body"><div id="chartRestante"></div></div>
         </div>
         <div class="chart-card">
@@ -1053,7 +1065,10 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
           <div class="chart-card-body"><div id="chartAhorro"></div></div>
         </div>
         <div class="chart-card chart-card-wide">
-          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Mapa de calor: gasto por categoría y mes</h3></div>
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron">▾</span>Mapa de calor: gasto por categoría y mes</h3>
+            <label class="chart-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="toggleUsdHeatmap"> Ver en USD equivalente</label>
+          </div>
           <div class="chart-card-body"><div id="chartHeatmap"></div></div>
         </div>
         <div class="chart-card chart-card-wide">
@@ -2755,6 +2770,9 @@ document.getElementById('filtInvMes').addEventListener('change', renderInversion
 document.getElementById('toggleUsdEquiv').addEventListener('change', renderGraficos);
 document.getElementById('toggleUsdFijoVar').addEventListener('change', renderGraficos);
 document.getElementById('fijoVarChartMode').addEventListener('change', renderGraficos);
+document.getElementById('toggleUsdDonut').addEventListener('change', renderGraficos);
+document.getElementById('toggleUsdRestante').addEventListener('change', renderGraficos);
+document.getElementById('toggleUsdHeatmap').addEventListener('change', renderGraficos);
 ['hormigaMes','hormigaUmbral','hormigaMinOcurrencias'].forEach(function(id){
   document.getElementById(id).addEventListener('input', renderHormiga);
   document.getElementById(id).addEventListener('change', renderHormiga);
@@ -3032,18 +3050,20 @@ function polarXY(cx,cy,r,deg){
   var rad = deg*Math.PI/180;
   return {x: cx+r*Math.cos(rad), y: cy+r*Math.sin(rad)};
 }
-function donutSlice(cx,cy,rOut,rIn,a0,a1,color,label,val,total,clickable){
+function donutSlice(cx,cy,rOut,rIn,a0,a1,color,label,val,total,clickable,fmtFull){
   if(a1-a0>=359.99) a1=a0+359.98;
   var largeArc = (a1-a0)>180 ? 1 : 0;
   var p1=polarXY(cx,cy,rOut,a0), p2=polarXY(cx,cy,rOut,a1);
   var p3=polarXY(cx,cy,rIn,a1), p4=polarXY(cx,cy,rIn,a0);
   var d = ['M',p1.x,p1.y,'A',rOut,rOut,0,largeArc,1,p2.x,p2.y,'L',p3.x,p3.y,'A',rIn,rIn,0,largeArc,0,p4.x,p4.y,'Z'].join(' ');
   var pct = total>0 ? (val/total*100).toFixed(1) : 0;
-  var tip = escapeHtml(label+': '+money(val)+' ('+pct+'%)');
+  var tip = escapeHtml(label+': '+(fmtFull||money)(val)+' ('+pct+'%)');
   var extra = clickable ? ' class="donut-slice" data-cat="'+escapeHtml(label)+'"' : '';
   return '<path d="'+d+'"'+extra+' data-tip="'+tip+'" fill="'+color+'"/>';
 }
-function buildDonutChart(catTotals){
+function buildDonutChart(catTotals, opts){
+  opts = opts || {};
+  var fmtFull = opts.usd ? usd : money;
   var entries = Object.keys(catTotals).map(function(c){return {cat:c, val:catTotals[c]};}).filter(function(e){return e.val>0;});
   if(!entries.length){
     return '<div class="empty-state">Todavía no hay gastos cargados.</div>';
@@ -3057,7 +3077,7 @@ function buildDonutChart(catTotals){
   top.forEach(function(e,i){
     var angle = e.val/total*360, end=start+angle;
     var clickable = e.cat!=='Otras categorías';
-    arcs += donutSlice(cx,cy,rOut,rIn,start,end,DONUT_PALETTE[i%DONUT_PALETTE.length],e.cat,e.val,total,clickable);
+    arcs += donutSlice(cx,cy,rOut,rIn,start,end,DONUT_PALETTE[i%DONUT_PALETTE.length],e.cat,e.val,total,clickable,fmtFull);
     start = end;
   });
   var legend = top.map(function(e,i){
@@ -3073,7 +3093,9 @@ function buildDonutChart(catTotals){
     '<div style="flex:0 1 260px;min-width:160px;max-width:280px;">'+legend+'</div></div>';
 }
 
-function buildLineChart(data){
+function buildLineChart(data, opts){
+  opts = opts || {};
+  var tipFmt = opts.usd ? usd : money;
   var W=860,H=260,padL=58,padR=14,padT=14,padB=40;
   var innerW=W-padL-padR, innerH=H-padT-padB;
   var maxVal=Math.max.apply(null, data.concat([0]));
@@ -3087,7 +3109,7 @@ function buildLineChart(data){
   var points=data.map(function(v,i){return xFor(i)+','+yFor(v);}).join(' ');
   var areaPts = 'M'+xFor(0)+','+zeroY+' '+data.map(function(v,i){return 'L'+xFor(i)+','+yFor(v);}).join(' ')+' L'+xFor(n-1)+','+zeroY+' Z';
   var dots=data.map(function(v,i){
-    return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+(v>=0?CHART_COLORS.ingreso:CHART_COLORS.neg)+'" data-tip="'+escapeHtml(MESES[i]+': '+money(v))+'"/>';
+    return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+(v>=0?CHART_COLORS.ingreso:CHART_COLORS.neg)+'" data-tip="'+escapeHtml(MESES[i]+': '+tipFmt(v))+'"/>';
   }).join('');
   var xlabels=MESES.map(function(m,i){
     return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+m.slice(0,3)+'</text>';
@@ -3277,7 +3299,10 @@ function renderAhorroChart(){
 }
 
 /* ----- Mapa de calor: gasto por categoría y mes ----- */
-function buildHeatmapChart(months){
+function buildHeatmapChart(months, opts){
+  opts = opts || {};
+  var fmtFull = opts.usd ? usd : money;
+  var fmtCompact = opts.usd ? compactUsd : compactMoney;
   var cats = [];
   CAT_FIJAS.forEach(function(c){ cats.push({cat:c, tipo:'Fijo'}); });
   CAT_VARIABLES.forEach(function(c){ cats.push({cat:c, tipo:'Variable'}); });
@@ -3300,7 +3325,7 @@ function buildHeatmapChart(months){
       if(v<=0) return '<td class="heatmap-empty">·</td>';
       var intensity = Math.min(1, v/globalMax);
       var opacityPct = Math.round(12 + intensity*78);
-      return '<td class="heatmap-cell" style="background:color-mix(in srgb, '+baseColor+' '+opacityPct+'%, transparent);" data-tip="'+escapeHtml(r.cat+' · '+MESES[i]+': '+money(v))+'">'+compactMoney(v)+'</td>';
+      return '<td class="heatmap-cell" style="background:color-mix(in srgb, '+baseColor+' '+opacityPct+'%, transparent);" data-tip="'+escapeHtml(r.cat+' · '+MESES[i]+': '+fmtFull(v))+'">'+fmtCompact(v)+'</td>';
     }).join('');
     return '<tr><td>'+escapeHtml(r.cat)+'</td>'+cells+'</tr>';
   }).join('');
@@ -3520,13 +3545,18 @@ function renderGraficos(){
     ], 'stacked', {usd:enUsdFijoVar});
   }
 
+  var enUsdDonut = document.getElementById('toggleUsdDonut').checked;
   var catTotals = {};
-  months.forEach(function(m){
-    Object.keys(m.fijosPorCat).forEach(function(c){ catTotals[c]=(catTotals[c]||0)+m.fijosPorCat[c]; });
-    Object.keys(m.variablesPorCat).forEach(function(c){ catTotals[c]=(catTotals[c]||0)+m.variablesPorCat[c]; });
+  months.forEach(function(m,i){
+    Object.keys(m.fijosPorCat).forEach(function(c){ catTotals[c]=(catTotals[c]||0)+convUsd(m.fijosPorCat[c],i,enUsdDonut); });
+    Object.keys(m.variablesPorCat).forEach(function(c){ catTotals[c]=(catTotals[c]||0)+convUsd(m.variablesPorCat[c],i,enUsdDonut); });
   });
-  document.getElementById('chartDonut').innerHTML = buildDonutChart(catTotals);
-  document.getElementById('chartRestante').innerHTML = buildLineChart(months.map(function(m){return m.totalRestante;}));
+  document.getElementById('chartDonut').innerHTML = buildDonutChart(catTotals, {usd:enUsdDonut});
+
+  var enUsdRestante = document.getElementById('toggleUsdRestante').checked;
+  document.getElementById('chartRestante').innerHTML = buildLineChart(
+    months.map(function(m,i){return convUsd(m.totalRestante,i,enUsdRestante);}), {usd:enUsdRestante}
+  );
 
   // "Evolución del dólar (referencia)": siempre usa el promedio oficial
   // histórico (ArgentinaDatos) para cada mes, haya o no compra propia
@@ -3546,7 +3576,14 @@ function renderGraficos(){
 
   renderPresupuestoChart();
   renderAhorroChart();
-  document.getElementById('chartHeatmap').innerHTML = buildHeatmapChart(months);
+  var enUsdHeatmap = document.getElementById('toggleUsdHeatmap').checked;
+  var monthsHeatmap = !enUsdHeatmap ? months : months.map(function(m,i){
+    var fijosPorCat={}, variablesPorCat={};
+    Object.keys(m.fijosPorCat).forEach(function(c){ fijosPorCat[c]=convUsd(m.fijosPorCat[c],i,true); });
+    Object.keys(m.variablesPorCat).forEach(function(c){ variablesPorCat[c]=convUsd(m.variablesPorCat[c],i,true); });
+    return Object.assign({}, m, {fijosPorCat:fijosPorCat, variablesPorCat:variablesPorCat});
+  });
+  document.getElementById('chartHeatmap').innerHTML = buildHeatmapChart(monthsHeatmap, {usd:enUsdHeatmap});
 
   if(usdOficialFetchState==='idle'){
     fetchUsdOficialHistorico(function(){ renderGraficos(); });
