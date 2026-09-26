@@ -975,6 +975,13 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 @media (prefers-reduced-motion:reduce){
   *{animation:none !important;transition:none !important;}
 }
+
+#formInversion{grid-template-columns:repeat(3,minmax(0,1fr))}#formInversion .field{min-width:0}#formInversion input,#formInversion select{width:100%;min-width:0}#view-inversion .kpi-value{overflow-wrap:anywhere}#view-inversion .inv-history .entry-edit,#view-inversion .inv-history .entry-del{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;margin:0}#view-inversion .inv-history td:last-child{white-space:nowrap}@media(max-width:1100px){#formInversion{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){#formInversion{grid-template-columns:1fr}.inv-accounts{grid-template-columns:minmax(0,1fr)}}
+.field[hidden]{display:none!important}
+.inv-accounts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-bottom:22px}
+.inv-account{border:1px solid var(--line);border-radius:12px;padding:18px;background:var(--surface);min-width:0}
+.inv-account h3{font-size:15px;margin:0 0 12px;overflow-wrap:anywhere}.inv-account strong{font-family:var(--font-mono);font-size:22px}.inv-help{font-size:12px;color:var(--text-dim);line-height:1.7;margin:10px 0;overflow-wrap:anywhere}.form-grid>.inv-help{grid-column:1/-1}.inv-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.inv-actions button{font-size:12px;padding:7px 10px}.inv-history{overflow-x:auto}.inv-history table{width:100%;border-collapse:collapse;min-width:680px;font-size:13px}.inv-history th,.inv-history td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line-soft)}.inv-history th{color:var(--text-dim)}.inv-history td:nth-child(4){white-space:nowrap}.inv-warn{color:var(--fijo)}.inv-chart-wrap svg{width:100%;height:auto;min-width:560px}.inv-chart-wrap{overflow-x:auto}.inv-legend{display:flex;gap:20px;flex-wrap:wrap;font-size:12px;margin:12px 0}.inv-chart-table summary{cursor:pointer;font-size:12px;color:var(--text-dim)}
+
 </style>
 </head>
 <body>
@@ -1069,6 +1076,11 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
         </div>
       </div>
       <div class="chart-grid">
+        <div class="chart-card chart-card-wide">
+          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Evolución de las inversiones</h3><div class="chart-toggle-group" onclick="event.stopPropagation()"><select id="invChartCurrency" aria-label="Moneda del gráfico"><option value="ARS">Pesos (ARS)</option><option value="USD">Dólares (USD)</option></select><select id="invChartName" aria-label="Inversión del gráfico"><option value="">Todas las inversiones</option></select></div></div>
+          <div class="chart-card-body"><div id="chartInversion"></div></div>
+        </div>
+
         <div class="chart-card chart-card-wide">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron">▾</span>Ingresos vs. Gastos por mes</h3>
@@ -1268,27 +1280,34 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 
     <!-- INVERSION -->
     <section class="view" id="view-inversion">
-      <div class="view-header">
-        <div>
-          <h1 class="view-title">Inversión</h1>
-          <p class="view-desc">Aportes mensuales y evolución del valor de la inversión.</p>
-        </div>
-      </div>
+      <div class="view-header"><div><h1 class="view-title">Inversiones</h1><p class="view-desc">Tus aportes, retiros y resultados, en un solo lugar.</p></div></div>
+      <div class="filters-row"><label for="invCurrency">Moneda</label><select id="invCurrency"><option value="ARS">Pesos (ARS)</option><option value="USD">Dólares (USD)</option></select></div>
       <div class="kpi-row" id="invKpiRow"></div>
+      <div id="invAccounts" class="inv-accounts"></div>
       <div class="form-card">
-        <h3 id="invFormTitle">Registrar inversión</h3>
+        <h3 id="invFormTitle">Registrar movimiento</h3>
         <form id="formInversion" class="form-grid">
-          <div class="field"><label>Mes</label><select name="mes" id="invMes" required></select></div>
-          <div class="field"><label>% de inversión</label><input type="text" inputmode="decimal" name="pct" id="invPct" placeholder="ej: 10"></div>
-          <div class="field"><label>Valor actual (opcional)</label><input type="text" inputmode="decimal" name="valorActual" id="invValorActual" class="money-input" placeholder="Valor total a fin de mes"></div>
-          <button type="submit" class="btn btn-accent-ingreso" id="invSubmitBtn">Agregar</button>
-          <button type="button" class="btn btn-cancel-edit" id="invCancelEdit" style="display:none;">Cancelar</button>
+          <div class="field"><label for="invName">Inversión / cuenta</label><input id="invName" name="nombre" list="invNames" placeholder="Ej.: Fondo de emergencia · mi banco" maxlength="100" required><datalist id="invNames"></datalist></div>
+          <div class="field"><label for="invMoneda">Moneda de la inversión</label><select id="invMoneda" name="moneda"><option value="ARS">Pesos (ARS)</option><option value="USD">Dólares (USD)</option></select></div>
+          <div class="field"><label for="invTipo">Movimiento</label><select id="invTipo" name="tipo"><option value="aporte">Aporte</option><option value="retiro">Retiro</option><option value="valor">Actualizar saldo total</option><option value="inicial">Saldo inicial del año</option></select></div>
+          <div class="field"><label for="invFecha">Fecha</label><input type="date" id="invFecha" name="fecha" required><select name="mes" id="invMes" hidden aria-hidden="true"></select></div>
+          <div class="field"><label for="invMonto" id="invMontoLabel">Importe del aporte</label><input type="text" inputmode="decimal" name="monto" id="invMonto" placeholder="0,00" required></div>
+          <div class="field"><label for="invValorActual">Saldo total después del movimiento (opcional)</label><input type="text" inputmode="decimal" name="valorActual" id="invValorActual" placeholder="Lo que muestra tu banco o aplicación"></div>
+          <div class="field"><label for="invCashMode">Efecto en el dinero disponible</label><select id="invCashMode" name="cashMode"><option value="auto">Descontar / reintegrar pesos</option><option value="none">Sin movimiento de pesos</option></select></div>
+          <div class="field" id="invPesosField"><label for="invPesos">Pesos efectivamente pagados / recibidos</label><input id="invPesos" name="pesos" inputmode="decimal" placeholder="Solo si hubo un movimiento de pesos"></div>
+          <div class="field"><label for="invNota">Nota (opcional)</label><input id="invNota" name="nota" maxlength="200" placeholder="Detalle que quieras recordar"></div>
+          <div class="inv-help" id="invFormHelp"></div>
+          <button type="submit" class="btn btn-accent-ingreso" id="invSubmitBtn">Agregar</button><button type="button" class="btn btn-cancel-edit" id="invCancelEdit" style="display:none;">Cancelar</button>
         </form>
       </div>
-      <div class="filters-row">
-        <select id="filtInvMes"><option value="">Todos los meses</option></select>
-      </div>
-      <div id="listInversion"></div>
+      <details class="form-card"><summary>Meta mensual y ayuda</summary>
+        <p class="inv-help">La meta es un porcentaje de tus ingresos. Los aportes reales se cargan arriba y nunca se modifican al cambiar tus ingresos.</p>
+        <form id="invGoalForm" class="form-grid"><div class="field"><label for="invGoalMes">Mes</label><select id="invGoalMes"></select></div><div class="field"><label for="invGoalPct">Meta de inversión (%)</label><input id="invGoalPct" type="number" min="0" max="100" step="0.1" placeholder="Ej.: 10" required></div><button class="btn" type="submit">Guardar meta</button></form><p id="invGoalStatus" class="inv-help"></p>
+        <p class="inv-help">Cada año tiene su propio registro. Si ya tenías inversiones, cargá una vez su saldo inicial al 1 de enero; será la base para medir el resultado de este año. Los rendimientos distribuidos que sacás de la inversión se registran como retiros. Los reinvertidos quedan incluidos en el saldo total.</p>
+        <p class="inv-help">Si ya registraste la compra de dólares en «Dólar», usá «Sin movimiento de pesos» al invertirlos para evitar descontar el mismo dinero dos veces. Los valores se actualizan manualmente; no hay conexión con bancos ni cotizaciones automáticas.</p>
+      </details>
+      <div class="filters-row"><select id="filtInvMes"><option value="">Todos los meses</option></select><select id="filtInvName"><option value="">Todas las inversiones</option></select><button class="btn" id="invExport" type="button">Exportar movimientos CSV</button></div>
+      <div id="invLegacyNotice" class="inv-help"></div><div id="listInversion"></div>
     </section>
   </main>
 </div>
@@ -1656,6 +1675,7 @@ function normalizeExercise(data){
   if(!data.gastos) data.gastos = [];
   if(!data.dolar) data.dolar = [];
   if(!data.inversion) data.inversion = [];
+  upgradeInvestments(data);
   if(!data.customCategorias) data.customCategorias = {Fijo:[], Variable:[]};
   if(!data.customCategorias.Fijo) data.customCategorias.Fijo = [];
   if(!data.customCategorias.Variable) data.customCategorias.Variable = [];
@@ -2185,8 +2205,8 @@ function computeMonth(mes){
   var totalUsd = dolarMes.reduce(function(s,x){return s+(+x.total||0);},0);
 
   var invMes = DATA.inversion.filter(function(x){return x.mes===mes;});
-  var pctInversion = invMes.length ? (+invMes[invMes.length-1].pct||0) : 0;
-  var montoInversion = totalIngresos * (pctInversion/100);
+  var montoInversion = invMes.reduce(function(sum,x){return sum + (x.tipo==='aporte' ? (+x.pesos||0) : x.tipo==='retiro' ? -(+x.pesos||0) : 0);},0);
+  var pctInversion = totalIngresos>0 ? montoInversion/totalIngresos*100 : 0;
 
   var totalGastado = totalGastos + pesosGastadosUsd + montoInversion;
   var totalRestante = totalIngresos - totalGastado;
@@ -2321,7 +2341,7 @@ function renderResumen(){
 
   if(DATA.inversion.length){
     html += grpRowHtml('Inversión', 'inversion', false);
-    html += rowFor('Monto Invertido', function(m){return m.montoInversion;});
+    html += rowFor('Aportes − retiros (pesos)', function(m){return m.montoInversion;});
   }
 
   html += grpRowHtml('Resumen', 'resumen', false);
@@ -2463,59 +2483,113 @@ function renderDolar(){
   container.innerHTML = any ? html : '<div class="empty-state">Todavía no registraste compras de dólares.</div>';
 }
 
-function computeInversionTimeline(){
-  var acumulado = 0;
-  var lastValor = null;
-  return MESES.map(function(mes){
-    var entries = DATA.inversion.filter(function(x){return x.mes===mes;});
-    var m = computeMonth(mes);
-    var aporte = m.montoInversion;
-    acumulado += aporte;
-    var valorActualEntry = null;
-    entries.forEach(function(e){
-      if(e.valorActual!==null && e.valorActual!==undefined && e.valorActual!=='') valorActualEntry = +e.valorActual;
-    });
-    if(valorActualEntry!==null) lastValor = valorActualEntry;
-    var rendimiento = (lastValor!==null) ? (lastValor - acumulado) : null;
-    return {mes:mes, pct:m.pctInversion, aporte:aporte, aporteAcumulado:acumulado, valorActualUltimo:lastValor, rendimiento:rendimiento, entries:entries, totalIngresos:m.totalIngresos};
+/* Inversiones: movimientos reales, saldos fechados y monedas independientes. */
+function upgradeInvestments(data){
+  if(!data.invGoals) data.invGoals={};
+  var legacy=data.inversion.filter(function(x){return !x.tipo;});
+  if(!legacy.length) return;
+  data.inversionLegacyBackup=JSON.parse(JSON.stringify(legacy));
+  var fresh=data.inversion.filter(function(x){return !!x.tipo;});
+  MESES.forEach(function(mes,mi){
+    var old=legacy.filter(function(x){return x.mes===mes;}); if(!old.length)return;
+    var last=old[old.length-1], val=null;
+    old.forEach(function(x){if(x.valorActual!==null&&x.valorActual!==undefined&&x.valorActual!=='')val=+x.valorActual;});
+    var income=data.ingresos.filter(function(x){return x.mes===mes;}).reduce(function(sum,x){return sum+(+x.monto||0);},0);
+    var amount=Math.max(0,income*(+last.pct||0)/100);
+    fresh.push({id:last.id||uid('inv'),mes:mes,nombre:'Inversión anterior',moneda:'ARS',tipo:'aporte',monto:amount,pesos:amount,valorActual:val,legacy:true,nota:'Estimado a partir del porcentaje anterior ('+(+last.pct||0)+'%). Revisá el importe real.',autor:last.autor||null});
+    if(+last.pct>=0&&+last.pct<=100)data.invGoals[mes]=+last.pct;
   });
+  data.inversion=fresh;
 }
-
-function renderInversion(){
-  var timeline = computeInversionTimeline();
-  var totalAportado = timeline.length ? timeline[timeline.length-1].aporteAcumulado : 0;
-  var ultimoConValor = null;
-  timeline.forEach(function(t){ if(t.valorActualUltimo!==null) ultimoConValor = t; });
-  var valorActualFinal = ultimoConValor ? ultimoConValor.valorActualUltimo : null;
-  var rendimientoFinal = ultimoConValor ? ultimoConValor.rendimiento : null;
-  var rendimientoPct = (rendimientoFinal!==null && ultimoConValor.aporteAcumulado>0) ? (rendimientoFinal/ultimoConValor.aporteAcumulado*100) : null;
-
-  var kpiRow = document.getElementById('invKpiRow');
-  kpiRow.innerHTML =
-    '<div class="kpi k-ingreso"><div class="kpi-label">Total aportado</div><div class="kpi-value">'+money(totalAportado)+'</div><div class="kpi-sub">acumulado del año</div></div>'+
-    '<div class="kpi k-usd"><div class="kpi-label">Valor actual declarado</div><div class="kpi-value">'+(valorActualFinal!==null?money(valorActualFinal):'—')+'</div><div class="kpi-sub">último valor cargado</div></div>'+
-    '<div class="kpi k-restante kpi-hero"><div class="kpi-label">Rendimiento</div><div class="kpi-value'+(rendimientoFinal!==null && rendimientoFinal<0?' neg':'')+'">'+(rendimientoFinal!==null?money(rendimientoFinal):'—')+'</div><div class="kpi-sub">valor actual − aportado</div></div>'+
-    '<div class="kpi k-gasto"><div class="kpi-label">Rendimiento %</div><div class="kpi-value'+(rendimientoPct!==null && rendimientoPct<0?' neg':'')+'">'+(rendimientoPct!==null?rendimientoPct.toFixed(1)+'%':'—')+'</div><div class="kpi-sub">sobre lo aportado</div></div>';
-
-  var container = document.getElementById('listInversion');
-  var filtMes = document.getElementById('filtInvMes').value;
-  var html = "";
-  var any = false;
-  timeline.forEach(function(t){
-    if(filtMes && t.mes!==filtMes) return;
-    if(!t.entries.length) return;
-    any = true;
-    var collapsed = collapsedGroups.has('inversion-'+t.mes);
-    html += '<div class="month-group">'+monthHeadHtml('inversion', t.mes, money(t.aporte))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
-    t.entries.forEach(function(it){
-      var isEd = editingId.inversion===it.id;
-      var tieneValor = (it.valorActual!==null && it.valorActual!==undefined && it.valorActual!=='');
-      var descTxt = 'de '+money(t.totalIngresos)+(tieneValor?(' · valor decl. '+money(+it.valorActual)):'');
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag tag-inv">'+(it.pct||0)+'%</span><span class="entry-desc">'+descTxt+'</span><span class="entry-amt">'+money(t.totalIngresos*((it.pct||0)/100))+'</span><button class="entry-edit" data-kind="inversion" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="inversion" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
-    });
-    html += '</div></div>';
+var invLabels={aporte:'Aporte',retiro:'Retiro',valor:'Saldo actualizado',inicial:'Saldo inicial'};
+function invMoney(n,c){return n===null||n===undefined?'—':(c==='USD'?'US$ ':'$ ')+fmtDec.format(n);}
+function invDate(x){
+  if(x.fecha)return x.fecha;
+  var mi=MESES.indexOf(x.mes),year=+STORE.activeEjercicio;
+  return year+'-'+String(mi+1).padStart(2,'0')+'-'+new Date(year,mi+1,0).getDate();
+}
+function invRows(currency,name,month){
+  return DATA.inversion.map(function(x,i){return {x:x,i:i};}).filter(function(r){return (!currency||r.x.moneda===currency)&&(!name||r.x.nombre===name)&&(month===undefined||MESES.indexOf(r.x.mes)<=month);}).sort(function(a,b){return invDate(a.x).localeCompare(invDate(b.x))||a.i-b.i;}).map(function(r){return r.x;});
+}
+function invAccounts(currency,name,month){
+  var groups=new Map();
+  invRows(currency,name,month).forEach(function(x){
+    var key=JSON.stringify([x.nombre,x.moneda]);
+    if(!groups.has(key))groups.set(key,{nombre:x.nombre,moneda:x.moneda,initial:0,aportes:0,retiros:0,base:0,value:null,performance:null,asof:'',pending:false,rows:[]});
+    var a=groups.get(key);a.rows.push(x);
+    if(x.tipo==='inicial'){a.initial+=x.monto;a.base+=x.monto;}
+    if(x.tipo==='aporte'){a.aportes+=x.monto;a.base+=x.monto;a.pending=true;}
+    if(x.tipo==='retiro'){a.retiros+=x.monto;a.base-=x.monto;a.pending=true;}
+    var value=x.tipo==='valor'||x.tipo==='inicial'?x.monto:x.valorActual;
+    if(value!==null&&value!==undefined&&value!==''){
+      a.value=+value;a.asof=invDate(x);a.performance=a.value-a.base;a.pending=false;
+    }
   });
-  container.innerHTML = any ? html : '<div class="empty-state">No hay inversión cargada para ningún mes.</div>';
+  return Array.from(groups.values());
+}
+function invFillNames(id,currency,allLabel){
+  var el=document.getElementById(id),old=el.value;
+  var names=Array.from(new Set(DATA.inversion.filter(function(x){return !currency||x.moneda===currency;}).map(function(x){return x.nombre;}))).sort();
+  el.innerHTML=(allLabel?'<option value="">'+allLabel+'</option>':'')+names.map(function(n){return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+  if(names.indexOf(old)!==-1)el.value=old;
+}
+function invDefaultDate(){
+  var now=new Date(),yr=String(STORE.activeEjercicio);
+  document.getElementById('invFecha').value=yr+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(Math.min(now.getDate(),new Date(+yr,now.getMonth()+1,0).getDate())).padStart(2,'0');
+}
+function invFormMode(){
+  var type=document.getElementById('invTipo').value,flow=type==='aporte'||type==='retiro',currency=document.getElementById('invMoneda').value;
+  document.getElementById('invMontoLabel').textContent={aporte:'Importe del aporte',retiro:'Importe del retiro',valor:'Saldo total de la inversión',inicial:'Saldo al inicio del año'}[type];
+  document.getElementById('invValorActual').disabled=!flow;
+  document.getElementById('invValorActual').closest('.field').hidden=!flow;
+  document.getElementById('invCashMode').disabled=!flow;
+  document.getElementById('invCashMode').closest('.field').hidden=!flow;
+  document.getElementById('invPesosField').hidden=!(flow&&currency==='USD'&&document.getElementById('invCashMode').value==='auto');
+  document.getElementById('invFormHelp').textContent=type==='inicial'?'Cargá el saldo al 1 de enero. No descuenta dinero del presupuesto y establece la base del resultado anual.':type==='valor'?'Ingresá el saldo completo que muestra tu banco o aplicación, incluyendo tus aportes y rendimientos. No genera un ingreso ni un gasto.':'El saldo posterior es opcional, pero permite calcular el resultado a esta fecha. Registrá todos los movimientos anteriores a ese saldo. Si solo transferís dinero ya contabilizado, elegí «Sin movimiento de pesos».';
+}
+function renderInvGoal(){
+  var mes=document.getElementById('invGoalMes').value;
+  var goal=(DATA.invGoals||{})[mes];
+  document.getElementById('invGoalPct').value=goal===undefined?'':goal;
+  var income=computeMonth(mes).totalIngresos;
+  var actual=DATA.inversion.filter(function(x){return x.mes===mes&&x.tipo==='aporte';}).reduce(function(sum,x){return sum+(x.moneda==='ARS'?x.monto:x.pesos||0);},0);
+  var target=income*(goal||0)/100;
+  document.getElementById('invGoalStatus').textContent=goal===undefined?'Elegí el mes y guardá tu objetivo.':mes+': '+money(actual)+' aportados de '+money(target)+' de meta'+(target>0?' ('+Math.round(actual/target*100)+'%).':'.')+' Se cuentan aportes en pesos y aportes en USD con pesos declarados; no se descuentan retiros.';
+}
+function renderInversion(){
+  var currency=document.getElementById('invCurrency').value,accounts=invAccounts(currency);
+  var base=0,value=0,perf=0,complete=accounts.length>0;
+  accounts.forEach(function(a){base+=a.base;if(a.value===null||a.pending)complete=false;else{value+=a.value;perf+=a.performance;}});
+  var rows=invRows(currency),ap=rows.reduce(function(s,x){return s+(x.tipo==='aporte'?x.monto:0);},0),ret=rows.reduce(function(s,x){return s+(x.tipo==='retiro'?x.monto:0);},0);
+  var cards=[['Capital neto',invMoney(base,currency),'Saldo inicial + aportes − retiros'],['Valor declarado',complete?invMoney(value,currency):'Pendiente','Suma de últimos saldos; pueden tener fechas distintas'],['Resultado del año',complete?invMoney(perf,currency):'Pendiente','Valor declarado − capital neto'],['Aportes / retiros','<span style="font-size:16px">↑ '+invMoney(ap,currency)+'<br>↓ '+invMoney(ret,currency)+'</span>','Movimientos del año seleccionado']];
+  document.getElementById('invKpiRow').innerHTML=cards.map(function(c){return '<div class="kpi"><div class="kpi-label">'+c[0]+'</div><div class="kpi-value" style="font-size:22px">'+c[1]+'</div><div class="kpi-sub">'+c[2]+'</div></div>';}).join('');
+  document.getElementById('invAccounts').innerHTML=accounts.map(function(a){var name=escapeHtml(a.nombre);return '<article class="inv-account"><h3>'+name+'</h3><strong>'+invMoney(a.value,a.moneda)+'</strong><p class="inv-help">'+(a.asof?'Saldo declarado al '+a.asof:'Sin saldo declarado')+'<br>Capital neto: '+invMoney(a.base,a.moneda)+'<br>'+(a.pending||a.value===null?'<span class="inv-warn">Actualizá el saldo para calcular el resultado.</span>':'Resultado: '+invMoney(a.performance,a.moneda))+'</p><div class="inv-actions">'+['aporte','retiro','valor'].map(function(t){return '<button type="button" class="btn" data-inv-action="'+t+'" data-name="'+name+'" data-currency="'+a.moneda+'">'+{aporte:'Aportar',retiro:'Retirar',valor:'Actualizar saldo'}[t]+'</button>';}).join('')+'</div></article>';}).join('')||'<p class="inv-help">Todavía no registraste inversiones en esta moneda. Cargá tu primer aporte o un saldo inicial.</p>';
+  invFillNames('invNames',null,null);invFillNames('filtInvName',currency,'Todas las inversiones');
+  var mes=document.getElementById('filtInvMes').value,name=document.getElementById('filtInvName').value;
+  var filtered=rows.filter(function(x){return (!mes||x.mes===mes)&&(!name||x.nombre===name);}).reverse();
+  document.getElementById('listInversion').innerHTML=filtered.length?'<div class="inv-history"><table><thead><tr><th>Fecha</th><th>Inversión</th><th>Movimiento</th><th>Importe</th><th>Detalle</th><th>Acciones</th></tr></thead><tbody>'+filtered.map(function(x){return '<tr><td>'+invDate(x)+'</td><td>'+escapeHtml(x.nombre)+'</td><td>'+invLabels[x.tipo]+'</td><td>'+invMoney(x.monto,x.moneda)+'</td><td>'+escapeHtml(x.nota||'')+(x.valorActual!==null&&x.valorActual!==undefined?'<br>Saldo posterior: '+invMoney(x.valorActual,x.moneda):'')+(x.pesos>0?'<br>Movimiento de pesos: '+money(x.pesos):'')+'</td><td><button type="button" class="entry-edit" data-kind="inversion" data-id="'+escapeHtml(x.id)+'" aria-label="Editar movimiento">✎</button><button type="button" class="entry-del" data-kind="inversion" data-id="'+escapeHtml(x.id)+'" aria-label="Eliminar movimiento">×</button></td></tr>';}).join('')+'</tbody></table></div>':'<div class="empty-state">No hay movimientos con estos filtros.</div>';
+  document.getElementById('invLegacyNotice').textContent=DATA.inversion.some(function(x){return x.legacy;})?'Los registros anteriores se convirtieron en importes fijos estimados. Revisá «Inversión anterior»: se conservó el último porcentaje de cada mes y el último saldo declarado. Los originales están preservados en la copia de datos.':'';
+  var year=String(STORE.activeEjercicio),date=document.getElementById('invFecha');date.min=year+'-01-01';date.max=year+'-12-31';
+  if(!date.value||date.value.slice(0,4)!==year){invDefaultDate();}
+  renderInvGoal();invFormMode();
+}
+function renderInvestmentChart(){
+  var currency=document.getElementById('invChartCurrency').value;
+  invFillNames('invChartName',currency,'Todas las inversiones');
+  var name=document.getElementById('invChartName').value,rows=invRows(currency,name),el=document.getElementById('chartInversion');
+  if(!rows.length){el.innerHTML='<div class="empty-state">Registrá aportes y saldos para ver su evolución.</div>';return;}
+  var end=Math.max.apply(null,rows.map(function(x){return MESES.indexOf(x.mes);}));
+  var points=MESES.slice(0,end+1).map(function(m,i){var aa=invAccounts(currency,name,i),base=0,value=0,valid=aa.length>0;aa.forEach(function(a){base+=a.base;if(a.value===null||a.pending)valid=false;else value+=a.value;});return {mes:m,base:aa.length?base:null,value:valid?value:null};});
+  var nums=[0];points.forEach(function(p){if(p.base!==null)nums.push(p.base);if(p.value!==null)nums.push(p.value);});
+  var min=Math.min.apply(null,nums),max=Math.max.apply(null,nums);if(max===min)max=min+1;var span=max-min;max+=span*.12;min-=span*.08;
+  var W=900,H=290,L=100,R=28,T=20,B=45,iw=W-L-R,ih=H-T-B;
+  function xx(i){return L+i*iw/11;}function yy(v){return T+(max-v)/(max-min)*ih;}
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Capital neto y valor declarado de las inversiones por mes">';
+  for(var j=0;j<5;j++){var v=min+(max-min)*j/4,y=yy(v);svg+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y+'" y2="'+y+'" stroke="'+CHART_COLORS.grid+'"/><text x="'+(L-8)+'" y="'+(y+4)+'" text-anchor="end" fill="'+CHART_COLORS.textDim+'" font-size="11">'+fmt.format(v)+'</text>';}
+  MESES.forEach(function(m,i){svg+='<text x="'+xx(i)+'" y="'+(H-14)+'" text-anchor="middle" fill="'+CHART_COLORS.textDim+'" font-size="11">'+m.slice(0,3)+'</text>';});
+  [{key:'base',color:CHART_COLORS.inversion,label:'Capital neto'},{key:'value',color:CHART_COLORS.ingreso,label:'Valor declarado'}].forEach(function(series){var path='',prev=false;points.forEach(function(p,i){var v=p[series.key];if(v===null){prev=false;return;}path+=(prev?' L ':' M ')+xx(i)+' '+yy(v);prev=true;});svg+='<path d="'+path+'" fill="none" stroke="'+series.color+'" stroke-width="2.5"/>';points.forEach(function(p,i){if(p[series.key]===null)return;var tip=p.mes+' · '+series.label+': '+invMoney(p[series.key],currency);svg+='<circle cx="'+xx(i)+'" cy="'+yy(p[series.key])+'" r="4" fill="'+series.color+'" data-tip="'+escapeHtml(tip)+'"><title>'+escapeHtml(tip)+'</title></circle>';});});
+  svg+='</svg>';
+  el.innerHTML='<div class="inv-legend"><span style="color:var(--inversion)">● Capital neto (inicial + aportes − retiros)</span><span style="color:var(--ingreso)">● Valor declarado</span></div><div class="inv-chart-wrap">'+svg+'</div><p class="inv-help">'+currency+' · Año '+escapeHtml(String(STORE.activeEjercicio))+'. Cada punto refleja los registros hasta fin de mes. Se conserva el último saldo declarado si no hubo nuevos movimientos; no implica que el valor de mercado siga igual. Si hubo aportes o retiros sin un nuevo saldo, la línea se interrumpe. La distancia entre líneas representa el resultado según los saldos declarados.</p><details class="inv-chart-table"><summary>Ver datos del gráfico</summary><div class="inv-history"><table><thead><tr><th>Mes</th><th>Capital neto</th><th>Valor declarado</th><th>Resultado</th></tr></thead><tbody>'+points.map(function(p){return '<tr><td>'+p.mes+'</td><td>'+invMoney(p.base,currency)+'</td><td>'+invMoney(p.value,currency)+'</td><td>'+invMoney(p.value===null?null:p.value-p.base,currency)+'</td></tr>';}).join('')+'</tbody></table></div></details>';
 }
 
 function escapeHtml(s){
@@ -2530,7 +2604,7 @@ var SECTION_FORM = {
   ingresos:{formId:'formIngreso', titleId:'ingFormTitle', submitId:'ingSubmitBtn', cancelId:'ingCancelEdit', mesId:'ingMes', addTitle:'Agregar ingreso', editTitle:'Editar ingreso', addBtn:'Agregar', editBtn:'Guardar cambios'},
   gastos:{formId:'formGasto', titleId:'gasFormTitle', submitId:'gasSubmitBtn', cancelId:'gasCancelEdit', mesId:'gasMes', addTitle:'Agregar gasto', editTitle:'Editar gasto', addBtn:'Agregar', editBtn:'Guardar cambios'},
   dolar:{formId:'formDolar', titleId:'usdFormTitle', submitId:'usdSubmitBtn', cancelId:'usdCancelEdit', mesId:'usdMes', addTitle:'Registrar compra', editTitle:'Editar compra', addBtn:'Agregar', editBtn:'Guardar cambios'},
-  inversion:{formId:'formInversion', titleId:'invFormTitle', submitId:'invSubmitBtn', cancelId:'invCancelEdit', mesId:'invMes', addTitle:'Registrar inversión', editTitle:'Editar inversión', addBtn:'Agregar', editBtn:'Guardar cambios'}
+  inversion:{formId:'formInversion', titleId:'invFormTitle', submitId:'invSubmitBtn', cancelId:'invCancelEdit', mesId:'invMes', addTitle:'Registrar movimiento', editTitle:'Editar movimiento', addBtn:'Agregar', editBtn:'Guardar cambios'}
 };
 
 function setFormEditMode(kind, isEditing){
@@ -2563,6 +2637,7 @@ function resetFormDefaults(kind){
     if(ro) ro.style.display = 'none';
     if(rd) rd.style.display = 'none';
   }
+  if(kind==='inversion'){ invDefaultDate(); invFormMode(); }
   if(kind==='ingresos') hideMoneyPreview('ingMontoPreview');
   if(kind==='gastos') hideMoneyPreview('gasMontoPreview');
 }
@@ -2599,8 +2674,16 @@ function populateFormForEdit(kind, item){
     setMoneyInputValue(document.getElementById('usdTotal'), item.total);
   } else if(kind==='inversion'){
     document.getElementById('invMes').value = item.mes;
-    document.getElementById('invPct').value = (item.pct!==undefined && item.pct!==null) ? String(item.pct).replace('.',',') : '';
+    document.getElementById('invName').value = item.nombre;
+    document.getElementById('invMoneda').value = item.moneda;
+    document.getElementById('invTipo').value = item.tipo;
+    document.getElementById('invFecha').value = invDate(item);
+    setMoneyInputValue(document.getElementById('invMonto'), item.monto);
     setMoneyInputValue(document.getElementById('invValorActual'), item.valorActual);
+    document.getElementById('invCashMode').value = item.pesos>0 ? 'auto' : 'none';
+    setMoneyInputValue(document.getElementById('invPesos'), item.pesos);
+    document.getElementById('invNota').value = item.nota||'';
+    invFormMode();
   }
 }
 
@@ -2809,29 +2892,56 @@ document.getElementById('formDolar').addEventListener('submit', function(e){
   document.getElementById('usdTotal').value='';
 });
 
-document.getElementById('formInversion').addEventListener('submit', function(e){
-  e.preventDefault();
-  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés cargar inversiones.'); return; }
-  var fd = new FormData(e.target);
-  var pctRaw = fd.get('pct');
-  var pct = pctRaw==='' ? 0 : parseMoneyValue(pctRaw);
-  if(isNaN(pct)) pct = 0;
-  var valorRaw = fd.get('valorActual');
-  var valorActual = valorRaw==='' ? null : parseMoneyValue(valorRaw);
-  if(editingId.inversion){
-    var item = DATA.inversion.filter(function(x){return x.id===editingId.inversion;})[0];
-    if(item){ item.mes=fd.get('mes'); item.pct=pct; item.valorActual=valorActual; item.autor=currentAutor(); }
-    editingId.inversion = null;
-    setFormEditMode('inversion', false);
-    toast('Inversión actualizada');
-  } else {
-    DATA.inversion.push({id:uid('inv'), mes:fd.get('mes'), pct:pct, valorActual:valorActual, autor:currentAutor()});
-    toast('Inversión agregada');
+function invNumber(id,optional){
+  var raw=document.getElementById(id).value.trim();if(!raw&&optional)return null;
+  if(!/^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{1,2})?$/.test(raw))return NaN;
+  return Number(raw.replace(/\./g,'').replace(',','.'));
+}
+document.getElementById('formInversion').addEventListener('submit',function(e){
+  e.preventDefault();if(esSoloLectura()){toast('Estás en modo solo lectura.');return;}
+  var nombre=document.getElementById('invName').value.trim(),moneda=document.getElementById('invMoneda').value,tipo=document.getElementById('invTipo').value,fecha=document.getElementById('invFecha').value;
+  var monto=invNumber('invMonto'),valor=invNumber('invValorActual',true),flow=tipo==='aporte'||tipo==='retiro';
+  if(!nombre||!fecha||fecha.slice(0,4)!==String(STORE.activeEjercicio)||!Number.isFinite(monto)||monto<0||(flow&&monto===0)){toast('Revisá nombre, fecha e importe. Usá coma para los decimales.');return;}
+  if(flow&&valor!==null&&(!Number.isFinite(valor)||valor<0)){toast('El saldo debe ser un número igual o mayor a cero.');return;}
+  if(tipo==='inicial'&&fecha!==String(STORE.activeEjercicio)+'-01-01'){toast('El saldo inicial corresponde al 1 de enero del año seleccionado.');return;}
+  if(tipo==='inicial'&&DATA.inversion.some(function(x){return x.id!==editingId.inversion&&x.nombre===nombre&&x.moneda===moneda&&x.tipo==='inicial';})){toast('Esta inversión ya tiene saldo inicial. Editá el registro existente.');return;}
+  var pesos=0;
+  if(flow&&document.getElementById('invCashMode').value==='auto'){
+    pesos=moneda==='ARS'?monto:invNumber('invPesos');
+    if(!Number.isFinite(pesos)||pesos<=0){toast('Indicá los pesos pagados o recibidos, o elegí «Sin movimiento de pesos».');return;}
   }
-  saveData(); renderAll();
-  document.getElementById('invPct').value='';
-  document.getElementById('invValorActual').value='';
+  var item={id:editingId.inversion||uid('inv'),mes:MESES[Number(fecha.slice(5,7))-1],fecha:fecha,nombre:nombre,moneda:moneda,tipo:tipo,monto:monto,pesos:pesos,valorActual:flow?valor:null,nota:document.getElementById('invNota').value.trim(),autor:currentAutor()};
+  if(editingId.inversion){var idx=DATA.inversion.findIndex(function(x){return x.id===editingId.inversion;});if(idx===-1){toast('El movimiento ya no existe.');return;}DATA.inversion[idx]=item;}
+  else DATA.inversion.push(item);
+  editingId.inversion=null;setFormEditMode('inversion',false);saveData();
+  document.getElementById('formInversion').reset();document.getElementById('invName').value=nombre;document.getElementById('invMoneda').value=moneda;document.getElementById('invCurrency').value=moneda;
+  invDefaultDate();renderAll();toast('Movimiento guardado');
 });
+['invTipo','invMoneda','invCashMode'].forEach(function(id){document.getElementById(id).addEventListener('change',function(){
+  if(id==='invMoneda')document.getElementById('invCashMode').value=document.getElementById(id).value==='USD'?'none':'auto';
+  if(id==='invTipo'&&document.getElementById(id).value==='inicial')document.getElementById('invFecha').value=STORE.activeEjercicio+'-01-01';
+  invFormMode();
+});});
+['invCurrency','filtInvName'].forEach(function(id){document.getElementById(id).addEventListener('change',renderInversion);});
+['invChartCurrency','invChartName'].forEach(function(id){document.getElementById(id).addEventListener('change',renderInvestmentChart);});
+document.getElementById('invAccounts').addEventListener('click',function(e){var b=e.target.closest('[data-inv-action]');if(!b)return;
+  if(esSoloLectura()){toast('Estás en modo solo lectura.');return;}
+  editingId.inversion=null;setFormEditMode('inversion',false);document.getElementById('formInversion').reset();
+  document.getElementById('invName').value=b.dataset.name;document.getElementById('invMoneda').value=b.dataset.currency;document.getElementById('invTipo').value=b.dataset.invAction;document.getElementById('invCashMode').value=b.dataset.currency==='USD'?'none':'auto';invDefaultDate();invFormMode();document.getElementById('formInversion').scrollIntoView({behavior:'smooth',block:'center'});document.getElementById('invMonto').focus();
+});
+document.getElementById('invGoalMes').innerHTML=MESES.map(function(m){return '<option>'+m+'</option>';}).join('');
+document.getElementById('invGoalMes').value=MESES[new Date().getMonth()];
+document.getElementById('invGoalMes').addEventListener('change',renderInvGoal);
+document.getElementById('invGoalForm').addEventListener('submit',function(e){e.preventDefault();if(esSoloLectura()){toast('Estás en modo solo lectura.');return;}var raw=document.getElementById('invGoalPct').value,pct=Number(raw);if(raw===''||!Number.isFinite(pct)||pct<0||pct>100)return;DATA.invGoals[document.getElementById('invGoalMes').value]=pct;saveData();renderInvGoal();toast('Meta guardada');});
+document.getElementById('invExport').addEventListener('click',function(){
+  var mes=document.getElementById('filtInvMes').value,nombre=document.getElementById('filtInvName').value;
+  var records=invRows(document.getElementById('invCurrency').value,nombre).filter(function(x){return !mes||x.mes===mes;});
+  if(!records.length){toast('No hay movimientos para exportar.');return;}
+  var rows=[['Fecha','Inversión','Moneda','Movimiento','Importe','Saldo posterior','Pesos pagados/recibidos','Nota']].concat(records.map(function(x){return [invDate(x),x.nombre,x.moneda,invLabels[x.tipo],x.monto,x.valorActual==null?'':x.valorActual,x.pesos||0,x.nota||''];}));
+  var csv=rows.map(function(row){return row.map(function(v){var s=typeof v==='number'?String(v).replace('.',','):String(v);if(/^[=+@-]/.test(s)&&typeof v==='string')s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}).join(';');}).join('\r\n');
+  var url=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');a.href=url;a.download='inversiones-'+STORE.activeEjercicio+'.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);
+});
+invDefaultDate();
 
 /* filters for gastos */
 ['filtMes','filtTipo','filtBusqueda'].forEach(function(id){
@@ -2890,7 +3000,7 @@ function exportResumenCSV(){
   addRow('Gastos Totales', function(m){return m.totalGastos;});
   addRow('$ Gastados (pesos)', function(m){return m.pesosGastadosUsd;});
   addRow('USD Totales', function(m){return m.totalUsd;});
-  if(DATA.inversion.length){ addRow('Monto Invertido', function(m){return m.montoInversion;}); }
+  if(DATA.inversion.length){ addRow('Aportes − retiros (pesos)', function(m){return m.montoInversion;}); }
   addRow('Total Gastado', function(m){return m.totalGastado;});
   addRow('Total Restante', function(m){return m.totalRestante;});
 
@@ -3597,6 +3707,7 @@ function refreshChartThemeColors(){
 
 function renderGraficos(){
   refreshChartThemeColors();
+  renderInvestmentChart();
   var months = MESES.map(computeMonth);
   var enUsd = document.getElementById('toggleUsdEquiv').checked;
   var anioActivo = STORE.activeEjercicio;
@@ -3823,10 +3934,7 @@ function buildSearchIndex(){
       searchText:normalizeSearchText(x.mes+' dolar usd compra '+subtxt+' '+x.total)});
   });
   DATA.inversion.forEach(function(x){
-    idx.push({kind:'inversion', id:x.id, mes:x.mes, title:(x.pct||0)+'% inversión',
-      sub: (x.valorActual!==null && x.valorActual!==undefined && x.valorActual!=='') ? ('valor '+money(+x.valorActual)) : '',
-      amountText:'',
-      searchText:normalizeSearchText(x.mes+' inversion '+(x.pct||0)+'%')});
+    idx.push({kind:'inversion',id:x.id,mes:x.mes,title:x.nombre,sub:invLabels[x.tipo]+' · '+invDate(x),amountText:invMoney(x.monto,x.moneda),searchText:normalizeSearchText(x.mes+' inversion '+x.nombre+' '+x.tipo+' '+x.moneda+' '+(x.nota||''))});
   });
   return idx;
 }
