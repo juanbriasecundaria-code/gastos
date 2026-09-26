@@ -3111,10 +3111,11 @@ function dolarValorConCarry(valores){
   var last=null;
   return valores.map(function(v){ if(v!==null && v!==undefined){ last=v; return v; } return last; });
 }
-function buildDolarRefChart(valores){
+function buildDolarRefChart(valores, fuentes){
+  fuentes = fuentes || valores.map(function(v){ return (v===null||v===undefined) ? null : 'compra'; });
   var known = valores.filter(function(v){return v!==null && v!==undefined;});
   if(!known.length){
-    return '<div class="empty-state">Todavía no registraste compras de dólares.</div>';
+    return '<div class="empty-state">Todavía no registraste compras de dólares ni se pudo traer la cotización oficial (necesitás conexión a internet al menos una vez).</div>';
   }
   var W=860,H=260,padL=58,padR=14,padT=14,padB=40;
   var innerW=W-padL-padR, innerH=H-padT-padB;
@@ -3148,17 +3149,26 @@ function buildDolarRefChart(valores){
   }).join('');
   var dots = valores.map(function(v,i){
     if(v===null||v===undefined) return '';
-    return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'" data-tip="'+escapeHtml(MESES[i]+': '+money(v)+' /USD')+'"/>';
+    var esCompra = fuentes[i]==='compra';
+    var tip = esCompra ? (MESES[i]+': '+money(v)+' /USD (tu compra registrada)') : (MESES[i]+': '+money(v)+' /USD (referencia oficial, sin compra ese mes)');
+    return esCompra
+      ? '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'" data-tip="'+escapeHtml(tip)+'"/>'
+      : '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="var(--surface)" stroke="'+CHART_COLORS.dolar+'" stroke-width="2" data-tip="'+escapeHtml(tip)+'"/>';
   }).join('');
   var xlabels=MESES.map(function(m,i){
     return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+m.slice(0,3)+'</text>';
   }).join('');
-  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">'+
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">'+
     '<defs><linearGradient id="gDolarRefArea" x1="0" y1="0" x2="0" y2="1">'+
       '<stop offset="0%" stop-color="'+CHART_COLORS.dolar+'" stop-opacity="0.28"/>'+
       '<stop offset="100%" stop-color="'+CHART_COLORS.dolar+'" stop-opacity="0"/>'+
     '</linearGradient></defs>'+
     gridLines+yLabels+areas+lines+dots+xlabels+'</svg>';
+  var legend = '<div class="chart-legend-row">'+
+      '<div class="chart-legend-item"><span style="width:9px;height:9px;border-radius:50%;background:'+CHART_COLORS.dolar+';display:inline-block;"></span>Tu compra registrada</div>'+
+      '<div class="chart-legend-item"><span style="width:9px;height:9px;border-radius:50%;background:var(--surface);border:2px solid '+CHART_COLORS.dolar+';display:inline-block;"></span>Referencia oficial (mes sin compra)</div>'+
+    '</div>';
+  return svg+legend;
 }
 
 /* ----- Presupuesto vs. Real por categoría ----- */
@@ -3452,6 +3462,7 @@ function renderGraficos(){
   refreshChartThemeColors();
   var months = MESES.map(computeMonth);
   var enUsd = document.getElementById('toggleUsdEquiv').checked;
+  var anioActivo = STORE.activeEjercicio;
   var valores = dolarValorMensual();
   var valoresConv = dolarValorConCarry(valores);
   function conv(v,i){
@@ -3476,13 +3487,23 @@ function renderGraficos(){
   });
   document.getElementById('chartDonut').innerHTML = buildDonutChart(catTotals);
   document.getElementById('chartRestante').innerHTML = buildLineChart(months.map(function(m){return m.totalRestante;}));
-  document.getElementById('chartDolarRef').innerHTML = buildDolarRefChart(valores);
+
+  // "Evolución del dólar (referencia)": donde falta una compra propia cargada
+  // ese mes, se completa con el promedio oficial histórico (ArgentinaDatos)
+  // para que la línea no tenga huecos.
+  var valoresRef = [], fuentesRef = [];
+  valores.forEach(function(v, i){
+    if(v!==null && v!==undefined){ valoresRef.push(v); fuentesRef.push('compra'); return; }
+    var oficial = usdOficialPromedioMes(anioActivo, i);
+    if(oficial!==null && oficial!==undefined){ valoresRef.push(oficial); fuentesRef.push('oficial'); }
+    else { valoresRef.push(null); fuentesRef.push(null); }
+  });
+  document.getElementById('chartDolarRef').innerHTML = buildDolarRefChart(valoresRef, fuentesRef);
 
   renderPresupuestoChart();
   renderAhorroChart();
   document.getElementById('chartHeatmap').innerHTML = buildHeatmapChart(months);
 
-  var anioActivo = STORE.activeEjercicio;
   var usdOfEquivArr = months.map(function(m,i){
     var rate = usdOficialPromedioMes(anioActivo, i);
     return rate ? (m.totalGastos/rate) : null;
