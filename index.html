@@ -529,8 +529,12 @@ main{
 .chart-card svg text{font-family:var(--font-mono);}
 .chart-card-head{
   display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap;
+  cursor:pointer;user-select:none;
 }
-.chart-card-head h3{margin:0;}
+.chart-card-head h3{margin:0;display:flex;align-items:center;}
+.chart-card-body{overflow:hidden;}
+.chart-card.collapsed .chart-card-head{margin-bottom:0;}
+.chart-card.collapsed .chart-card-body{display:none;}
 .chart-toggle{
   display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);cursor:pointer;user-select:none;
 }
@@ -968,38 +972,38 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
       </div>
       <div class="chart-grid">
         <div class="chart-card chart-card-wide">
-          <div class="chart-card-head">
-            <h3>Ingresos vs. Gastos por mes</h3>
-            <label class="chart-toggle"><input type="checkbox" id="toggleUsdEquiv"> Ver en USD equivalente</label>
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron">▾</span>Ingresos vs. Gastos por mes</h3>
+            <label class="chart-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="toggleUsdEquiv"> Ver en USD equivalente</label>
           </div>
-          <div id="chartIngGas"></div>
+          <div class="chart-card-body"><div id="chartIngGas"></div></div>
         </div>
         <div class="chart-card chart-card-wide">
-          <h3>Composición de gastos: Fijos vs. Variables</h3>
-          <div id="chartFijoVar"></div>
+          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Composición de gastos: Fijos vs. Variables</h3></div>
+          <div class="chart-card-body"><div id="chartFijoVar"></div></div>
         </div>
         <div class="chart-card">
-          <h3>Top categorías de gasto (año)</h3>
-          <div id="chartDonut"></div>
+          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Top categorías de gasto (año)</h3></div>
+          <div class="chart-card-body"><div id="chartDonut"></div></div>
         </div>
         <div class="chart-card">
-          <h3>Evolución del restante mensual</h3>
-          <div id="chartRestante"></div>
+          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Evolución del restante mensual</h3></div>
+          <div class="chart-card-body"><div id="chartRestante"></div></div>
         </div>
         <div class="chart-card">
-          <h3>Evolución del dólar (referencia)</h3>
-          <div id="chartDolarRef"></div>
+          <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron">▾</span>Evolución del dólar (referencia)</h3></div>
+          <div class="chart-card-body"><div id="chartDolarRef"></div></div>
         </div>
         <div class="chart-card chart-card-wide">
-          <div class="chart-card-head">
-            <h3>Gasto hormiga</h3>
-            <div class="hormiga-controls">
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron">▾</span>Gasto hormiga</h3>
+            <div class="hormiga-controls" onclick="event.stopPropagation()">
               <select id="hormigaMes"></select>
               <input type="text" inputmode="decimal" id="hormigaUmbral" value="10.000" placeholder="Umbral $" title="Considerar 'chico' todo gasto por debajo de este monto">
               <input type="number" min="2" id="hormigaMinOcurrencias" value="3" placeholder="Mín. veces" title="Mínimo de repeticiones para considerarlo hormiga" style="width:70px;">
             </div>
           </div>
-          <div id="hormigaContent"></div>
+          <div class="chart-card-body"><div id="hormigaContent"></div></div>
         </div>
       </div>
     </section>
@@ -3178,6 +3182,21 @@ function renderGraficos(){
   document.getElementById('chartDolarRef').innerHTML = buildDolarRefChart(valores);
   renderHormiga();
 }
+
+/* ----- Tarjetas de gráficos colapsables ----- */
+(function setupChartCollapse(){
+  var grid = document.querySelector('#view-graficos .chart-grid');
+  if(!grid) return;
+  grid.addEventListener('click', function(e){
+    var head = e.target.closest('[data-chart-toggle]');
+    if(!head) return;
+    var card = head.closest('.chart-card');
+    if(!card) return;
+    card.classList.toggle('collapsed');
+    var chevron = head.querySelector('.grp-chevron');
+    if(chevron) chevron.classList.toggle('is-collapsed', card.classList.contains('collapsed'));
+  });
+})();
 
 /* ----- Tooltip propio para los gráficos (reemplaza el title nativo del navegador) ----- */
 (function setupChartTooltips(){
