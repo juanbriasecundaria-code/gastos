@@ -2091,7 +2091,7 @@ function renderResumen(){
       var vals = months.map(function(m){ return valuesFn(m, cat); });
       var tot = vals.reduce(function(a,b){return a+b;},0);
       return {cat:cat, vals:vals, tot:tot};
-    });
+    }).filter(function(r){ return r.tot !== 0; });
     rows.sort(function(a,b){ return b.tot - a.tot; });
     var maxTot = rows.reduce(function(m,r){return Math.max(m,r.tot);},0) || 1;
     return rows.map(function(r){
