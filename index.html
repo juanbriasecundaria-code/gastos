@@ -308,6 +308,7 @@ a{color:inherit;}
   display:flex;align-items:center;justify-content:center;
   background:color-mix(in srgb, var(--ingreso) 20%, var(--surface));
   color:var(--ingreso);font-family:var(--font-display);font-weight:700;font-size:11.5px;
+  background-size:cover;background-position:center;
 }
 .ub-avatar .sync-dot{position:absolute;right:-1px;bottom:-1px;width:8px;height:8px;border:2px solid var(--surface-2);}
 .user-badge .ub-email{
@@ -841,6 +842,16 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
   background:none;border:1px solid var(--line);color:var(--text-dim);
 }
 .btn-cancel-edit:hover{border-color:var(--text-dim);color:var(--text);opacity:1;}
+.acc-photo-row{display:flex;align-items:center;gap:14px;}
+.acc-avatar-preview{
+  width:56px;height:56px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb, var(--ingreso) 20%, var(--surface));
+  color:var(--ingreso);font-family:var(--font-display);font-weight:700;font-size:20px;
+  background-size:cover;background-position:center;
+}
+.acc-photo-actions{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
+.acc-photo-actions label.btn{display:block;width:100%;text-align:center;box-sizing:border-box;}
 .form-card.is-editing{border-color:var(--dolar);}
 .edit-badge{
   display:inline-block;font-family:var(--font-mono);font-size:10px;color:var(--dolar);
@@ -1338,6 +1349,21 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
     <button class="account-close" id="accountClose" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>
     <h3>Cuenta</h3>
     <p class="account-current-email" id="accCurrentEmail"></p>
+
+    <div class="account-section">
+      <h4>Foto de perfil</h4>
+      <div class="account-msg" id="accPhotoMsg"></div>
+      <div class="acc-photo-row">
+        <div class="acc-avatar-preview" id="accAvatarPreview">·</div>
+        <div class="acc-photo-actions">
+          <label class="btn" id="btnAccPhotoPick">
+            Subir foto
+            <input type="file" id="accPhotoInput" accept="image/*" style="display:none;">
+          </label>
+          <button type="button" class="btn btn-cancel-edit" id="btnAccPhotoRemove" style="display:none;">Quitar foto</button>
+        </div>
+      </div>
+    </div>
 
     <div class="account-section">
       <h4>Cambiar contraseña</h4>
@@ -3983,11 +4009,32 @@ window.__gastosApplyRemoteStore = function(json){
   var userBadge = document.getElementById('userBadge');
   var ubEmail = document.getElementById('ubEmail');
   var ubAvatar = document.getElementById('ubAvatar');
+  var currentPhotoURL = null;
+  function setUbPhoto(url){
+    currentPhotoURL = url || null;
+    var targets = [ubAvatar, document.getElementById('accAvatarPreview')];
+    targets.forEach(function(el){
+      if(!el) return;
+      if(currentPhotoURL){
+        el.style.backgroundImage = 'url("'+currentPhotoURL+'")';
+        if(el.firstChild && el.firstChild.nodeType===3) el.firstChild.textContent = '';
+      } else {
+        el.style.backgroundImage = '';
+      }
+    });
+    var btnRemove = document.getElementById('btnAccPhotoRemove');
+    if(btnRemove) btnRemove.style.display = currentPhotoURL ? 'block' : 'none';
+    if(!currentPhotoURL) setUbName(ubEmail.textContent);
+  }
   function setUbName(txt){
     ubEmail.textContent = txt || '';
-    if(ubAvatar){
+    if(!currentPhotoURL){
       var t = (txt||'').trim();
-      ubAvatar.firstChild.textContent = (t && t.charAt(0) !== '(') ? t.charAt(0).toUpperCase() : '·';
+      var letter = (t && t.charAt(0) !== '(') ? t.charAt(0).toUpperCase() : '·';
+      [ubAvatar, document.getElementById('accAvatarPreview')].forEach(function(el){
+        if(!el) return;
+        if(el.firstChild && el.firstChild.nodeType===3) el.firstChild.textContent = letter;
+      });
     }
   }
   var syncDot = document.getElementById('syncDot');
@@ -3996,6 +4043,10 @@ window.__gastosApplyRemoteStore = function(json){
   var accountOverlay = document.getElementById('accountOverlay');
   var accountClose = document.getElementById('accountClose');
   var accCurrentEmail = document.getElementById('accCurrentEmail');
+  var accPhotoMsg = document.getElementById('accPhotoMsg');
+  var accAvatarPreview = document.getElementById('accAvatarPreview');
+  var accPhotoInput = document.getElementById('accPhotoInput');
+  var btnAccPhotoRemove = document.getElementById('btnAccPhotoRemove');
   var accPassForm = document.getElementById('accPassForm');
   var accPassCurrent = document.getElementById('accPassCurrent');
   var accPassNew = document.getElementById('accPassNew');
@@ -4299,6 +4350,7 @@ window.__gastosApplyRemoteStore = function(json){
           return;
         }
         var userData = (userDoc.exists && userDoc.data()) ? userDoc.data() : {};
+        setUbPhoto(userData.photoURL || null);
 
         function conUsernameResuelto(resolvedUsername){
           if(AUTH_MODE === 'username'){ setUbName(resolvedUsername || '(usuario)'); }
@@ -4389,6 +4441,7 @@ window.__gastosApplyRemoteStore = function(json){
       currentLibroId = null;
       currentUsername = null;
       currentRol = 'owner';
+      setUbPhoto(null);
       if(libroUnsub){ libroUnsub(); libroUnsub = null; }
       window.__gastosCloudSync = null;
       userBadge.style.display = 'none';
@@ -4614,7 +4667,7 @@ window.__gastosApplyRemoteStore = function(json){
 
   // ---- Modal de Cuenta (cambiar contraseña / email / eliminar cuenta) ----
   function clearAccountMsgs(){
-    [accPassMsg, accEmailMsg, accDelMsg].forEach(function(el){
+    [accPassMsg, accEmailMsg, accDelMsg, accPhotoMsg].forEach(function(el){
       el.className = 'account-msg';
       el.textContent = '';
     });
@@ -4637,6 +4690,84 @@ window.__gastosApplyRemoteStore = function(json){
   document.addEventListener('keydown', function(e){
     if(e.key==='Escape' && accountOverlay.classList.contains('open')) closeAccountModal();
   });
+
+  // ---- Foto de perfil: recorte cuadrado + compresión en canvas antes de guardar ----
+  var ACC_PHOTO_SIZE = 256; // lado del cuadrado final, en px
+  function recortarYComprimirImagen(file, cb){
+    var reader = new FileReader();
+    reader.onerror = function(){ cb(null, 'No se pudo leer el archivo.'); };
+    reader.onload = function(){
+      var img = new Image();
+      img.onerror = function(){ cb(null, 'El archivo no parece ser una imagen válida.'); };
+      img.onload = function(){
+        var side = Math.min(img.naturalWidth, img.naturalHeight);
+        var sx = (img.naturalWidth - side) / 2;
+        var sy = (img.naturalHeight - side) / 2;
+        var canvas = document.createElement('canvas');
+        canvas.width = ACC_PHOTO_SIZE;
+        canvas.height = ACC_PHOTO_SIZE;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, ACC_PHOTO_SIZE, ACC_PHOTO_SIZE);
+        // Bajamos la calidad JPEG solo si hiciera falta, para no pasarnos del límite de Firestore.
+        var quality = 0.9;
+        var dataUrl = canvas.toDataURL('image/jpeg', quality);
+        while(dataUrl.length > 350000 && quality > 0.4){
+          quality -= 0.15;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        cb(dataUrl, null);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  if(accPhotoInput){
+    accPhotoInput.addEventListener('change', function(){
+      var file = accPhotoInput.files && accPhotoInput.files[0];
+      accPhotoInput.value = '';
+      if(!file) return;
+      if(file.type.indexOf('image/') !== 0){
+        accPhotoMsg.className = 'account-msg err';
+        accPhotoMsg.textContent = 'Elegí un archivo de imagen (jpg, png, etc.).';
+        return;
+      }
+      accPhotoMsg.className = 'account-msg';
+      accPhotoMsg.textContent = 'Procesando imagen…';
+      recortarYComprimirImagen(file, function(dataUrl, err){
+        if(err || !dataUrl){
+          accPhotoMsg.className = 'account-msg err';
+          accPhotoMsg.textContent = err || 'No se pudo procesar la imagen.';
+          return;
+        }
+        if(!currentUid){
+          accPhotoMsg.className = 'account-msg err';
+          accPhotoMsg.textContent = 'No se pudo identificar la cuenta actual.';
+          return;
+        }
+        docRef(currentUid).set({ photoURL: dataUrl }, { merge: true }).then(function(){
+          setUbPhoto(dataUrl);
+          accPhotoMsg.className = 'account-msg ok';
+          accPhotoMsg.textContent = 'Foto actualizada.';
+        }).catch(function(err2){
+          accPhotoMsg.className = 'account-msg err';
+          accPhotoMsg.textContent = 'No se pudo guardar la foto: '+(err2.message||err2);
+        });
+      });
+    });
+  }
+  if(btnAccPhotoRemove){
+    btnAccPhotoRemove.addEventListener('click', function(){
+      if(!currentUid) return;
+      docRef(currentUid).set({ photoURL: null }, { merge: true }).then(function(){
+        setUbPhoto(null);
+        accPhotoMsg.className = 'account-msg ok';
+        accPhotoMsg.textContent = 'Foto eliminada.';
+      }).catch(function(err2){
+        accPhotoMsg.className = 'account-msg err';
+        accPhotoMsg.textContent = 'No se pudo quitar la foto: '+(err2.message||err2);
+      });
+    });
+  }
 
   // Handlers de los formularios: se completan en los próximos pasos
   // (cambiar contraseña, cambiar email, eliminar cuenta).
