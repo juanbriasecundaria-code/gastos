@@ -142,19 +142,27 @@ a{color:inherit;}
   .bottom-nav{
     display:flex;flex-direction:row;position:fixed;left:0;right:0;bottom:0;z-index:30;
     background:var(--surface);border-top:1px solid var(--line);
-    padding:6px 4px calc(6px + env(safe-area-inset-bottom));
-    overflow-x:auto;-webkit-overflow-scrolling:touch;
+    padding:4px 2px calc(4px + env(safe-area-inset-bottom));
   }
   .bottom-nav .nav-btn{
-    flex:0 0 auto;min-width:56px;
+    flex:1 1 0;min-width:0;
     flex-direction:column;align-items:center;justify-content:center;
-    gap:2px;padding:6px 3px;border-radius:8px;
-    font-size:10px;font-weight:500;color:var(--text-faint);
-    background:none;white-space:nowrap;
+    gap:2px;padding:5px 1px;border-radius:8px;
+    font-size:9.5px;font-weight:500;color:var(--text-faint);
+    background:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
-  .bottom-nav .nav-btn .bn-icon{font-size:17px;line-height:1;}
+  .bottom-nav .nav-btn .bn-icon{font-size:16px;line-height:1;}
+  .bottom-nav .nav-btn .bn-icon svg{width:18px;height:18px;}
   .bottom-nav .nav-btn:hover{background:var(--surface-2);color:var(--text-dim);}
   .bottom-nav .nav-btn.active{background:none;color:var(--ingreso);}
+}
+@media (max-width:400px){
+  .bottom-nav .nav-btn{font-size:8.6px;}
+  .bottom-nav .nav-btn .bn-icon svg{width:17px;height:17px;}
+}
+@media (max-width:360px){
+  .bottom-nav .bn-label{display:none;}
+  .bottom-nav .nav-btn{padding:8px 1px;}
 }
 
 .brand{
@@ -555,8 +563,25 @@ main{
 .table-wrap{
   border:1px solid var(--line);border-radius:var(--radius);overflow:auto;
   background:var(--surface);box-shadow:var(--shadow-card);
+  -webkit-overflow-scrolling:touch;
+  position:relative;
+  background-image:
+    linear-gradient(to right, var(--surface), var(--surface) 30px, transparent),
+    linear-gradient(to right, transparent, var(--surface) calc(100% - 30px), var(--surface)),
+    linear-gradient(to right, rgba(0,0,0,.12), transparent 30px),
+    linear-gradient(to left, rgba(0,0,0,.12), transparent 30px);
+  background-position:left, right, left, right;
+  background-repeat:no-repeat;
+  background-size:30px 100%, 30px 100%, 12px 100%, 12px 100%;
+  background-attachment:local, local, scroll, scroll;
 }
 table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
+@media (max-width:860px){
+  .pivot th, .pivot td{padding:8px 10px;font-size:12px;}
+  .pivot th:first-child, .pivot td:first-child{min-width:130px;}
+  table{min-width:620px;}
+  .cat-bar-wrap{width:60px;}
+}
 .pivot th, .pivot td{
   padding:10px 14px;text-align:right;white-space:nowrap;
   font-family:var(--font-mono);letter-spacing:-.01em;
@@ -605,15 +630,20 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 .pivot .grp-inversion td:first-child::before{background:var(--inversion);}
 .pivot .grp-resumen td:first-child::before{background:var(--text-faint);}
 
-.pivot .cat-row td:first-child{padding-left:24px;color:var(--text-dim);font-family:var(--font-body);font-weight:400;padding-top:8px;padding-bottom:8px;}
+.pivot .cat-row td:first-child{
+  padding-left:24px;color:var(--text-dim);font-family:var(--font-body);font-weight:400;
+  padding-top:8px;padding-bottom:8px;display:flex;align-items:flex-start;gap:7px;
+}
 .pivot .cat-fijo td:first-child::before, .pivot .cat-variable td:first-child::before{
   content:'';position:absolute;left:9px;top:7px;bottom:7px;width:2px;border-radius:1px;opacity:.6;
 }
 .pivot .cat-fijo td:first-child::before{background:var(--fijo);}
 .pivot .cat-variable td:first-child::before{background:var(--variable);}
+.cat-icon{width:13px;height:13px;margin-top:2px;flex-shrink:0;color:var(--text-faint);}
 
 /* Barra de peso relativo por categoría (estilo Monarch), sin necesitar un presupuesto definido */
-.cat-label{display:block;line-height:1.3;}
+.cat-label{display:block;min-width:0;}
+.cat-name{display:block;line-height:1.3;}
 .cat-bar-wrap{
   display:block;margin-top:5px;height:3px;width:84px;max-width:100%;
   background:var(--line-soft);border-radius:2px;overflow:hidden;
@@ -625,6 +655,13 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 .pivot .total-row td{font-weight:700;border-top:1px solid var(--line);border-bottom:none;color:var(--text);}
 .pivot .zero{color:var(--text-faint);}
 .pivot .col-total{border-left:1px solid var(--line);font-weight:600;}
+.var-badge{
+  display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:600;
+  padding:1px 6px;border-radius:999px;margin-left:6px;font-family:var(--font-mono);
+  vertical-align:middle;white-space:nowrap;cursor:default;
+}
+.var-good{color:var(--ingreso);background:color-mix(in srgb, var(--ingreso) 16%, transparent);}
+.var-bad{color:var(--neg);background:color-mix(in srgb, var(--neg) 16%, transparent);}
 
 /* ===== Forms ===== */
 .form-card{
@@ -871,12 +908,12 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
   </aside>
 
   <nav class="bottom-nav" aria-label="Navegación principal">
-    <button class="nav-btn" data-tab="resumen"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span><span class="bn-label">Resumen</span></button>
-    <button class="nav-btn" data-tab="ingresos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span><span class="bn-label">Ingresos</span></button>
-    <button class="nav-btn" data-tab="gastos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v18l3-2 3 2 3-2 3 2 3-2 3 2V3l-3 2-3-2-3 2-3-2-3 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span><span class="bn-label">Gastos</span></button>
-    <button class="nav-btn" data-tab="dolar"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="bn-label">Dólar</span></button>
-    <button class="nav-btn" data-tab="inversion"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><span class="bn-label">Inversión</span></button>
-    <button class="nav-btn" data-tab="graficos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span><span class="bn-label">Gráficos</span></button>
+    <button class="nav-btn" data-tab="resumen" aria-label="Resumen"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span><span class="bn-label">Resumen</span></button>
+    <button class="nav-btn" data-tab="ingresos" aria-label="Ingresos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span><span class="bn-label">Ingresos</span></button>
+    <button class="nav-btn" data-tab="gastos" aria-label="Gastos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v18l3-2 3 2 3-2 3 2 3-2 3 2V3l-3 2-3-2-3 2-3-2-3 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span><span class="bn-label">Gastos</span></button>
+    <button class="nav-btn" data-tab="dolar" aria-label="Dólar"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="bn-label">Dólar</span></button>
+    <button class="nav-btn" data-tab="inversion" aria-label="Inversión"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><span class="bn-label">Inversión</span></button>
+    <button class="nav-btn" data-tab="graficos" aria-label="Gráficos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span><span class="bn-label">Gráficos</span></button>
     <button class="nav-btn" id="btnMobileSearch" aria-label="Buscar"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span><span class="bn-label">Buscar</span></button>
     <button class="nav-btn" id="btnMobileMenu" aria-label="Abrir menú" aria-expanded="false"><span class="bn-icon">☰</span><span class="bn-label">Menú</span></button>
   </nav>
@@ -889,7 +926,10 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
           <h1 class="view-title">Resumen</h1>
           <p class="view-desc">Ingresos, gastos y compra de dólares — vista mensual del año.</p>
         </div>
-        <button class="ghost-btn no-print" id="btnPrintResumen" title="Exportar el resumen como PDF o imprimirlo"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Exportar / Imprimir</button>
+        <div class="view-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="ghost-btn no-print" id="btnExportCsv" title="Descargar el resumen del año como CSV"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 21h16"/></svg> Exportar CSV</button>
+          <button class="ghost-btn no-print" id="btnPrintResumen" title="Exportar el resumen como PDF o imprimirlo"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Exportar / Imprimir</button>
+        </div>
       </div>
       <div class="print-header" id="printHeader"></div>
       <div class="kpi-row" id="kpiRow"></div>
@@ -1500,6 +1540,35 @@ function catsFor(tipo){
   var custom = DATA.customCategorias[tipo] || [];
   return baseVisible.concat(custom).sort(function(a,b){ return a.localeCompare(b, 'es'); });
 }
+
+/* Ícono simple (estilo lucide, sin emoji) según palabras clave del nombre de categoría */
+var CAT_ICON_DEFS = [
+  { kw:['alquiler','renta','vivienda','casa','hogar','expensas'],
+    svg:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10a1 1 0 0 0 1 1h3v-7h6v7h3a1 1 0 0 0 1-1V10"/>' },
+  { kw:['comida','super','almacen','almacén','alimento','mercado','despensa','verduler'],
+    svg:'<circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.5 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 8H6"/>' },
+  { kw:['transporte','auto','nafta','combustible','colectivo','uber','sube','nena'],
+    svg:'<path d="M5 17h14M5 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm14 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM3 17V11l2-5h14l2 5v6"/>' },
+  { kw:['salud','medic','farmacia','doctor','obra social','odont'],
+    svg:'<path d="M12 21s-7-4.35-9.5-8.5C.7 9 2 5 6 5c2.2 0 3.5 1.3 4.5 3 1-1.7 2.3-3 4.5-3 4 0 5.3 4 3.5 7.5C19 16.65 12 21 12 21z"/>' },
+  { kw:['servicio','luz','agua','gas','internet','telefono','teléfono','wifi','cable'],
+    svg:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' },
+  { kw:['educ','colegio','curso','universidad','escuela','libro'],
+    svg:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>' },
+  { kw:['entreten','ocio','salida','cine','streaming','netflix','spotify','suscripcion','suscripción'],
+    svg:'<rect x="2" y="3" width="20" height="18" rx="2"/><path d="M7 3v18M17 3v18M2 8h5M2 16h5M17 8h5M17 16h5"/>' },
+  { kw:['regalo','cumple'],
+    svg:'<rect x="3" y="8" width="18" height="13" rx="1"/><path d="M12 8v13M3 12h18"/><path d="M7.5 8a2.5 2.5 0 1 1 0-5C9.5 3 12 8 12 8s2.5-5 4.5-5a2.5 2.5 0 1 1 0 5"/>' },
+  { kw:['ropa','indumentaria','vestimenta','calzado'],
+    svg:'<path d="M16 3l3 3-2 2v13H7V8L5 6l3-3 4 2 4-2z"/>' }
+];
+var CAT_ICON_DEFAULT = '<path d="M12.6 2.6a2 2 0 0 0-1.4-.6H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>';
+function catIconSvg(catName){
+  var n = (catName||'').toLowerCase();
+  var def = CAT_ICON_DEFS.find(function(d){ return d.kw.some(function(k){ return n.indexOf(k)!==-1; }); });
+  var path = def ? def.svg : CAT_ICON_DEFAULT;
+  return '<svg class="icon cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+path+'</svg>';
+}
 function isCustomCat(tipo, cat){
   return (DATA.customCategorias[tipo]||[]).indexOf(cat) !== -1;
 }
@@ -1940,16 +2009,30 @@ function renderResumen(){
     return ' style="animation-delay:'+d+'ms"';
   }
 
-  function rowFor(label, valuesFn, cls){
+  // Variación entre los dos últimos meses consecutivos con datos (para saber si "veníamos subiendo o bajando")
+  function variationBadge(vals, kind){
+    for(var i=vals.length-1; i>0; i--){
+      if(vals[i]!==0 && vals[i-1]!==0){
+        var pct = ((vals[i]-vals[i-1])/Math.abs(vals[i-1]))*100;
+        var up = pct >= 0;
+        var good = kind==='ingreso' ? up : !up;
+        return '<span class="var-badge '+(good?'var-good':'var-bad')+'" title="vs. '+MESES[i-1]+'">'+(up?'▲':'▼')+' '+Math.abs(Math.round(pct))+'%</span>';
+      }
+    }
+    return '';
+  }
+
+  function rowFor(label, valuesFn, cls, variationKind){
     var vals = months.map(valuesFn);
     var tot = vals.reduce(function(a,b){return a+b;},0);
     var r = '<tr class="'+(cls||'')+'"'+delayAttr()+'><td>'+label+'</td>';
     vals.forEach(function(v){ r += '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':money(v))+'</td>'; });
-    r += '<td class="col-total">'+money(tot)+'</td></tr>';
+    var badge = variationKind ? variationBadge(vals, variationKind) : '';
+    r += '<td class="col-total">'+money(tot)+badge+'</td></tr>';
     return r;
   }
 
-  // Filas de categoría con barra de peso relativo dentro de su grupo (estilo Monarch)
+  // Filas de categoría: ordenadas por influencia (mayor a menor), con ícono, barra relativa y heatmap por celda
   function catRowsHtml(cats, valuesFn, groupKey){
     var collapsed = !!pivotCollapsed[groupKey];
     var rows = cats.map(function(cat){
@@ -1957,12 +2040,18 @@ function renderResumen(){
       var tot = vals.reduce(function(a,b){return a+b;},0);
       return {cat:cat, vals:vals, tot:tot};
     });
+    rows.sort(function(a,b){ return b.tot - a.tot; });
     var maxTot = rows.reduce(function(m,r){return Math.max(m,r.tot);},0) || 1;
     return rows.map(function(r){
       var pct = Math.max(4, Math.round((r.tot/maxTot)*100));
-      var cells = '<td><span class="cat-label">'+r.cat+'</span>'+
-        '<span class="cat-bar-wrap"><span class="cat-bar" style="width:'+pct+'%"></span></span></td>';
-      r.vals.forEach(function(v){ cells += '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':money(v))+'</td>'; });
+      var rowMax = Math.max.apply(null, r.vals) || 1;
+      var cells = '<td>'+catIconSvg(r.cat)+'<span class="cat-label"><span class="cat-name">'+r.cat+'</span>'+
+        '<span class="cat-bar-wrap"><span class="cat-bar" style="width:'+pct+'%"></span></span></span></td>';
+      r.vals.forEach(function(v){
+        if(v===0){ cells += '<td class="zero">–</td>'; return; }
+        var alpha = Math.round((v/rowMax)*32);
+        cells += '<td style="background:color-mix(in srgb, var(--'+groupKey+') '+alpha+'%, transparent)">'+money(v)+'</td>';
+      });
       cells += '<td class="col-total">'+money(r.tot)+'</td>';
       return '<tr class="cat-row cat-'+groupKey+(collapsed?' row-collapsed':'')+'" data-group="'+groupKey+'"'+delayAttr()+'>'+cells+'</tr>';
     }).join('');
@@ -1978,7 +2067,7 @@ function renderResumen(){
   }
 
   html += grpRowHtml('Ingresos', 'ingreso', false);
-  html += rowFor('Total Ingresos', function(m){return m.totalIngresos;});
+  html += rowFor('Total Ingresos', function(m){return m.totalIngresos;}, '', 'ingreso');
 
   html += grpRowHtml('Gastos fijos', 'fijo', true);
   html += catRowsHtml(catsFor('Fijo'), function(m,cat){return m.fijosPorCat[cat]||0;}, 'fijo');
@@ -1988,7 +2077,7 @@ function renderResumen(){
   html += catRowsHtml(catsFor('Variable'), function(m,cat){return m.variablesPorCat[cat]||0;}, 'variable');
   html += rowFor('Total Gastos Variables', function(m){return m.totalVariables;}, 'total-row');
 
-  html += rowFor('Gastos Totales', function(m){return m.totalGastos;}, 'total-row');
+  html += rowFor('Gastos Totales', function(m){return m.totalGastos;}, 'total-row', 'gasto');
 
   html += grpRowHtml('Compra dólar', 'dolar', false);
   html += rowFor('$ Gastados', function(m){return m.pesosGastadosUsd;});
@@ -2003,7 +2092,7 @@ function renderResumen(){
 
   html += grpRowHtml('Resumen', 'resumen', false);
   html += rowFor('Total Gastado', function(m){return m.totalGastado;});
-  html += rowFor('Total Restante', function(m){return m.totalRestante;}, 'total-row');
+  html += rowFor('Total Restante', function(m){return m.totalRestante;}, 'total-row', 'ingreso');
 
   html += '</tbody>';
   table.innerHTML = html;
@@ -2527,6 +2616,62 @@ document.getElementById('toggleUsdEquiv').addEventListener('change', renderGrafi
 });
 
 /* ===================== EXPORTAR / IMPRIMIR RESUMEN ===================== */
+/* ===================== EXPORTAR CSV (Resumen) ===================== */
+function sortedCatsByTotal(cats, months, valuesFn){
+  return cats.map(function(cat){
+    var tot = months.reduce(function(s,m){ return s + valuesFn(m, cat); }, 0);
+    return {cat:cat, tot:tot};
+  }).sort(function(a,b){ return b.tot - a.tot; }).map(function(x){ return x.cat; });
+}
+function exportResumenCSV(){
+  var months = MESES.map(computeMonth);
+  var rows = [['Categoría'].concat(MESES).concat(['Total'])];
+
+  function addRow(label, valuesFn){
+    var vals = months.map(valuesFn);
+    var tot = vals.reduce(function(a,b){return a+b;},0);
+    rows.push([label].concat(vals).concat([tot]));
+  }
+
+  addRow('Total Ingresos', function(m){return m.totalIngresos;});
+
+  sortedCatsByTotal(catsFor('Fijo'), months, function(m,cat){return m.fijosPorCat[cat]||0;}).forEach(function(cat){
+    addRow(cat, function(m){return m.fijosPorCat[cat]||0;});
+  });
+  addRow('Total Gastos Fijos', function(m){return m.totalFijos;});
+
+  sortedCatsByTotal(catsFor('Variable'), months, function(m,cat){return m.variablesPorCat[cat]||0;}).forEach(function(cat){
+    addRow(cat, function(m){return m.variablesPorCat[cat]||0;});
+  });
+  addRow('Total Gastos Variables', function(m){return m.totalVariables;});
+  addRow('Gastos Totales', function(m){return m.totalGastos;});
+  addRow('$ Gastados (pesos)', function(m){return m.pesosGastadosUsd;});
+  addRow('USD Totales', function(m){return m.totalUsd;});
+  if(DATA.inversion.length){ addRow('Monto Invertido', function(m){return m.montoInversion;}); }
+  addRow('Total Gastado', function(m){return m.totalGastado;});
+  addRow('Total Restante', function(m){return m.totalRestante;});
+
+  var csv = rows.map(function(r){
+    return r.map(function(cell){
+      var s = String(cell);
+      if(s.indexOf(',')!==-1 || s.indexOf('"')!==-1 || s.indexOf('\n')!==-1){ s = '"'+s.replace(/"/g,'""')+'"'; }
+      return s;
+    }).join(',');
+  }).join('\r\n');
+
+  var blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'resumen-'+String(STORE.activeEjercicio).replace(/[^a-z0-9-_]/gi,'_')+'.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 500);
+  toast('CSV descargado');
+}
+document.getElementById('btnExportCsv').addEventListener('click', exportResumenCSV);
+
 document.getElementById('btnPrintResumen').addEventListener('click', function(){
   var resumenBtn = document.querySelector('.nav-btn[data-tab="resumen"]');
   if(resumenBtn && !resumenBtn.classList.contains('active')) resumenBtn.click();
