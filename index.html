@@ -30,6 +30,8 @@
   --font-display:'Space Grotesk',sans-serif;
   --font-body:'Inter',sans-serif;
   --font-mono:'IBM Plex Mono',monospace;
+  --shadow-card:0 1px 2px rgba(0,0,0,.4), 0 10px 24px -16px rgba(0,0,0,.6);
+  --shadow-pop:0 24px 70px rgba(0,0,0,.55);
 }
 /* ===== Tema claro (para uso al sol / poca luminosidad de pantalla) ===== */
 html.theme-light{
@@ -41,12 +43,14 @@ html.theme-light{
   --text:#1A1F27;
   --text-dim:#4B5563;
   --text-faint:#6B7280;
-  --ingreso:#1FA47A;
-  --fijo:#B5810A;
-  --variable:#8B4FD1;
-  --dolar:#2B6FCB;
+  --ingreso:#0E9E71;
+  --fijo:#A9720A;
+  --variable:#7C3AED;
+  --dolar:#1E63C7;
   --inversion:#C23D6B;
   --neg:#D93A3D;
+  --shadow-card:0 1px 2px rgba(20,30,45,.06), 0 10px 22px -14px rgba(20,30,45,.16);
+  --shadow-pop:0 20px 50px rgba(20,30,45,.18);
 }
 html.theme-light body{background:var(--bg);}
 *{box-sizing:border-box;}
@@ -64,6 +68,9 @@ body{
 ::-webkit-scrollbar-track{background:transparent;}
 
 a{color:inherit;}
+.icon{width:14px;height:14px;vertical-align:-2px;flex-shrink:0;stroke:currentColor;}
+.bn-icon svg{width:19px;height:19px;display:block;margin:0 auto;stroke:currentColor;}
+.share-badge-wrap{position:relative;display:inline-flex;}
 
 /* ===== Layout ===== */
 .app{
@@ -208,7 +215,7 @@ a{color:inherit;}
 .search-box{
   width:640px;max-width:92vw;max-height:70vh;display:flex;flex-direction:column;
   background:var(--surface);border:1px solid var(--line);border-radius:12px;
-  overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.55);
+  overflow:hidden;box-shadow:var(--shadow-pop);
 }
 .search-input-wrap{
   display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);flex-shrink:0;
@@ -377,7 +384,11 @@ a{color:inherit;}
   }
   .search-trigger span:not(.search-kbd){display:none;}
   .search-kbd{display:none;}
-  .search-trigger::before{content:"🔍";font-size:14px;}
+  .search-trigger::before{
+    content:"";display:block;width:15px;height:15px;background:var(--text-faint);
+    -webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') center/contain no-repeat;
+    mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') center/contain no-repeat;
+  }
 }
 nav{display:flex;flex-direction:column;gap:2px;}
 .nav-btn{
@@ -447,7 +458,10 @@ main{
 .kpi{
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
   padding:16px 16px 14px;position:relative;overflow:hidden;
+  box-shadow:var(--shadow-card);
+  transition:transform .15s ease, box-shadow .15s ease;
 }
+.kpi:hover{transform:translateY(-1px);}
 .kpi::before{
   content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);
 }
@@ -459,6 +473,15 @@ main{
 .kpi-value{font-family:var(--font-mono);font-size:22px;font-weight:600;letter-spacing:-0.01em;}
 .kpi-value.neg{color:var(--neg);}
 .kpi-sub{font-size:11.5px;color:var(--text-faint);margin-top:4px;}
+
+/* El KPI principal (restante/saldo) se destaca del resto en vez de pesar igual */
+.kpi.kpi-hero{
+  background:linear-gradient(180deg, var(--surface-2), var(--surface));
+}
+.kpi.kpi-hero::before{width:4px;}
+.kpi.kpi-hero .kpi-label{color:var(--text-dim);}
+.kpi.kpi-hero .kpi-value{font-size:30px;}
+@media (max-width:860px){ .kpi.kpi-hero{grid-column:1 / -1;} .kpi.kpi-hero .kpi-value{font-size:26px;} }
 
 /* ===== Month strip ===== */
 .month-strip{
@@ -480,7 +503,7 @@ main{
 @media (max-width:860px){.chart-grid{grid-template-columns:1fr;}}
 .chart-card{
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-  padding:18px;
+  padding:18px;box-shadow:var(--shadow-card);
 }
 .chart-card-wide{grid-column:1 / -1;}
 .chart-card h3{
@@ -531,7 +554,7 @@ main{
 /* ===== Table (pivot) ===== */
 .table-wrap{
   border:1px solid var(--line);border-radius:var(--radius);overflow:auto;
-  background:var(--surface);
+  background:var(--surface);box-shadow:var(--shadow-card);
 }
 table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 .pivot th, .pivot td{
@@ -562,7 +585,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 /* ===== Forms ===== */
 .form-card{
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-  padding:18px;margin-bottom:22px;
+  padding:18px;margin-bottom:22px;box-shadow:var(--shadow-card);
 }
 .form-card h3{
   font-family:var(--font-display);font-size:14px;font-weight:600;margin:0 0 14px;
@@ -617,15 +640,20 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 .btn{
   font-family:var(--font-body);font-weight:600;font-size:13px;
   padding:10px 16px;border-radius:7px;border:none;cursor:pointer;
-  background:var(--text);color:var(--bg);transition:opacity .15s;
+  background:var(--text);color:var(--bg);
+  transition:opacity .15s, transform .12s ease, box-shadow .12s ease;
 }
-.btn:hover{opacity:.85;}
+.btn:hover{opacity:.85;transform:translateY(-1px);}
+.btn:active{transform:translateY(0);opacity:1;}
 .btn:focus-visible, .nav-btn:focus-visible, .month-pill:focus-visible, .ghost-btn:focus-visible, select:focus-visible, input:focus-visible{
   outline:2px solid var(--dolar);outline-offset:2px;
 }
 .btn-accent-ingreso{background:var(--ingreso);color:#08221A;}
+.btn-accent-ingreso:hover{box-shadow:0 6px 16px -6px rgba(79,209,165,.55);}
 .btn-accent-fijo{background:var(--fijo);color:#241900;}
+.btn-accent-fijo:hover{box-shadow:0 6px 16px -6px rgba(240,180,58,.55);}
 .btn-accent-dolar{background:var(--dolar);color:#071B33;}
+.btn-accent-dolar:hover{box-shadow:0 6px 16px -6px rgba(91,159,237,.55);}
 .btn-cancel-edit{
   background:none;border:1px solid var(--line);color:var(--text-dim);
 }
@@ -677,6 +705,18 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 .tag-variable{background:rgba(180,126,245,.16);color:var(--variable);border:1px solid rgba(180,126,245,.35);}
 .tag-sueldo{background:rgba(79,209,165,.14);color:var(--ingreso);}
 .tag-extra{background:rgba(91,159,237,.14);color:var(--dolar);}
+.tag-usd{background:rgba(91,159,237,.14);color:var(--dolar);}
+.tag-inv{background:rgba(79,209,165,.14);color:var(--ingreso);}
+
+/* Franja de color por categoría: se puede "leer" fijo/variable/ingreso
+   escaneando la lista sin fijarse en el tag de texto */
+.entry-row{border-left:2px solid transparent;}
+.entry-row:has(.tag-fijo){border-left-color:var(--fijo);}
+.entry-row:has(.tag-variable){border-left-color:var(--variable);}
+.entry-row:has(.tag-sueldo){border-left-color:var(--ingreso);}
+.entry-row:has(.tag-extra){border-left-color:var(--dolar);}
+.entry-row:has(.tag-usd){border-left-color:var(--dolar);}
+.entry-row:has(.tag-inv){border-left-color:var(--ingreso);}
 .entry-desc{color:var(--text);}
 .entry-desc small{display:block;color:var(--text-faint);font-size:11px;margin-top:1px;}
 .entry-amt{font-family:var(--font-mono);text-align:right;font-weight:500;}
@@ -689,6 +729,12 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 .empty-state{
   padding:34px 20px;text-align:center;color:var(--text-faint);font-size:13px;
   border:1px dashed var(--line);border-radius:var(--radius);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.empty-state::before{
+  content:"";display:block;width:26px;height:26px;background:var(--text-faint);opacity:.5;
+  -webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22l-3 5H4z"/><path d="M10 12h4"/></svg>') center/contain no-repeat;
+  mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22l-3 5H4z"/><path d="M10 12h4"/></svg>') center/contain no-repeat;
 }
 
 /* toast */
@@ -744,7 +790,8 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
   <div id="inviteBanner" class="invite-banner" style="display:none;"></div>
   <div class="mobile-sidebar-backdrop" id="mobileSidebarBackdrop"></div>
   <button id="btnShareFloat" class="share-float-btn share-trigger-btn" title="Compartir este libro" aria-label="Compartir este libro">
-    👥<span class="share-badge" id="shareFloatBadge" style="display:none;"></span>
+    <svg class="icon" style="width:18px;height:18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span class="share-badge" id="shareFloatBadge" style="display:none;"></span>
   </button>
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span>Libro de Gastos</div>
@@ -752,9 +799,9 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
       <select id="ejercicioSelect" class="ejercicio-select" title="Ejercicio activo"></select>
       <button id="btnNuevoEjercicio" class="ejercicio-add" title="Nuevo ejercicio" aria-label="Nuevo ejercicio">+</button>
     </div>
-    <button class="ghost-btn theme-toggle-btn" id="btnThemeToggle">☀️ Modo claro</button>
+    <button class="ghost-btn theme-toggle-btn" id="btnThemeToggle"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg> Modo claro</button>
     <button class="search-trigger" id="btnOpenSearch" aria-label="Buscar">
-      <span>🔍 Buscar…</span><span class="search-kbd">Ctrl K</span>
+      <span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Buscar…</span><span class="search-kbd">Ctrl K</span>
     </button>
     <nav>
       <button class="nav-btn active" data-tab="resumen"><span class="ind"></span>Resumen</button>
@@ -771,7 +818,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
         <button class="ub-account" id="btnAccount" title="Cuenta" aria-label="Cuenta">⚙</button>
         <button class="ub-logout" id="btnLogout">Salir</button>
       </div>
-      <button class="ghost-btn share-trigger-btn" id="btnShare">👥 Compartir este libro</button>
+      <button class="ghost-btn share-trigger-btn" id="btnShare"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Compartir este libro</button>
       <button class="ghost-btn" id="btnExport">↓ Exportar backup (.json)</button>
       <button class="ghost-btn" id="btnImport">↑ Importar backup</button>
       <input type="file" id="fileImport" accept="application/json" style="display:none;">
@@ -781,13 +828,13 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
   </aside>
 
   <nav class="bottom-nav" aria-label="Navegación principal">
-    <button class="nav-btn" data-tab="resumen"><span class="bn-icon">📋</span><span class="bn-label">Resumen</span></button>
-    <button class="nav-btn" data-tab="ingresos"><span class="bn-icon">💵</span><span class="bn-label">Ingresos</span></button>
-    <button class="nav-btn" data-tab="gastos"><span class="bn-icon">🧾</span><span class="bn-label">Gastos</span></button>
-    <button class="nav-btn" data-tab="dolar"><span class="bn-icon">💲</span><span class="bn-label">Dólar</span></button>
-    <button class="nav-btn" data-tab="inversion"><span class="bn-icon">📊</span><span class="bn-label">Inversión</span></button>
-    <button class="nav-btn" data-tab="graficos"><span class="bn-icon">📈</span><span class="bn-label">Gráficos</span></button>
-    <button class="nav-btn" id="btnMobileSearch" aria-label="Buscar"><span class="bn-icon">🔍</span><span class="bn-label">Buscar</span></button>
+    <button class="nav-btn" data-tab="resumen"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span><span class="bn-label">Resumen</span></button>
+    <button class="nav-btn" data-tab="ingresos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span><span class="bn-label">Ingresos</span></button>
+    <button class="nav-btn" data-tab="gastos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v18l3-2 3 2 3-2 3 2 3-2 3 2V3l-3 2-3-2-3 2-3-2-3 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span><span class="bn-label">Gastos</span></button>
+    <button class="nav-btn" data-tab="dolar"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="bn-label">Dólar</span></button>
+    <button class="nav-btn" data-tab="inversion"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><span class="bn-label">Inversión</span></button>
+    <button class="nav-btn" data-tab="graficos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span><span class="bn-label">Gráficos</span></button>
+    <button class="nav-btn" id="btnMobileSearch" aria-label="Buscar"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span><span class="bn-label">Buscar</span></button>
     <button class="nav-btn" id="btnMobileMenu" aria-label="Abrir menú" aria-expanded="false"><span class="bn-icon">☰</span><span class="bn-label">Menú</span></button>
   </nav>
 
@@ -799,7 +846,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
           <h1 class="view-title">Resumen</h1>
           <p class="view-desc">Ingresos, gastos y compra de dólares — vista mensual del año.</p>
         </div>
-        <button class="ghost-btn no-print" id="btnPrintResumen" title="Exportar el resumen como PDF o imprimirlo">🖨 Exportar / Imprimir</button>
+        <button class="ghost-btn no-print" id="btnPrintResumen" title="Exportar el resumen como PDF o imprimirlo"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Exportar / Imprimir</button>
       </div>
       <div class="print-header" id="printHeader"></div>
       <div class="kpi-row" id="kpiRow"></div>
@@ -909,7 +956,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
           <div class="field"><label>Categoría</label>
             <div class="cat-select-row">
               <select name="cat" id="gasCat" required></select>
-              <button type="button" class="cat-del-btn" id="btnDelCat" title="Eliminar esta categoría">🗑</button>
+              <button type="button" class="cat-del-btn" id="btnDelCat" title="Eliminar esta categoría"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg></button>
             </div>
           </div>
           <div class="field">
@@ -1004,7 +1051,7 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px;}
 <div class="search-overlay" id="searchOverlay">
   <div class="search-box">
     <div class="search-input-wrap">
-      <span class="search-icon">🔍</span>
+      <span class="search-icon"><svg class="icon" style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
       <input type="text" id="searchInput" class="search-input" placeholder="Buscar por descripción, categoría, mes, monto…" autocomplete="off">
       <button class="search-close" id="btnCloseSearch" title="Cerrar (Esc)" aria-label="Cerrar búsqueda">Esc</button>
     </div>
@@ -1554,7 +1601,9 @@ var THEME_KEY = 'libroGastos_theme';
 function applyTheme(theme){
   document.documentElement.classList.toggle('theme-light', theme==='light');
   var btnTheme = document.getElementById('btnThemeToggle');
-  if(btnTheme) btnTheme.textContent = theme==='light' ? '🌙 Modo oscuro' : '☀️ Modo claro';
+  if(btnTheme) btnTheme.innerHTML = theme==='light'
+    ? '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Modo oscuro'
+    : '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg> Modo claro';
   try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
 }
 (function(){
@@ -1832,7 +1881,7 @@ function renderResumen(){
   kpiRow.innerHTML =
     '<div class="kpi k-ingreso"><div class="kpi-label">Ingresos del año</div><div class="kpi-value">'+money(yearIngresos)+'</div><div class="kpi-sub">acumulado 12 meses</div></div>'+
     '<div class="kpi k-gasto"><div class="kpi-label">Gastos del año</div><div class="kpi-value">'+money(yearGastos)+'</div><div class="kpi-sub">fijos + variables</div></div>'+
-    '<div class="kpi k-restante"><div class="kpi-label">Restante del año</div><div class="kpi-value'+(yearRestante<0?' neg':'')+'">'+money(yearRestante)+'</div><div class="kpi-sub">ingresos − gastado total</div></div>'+
+    '<div class="kpi k-restante kpi-hero"><div class="kpi-label">Restante del año</div><div class="kpi-value'+(yearRestante<0?' neg':'')+'">'+money(yearRestante)+'</div><div class="kpi-sub">ingresos − gastado total</div></div>'+
     '<div class="kpi k-usd"><div class="kpi-label">USD comprados</div><div class="kpi-value">'+usd(yearUsd)+'</div><div class="kpi-sub">total del año</div></div>';
 
   var table = document.getElementById('pivotTable');
@@ -1965,7 +2014,7 @@ function renderGastos(){
       var tagClass = it.tipo==='Fijo' ? 'tag-fijo' : 'tag-variable';
       var isEd = editingId.gastos===it.id;
       var subLine = [it.fecha?formatFechaCorta(it.fecha):null, it.desc?escapeHtml(it.desc):null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+it.tipo+'</span><span class="entry-desc">'+(it.recurrente?'<span class="recur-badge" title="Gasto recurrente">🔁</span>':'')+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="gastos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="gastos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+it.tipo+'</span><span class="entry-desc">'+(it.recurrente?'<span class="recur-badge" title="Gasto recurrente"><svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>':'')+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="gastos" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="gastos" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -1989,7 +2038,7 @@ function renderDolar(){
     items.forEach(function(it){
       var detail = (it.cant!==null && it.cant!==undefined) ? (money(it.cant)+' @ '+fmtDec.format(it.valor||0)) : 'Carga manual';
       var isEd = editingId.dolar===it.id;
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag" style="background:rgba(91,159,237,.14);color:var(--dolar);">USD</span><span class="entry-desc">'+detail+'</span><span class="entry-amt">'+usd(it.total)+'</span><button class="entry-edit" data-kind="dolar" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="dolar" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag tag-usd">USD</span><span class="entry-desc">'+detail+'</span><span class="entry-amt">'+usd(it.total)+'</span><button class="entry-edit" data-kind="dolar" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="dolar" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -2027,7 +2076,7 @@ function renderInversion(){
   kpiRow.innerHTML =
     '<div class="kpi k-ingreso"><div class="kpi-label">Total aportado</div><div class="kpi-value">'+money(totalAportado)+'</div><div class="kpi-sub">acumulado del año</div></div>'+
     '<div class="kpi k-usd"><div class="kpi-label">Valor actual declarado</div><div class="kpi-value">'+(valorActualFinal!==null?money(valorActualFinal):'—')+'</div><div class="kpi-sub">último valor cargado</div></div>'+
-    '<div class="kpi k-restante"><div class="kpi-label">Rendimiento</div><div class="kpi-value'+(rendimientoFinal!==null && rendimientoFinal<0?' neg':'')+'">'+(rendimientoFinal!==null?money(rendimientoFinal):'—')+'</div><div class="kpi-sub">valor actual − aportado</div></div>'+
+    '<div class="kpi k-restante kpi-hero"><div class="kpi-label">Rendimiento</div><div class="kpi-value'+(rendimientoFinal!==null && rendimientoFinal<0?' neg':'')+'">'+(rendimientoFinal!==null?money(rendimientoFinal):'—')+'</div><div class="kpi-sub">valor actual − aportado</div></div>'+
     '<div class="kpi k-gasto"><div class="kpi-label">Rendimiento %</div><div class="kpi-value'+(rendimientoPct!==null && rendimientoPct<0?' neg':'')+'">'+(rendimientoPct!==null?rendimientoPct.toFixed(1)+'%':'—')+'</div><div class="kpi-sub">sobre lo aportado</div></div>';
 
   var container = document.getElementById('listInversion');
@@ -2044,7 +2093,7 @@ function renderInversion(){
       var isEd = editingId.inversion===it.id;
       var tieneValor = (it.valorActual!==null && it.valorActual!==undefined && it.valorActual!=='');
       var descTxt = 'de '+money(t.totalIngresos)+(tieneValor?(' · valor decl. '+money(+it.valorActual)):'');
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag" style="background:rgba(79,209,165,.14);color:var(--ingreso);">'+(it.pct||0)+'%</span><span class="entry-desc">'+descTxt+'</span><span class="entry-amt">'+money(t.totalIngresos*((it.pct||0)/100))+'</span><button class="entry-edit" data-kind="inversion" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="inversion" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag tag-inv">'+(it.pct||0)+'%</span><span class="entry-desc">'+descTxt+'</span><span class="entry-amt">'+money(t.totalIngresos*((it.pct||0)/100))+'</span><button class="entry-edit" data-kind="inversion" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="inversion" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
     html += '</div></div>';
   });
@@ -2501,6 +2550,14 @@ function buildBarChart(series, mode, opts){
     maxVal = Math.max.apply(null, allVals.concat([1]));
   }
   var niceMax = niceCeil(maxVal);
+  function gradId(color){ return 'gBar_'+color.replace(/[^a-zA-Z0-9]/g,''); }
+  var defs = series.map(function(se){
+    var id = gradId(se.color);
+    return '<linearGradient id="'+id+'" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0%" stop-color="'+se.color+'"/>'+
+      '<stop offset="100%" stop-color="'+se.color+'" stop-opacity="0.72"/>'+
+    '</linearGradient>';
+  }).join('');
   var ticks=4, gridLines='', yLabels='';
   for(var t=0;t<=ticks;t++){
     var v=niceMax*t/ticks;
@@ -2522,7 +2579,7 @@ function buildBarChart(series, mode, opts){
         if(v<=0) return;
         var bh = innerH*v/niceMax;
         yBase -= bh;
-        bars += '<rect x="'+(cx-barW/2)+'" y="'+yBase+'" width="'+barW+'" height="'+bh+'" fill="'+se.color+'" rx="2"><title>'+mes+' · '+escapeHtml(se.label)+': '+tipFmt(v)+'</title></rect>';
+        bars += '<rect x="'+(cx-barW/2)+'" y="'+yBase+'" width="'+barW+'" height="'+bh+'" fill="url(#'+gradId(se.color)+')" rx="3"><title>'+mes+' · '+escapeHtml(se.label)+': '+tipFmt(v)+'</title></rect>';
       });
     } else {
       var count = series.length, barW = Math.min(14, groupW*0.28), gap=4;
@@ -2531,14 +2588,14 @@ function buildBarChart(series, mode, opts){
         var v = se.data[i]||0;
         var bh = innerH*v/niceMax;
         var x = startX+si*(barW+gap), y=padT+innerH-bh;
-        bars += '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+Math.max(bh,0)+'" fill="'+se.color+'" rx="2"><title>'+mes+' · '+escapeHtml(se.label)+': '+tipFmt(v)+'</title></rect>';
+        bars += '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+Math.max(bh,0)+'" fill="url(#'+gradId(se.color)+')" rx="3"><title>'+mes+' · '+escapeHtml(se.label)+': '+tipFmt(v)+'</title></rect>';
       });
     }
   });
   var legend = series.map(function(se,i){
     return '<g transform="translate('+(padL+i*150)+','+(H-8)+')"><rect width="10" height="10" fill="'+se.color+'" rx="2"/><text x="14" y="9" font-size="10" fill="'+CHART_COLORS.textDim+'">'+escapeHtml(se.label)+'</text></g>';
   }).join('');
-  return '<svg viewBox="0 0 '+W+' '+(H+8)+'" style="width:100%;height:auto">'+gridLines+yLabels+bars+xlabels+legend+'</svg>';
+  return '<svg viewBox="0 0 '+W+' '+(H+8)+'" style="width:100%;height:auto"><defs>'+defs+'</defs>'+gridLines+yLabels+bars+xlabels+legend+'</svg>';
 }
 
 function polarXY(cx,cy,r,deg){
@@ -2602,7 +2659,11 @@ function buildLineChart(data){
     return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+m.slice(0,3)+'</text>';
   }).join('');
   return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">'+
-    '<path d="'+areaPts+'" fill="'+CHART_COLORS.dolar+'" opacity="0.08"/>'+
+    '<defs><linearGradient id="gRestArea" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0%" stop-color="'+CHART_COLORS.dolar+'" stop-opacity="0.32"/>'+
+      '<stop offset="100%" stop-color="'+CHART_COLORS.dolar+'" stop-opacity="0"/>'+
+    '</linearGradient></defs>'+
+    '<path d="'+areaPts+'" fill="url(#gRestArea)"/>'+
     gridLines+
     '<polyline points="'+points+'" fill="none" stroke="'+CHART_COLORS.dolar+'" stroke-width="2"/>'+
     dots+xlabels+'</svg>';
@@ -2652,6 +2713,12 @@ function buildDolarRefChart(valores){
   var lines = segs.map(function(seg){
     return '<polyline points="'+seg.join(' ')+'" fill="none" stroke="'+CHART_COLORS.dolar+'" stroke-width="2"/>';
   }).join('');
+  var areas = segs.map(function(seg){
+    var pts = seg.map(function(p){return p;});
+    var firstX = pts[0].split(',')[0], lastX = pts[pts.length-1].split(',')[0];
+    var floorY = padT+innerH;
+    return '<path d="M'+firstX+','+floorY+' L'+pts.join(' L')+' L'+lastX+','+floorY+' Z" fill="url(#gDolarRefArea)"/>';
+  }).join('');
   var dots = valores.map(function(v,i){
     if(v===null||v===undefined) return '';
     return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'"><title>'+MESES[i]+': '+money(v)+' /USD</title></circle>';
@@ -2659,7 +2726,12 @@ function buildDolarRefChart(valores){
   var xlabels=MESES.map(function(m,i){
     return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="'+CHART_COLORS.textFaint+'">'+m.slice(0,3)+'</text>';
   }).join('');
-  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">'+gridLines+yLabels+lines+dots+xlabels+'</svg>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">'+
+    '<defs><linearGradient id="gDolarRefArea" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0%" stop-color="'+CHART_COLORS.dolar+'" stop-opacity="0.28"/>'+
+      '<stop offset="100%" stop-color="'+CHART_COLORS.dolar+'" stop-opacity="0"/>'+
+    '</linearGradient></defs>'+
+    gridLines+yLabels+areas+lines+dots+xlabels+'</svg>';
 }
 
 /* ----- Gasto hormiga ----- */
