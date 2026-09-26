@@ -4107,8 +4107,24 @@ window.__gastosApplyRemoteStore = function(json){
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('./sw.js').catch(function(err){
+    navigator.serviceWorker.register('./sw.js').then(function(reg){
+      // Busca una versión nueva del Service Worker al abrir la app y cada vez
+      // que vuelve a primer plano (clave para la app instalada en el celular,
+      // que si no se le pide, puede quedarse con una copia vieja indefinidamente).
+      reg.update();
+      document.addEventListener('visibilitychange', function(){
+        if(document.visibilityState === 'visible') reg.update();
+      });
+    }).catch(function(err){
       console.warn('No se pudo registrar el service worker (la app sigue funcionando igual):', err);
+    });
+    // Cuando el nuevo Service Worker toma el control, recargamos una sola vez
+    // para que los cambios se vean solos, sin tener que borrar y reinstalar la app.
+    var recargando = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function(){
+      if(recargando) return;
+      recargando = true;
+      window.location.reload();
     });
   });
 }
