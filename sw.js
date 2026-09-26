@@ -7,7 +7,7 @@
    cambió y descargue la versión nueva en vez de seguir usando la vieja para
    siempre (clave en la app instalada desde Safari en el celular).
 */
-var CACHE_NAME = 'libro-gastos-v6';
+var CACHE_NAME = 'libro-gastos-v7';
 
 var PRECACHE_URLS = [
   'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap',
