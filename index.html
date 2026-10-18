@@ -1183,6 +1183,11 @@ svg [data-tip][tabindex]:focus-visible{stroke:var(--text);stroke-width:2;}
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.001ms !important;animation-delay:0s !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;transition-delay:0s !important;scroll-behavior:auto !important;}
 }
+
+/* Resumen: la celda de categoría vuelve a ser celda de tabla real (con display:flex se cortaba la línea divisoria) */
+.pivot .cat-row td:first-child{display:table-cell;padding-left:44px;vertical-align:middle;}
+.pivot .cat-row td:first-child .cat-icon{position:absolute;left:24px;top:50%;margin-top:-7px;}
+.pivot .cat-row td:first-child .cat-label{display:block;}
 </style>
 </head>
 <body>
