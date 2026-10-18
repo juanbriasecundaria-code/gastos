@@ -816,6 +816,45 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 .var-good{color:var(--ingreso);background:color-mix(in srgb, var(--ingreso) 16%, transparent);}
 .var-bad{color:var(--neg);background:color-mix(in srgb, var(--neg) 16%, transparent);}
 
+
+/* ===== Mejoras estéticas (Resumen) ===== */
+/* Tarjetas KPI: mismo tamaño de número, misma altura de línea inferior, chips más legibles */
+.kpi{display:flex;flex-direction:column;}
+.kpi-value,.kpi.kpi-hero .kpi-value{font-size:26px;line-height:1.15;}
+.kpi-sub{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;min-height:26px;margin-top:6px;}
+.kpi-sub .var-badge{margin-left:0;padding:3px 9px;font-size:12.5px;}
+.var-badge{letter-spacing:0;}
+
+/* Barra de categoría: más visible y con porcentaje */
+.cat-meter{display:flex;align-items:center;gap:8px;margin-top:5px;}
+.cat-meter .cat-bar-wrap{margin-top:0;height:5px;width:96px;background:var(--line);flex-shrink:0;}
+.cat-pct{font-family:var(--font-mono);font-size:11px;line-height:1;color:var(--text-faint);white-space:nowrap;}
+@media (max-width:860px){ .cat-meter .cat-bar-wrap{width:56px;} }
+
+/* Jerarquía de la tabla: valores sueltos más suaves, totales con más peso */
+.pivot .cat-row td:where(:not(:first-child)){color:var(--text-dim);}
+.pivot .cat-row td.col-total{color:var(--text);}
+.pivot td.zero{color:var(--text-faint);opacity:.5;}
+.pivot .total-row td,.pivot .total-row td:first-child{background:var(--surface-2);}
+
+/* Mes actual resaltado y meses futuros atenuados */
+.pivot td.m-future,.pivot th.m-future,.pivot .cat-row td.m-future{color:color-mix(in srgb, var(--text-faint) 60%, transparent);}
+.pivot td.m-cur,.pivot th.m-cur{background:color-mix(in srgb, var(--ingreso) 7%, var(--surface));}
+.pivot th.m-cur{color:var(--text);font-weight:600;box-shadow:inset 0 -2px 0 var(--ingreso);}
+
+/* Interfaz: botones y rótulos con tipografía normal y mejor contraste */
+.ghost-btn{font-family:var(--font-body);font-size:13px;font-weight:500;}
+.nav-section-label{font-family:var(--font-body);font-size:11.5px;letter-spacing:.08em;color:var(--text-dim);}
+
+/* Sidebar: menos bordes, lo secundario queda liviano */
+.side-footer{gap:8px;}
+.side-footer .footer-group + .footer-group{border-top:none;padding-top:0;}
+.side-footer .footer-group > .ghost-btn,.side-footer .data-menu > summary.ghost-btn{border-color:transparent;}
+.side-footer .footer-group > .ghost-btn:hover,.side-footer .data-menu > summary.ghost-btn:hover{border-color:var(--line);}
+
+/* Pantallas anchas: contenido centrado */
+main{max-width:2200px;margin-left:auto;margin-right:auto;}
+
 /* ===== Forms ===== */
 .form-card{
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
@@ -3081,7 +3120,7 @@ function renderResumen(){
       for(var i=v.length-1;i>0;i--){
         if(v[i]!==0 && v[i-1]!==0){
           var pct=((v[i]-v[i-1])/Math.abs(v[i-1]))*100, up=pct>=0, good=kind==='ingreso'?up:!up;
-          return ' <span class="var-badge '+(good?'var-good':'var-bad')+'" title="'+MESES[i]+' vs. '+MESES[i-1]+'">'+MESES[i].slice(0,3)+' '+(up?'▲':'▼')+' '+(Math.abs(pct)>=300?money(Math.abs(v[i]-v[i-1])):Math.abs(Math.round(pct))+'%')+'</span>';
+          return ' <span class="var-badge '+(good?'var-good':'var-bad')+'" title="'+MESES[i]+' vs. '+MESES[i-1]+(good?' (a favor)':' (en contra)')+'">'+(up?'▲':'▼')+' '+(Math.abs(pct)>=300?money(Math.abs(v[i]-v[i-1])):Math.abs(Math.round(pct))+'%')+' vs '+MESES[i-1].slice(0,3)+'</span>';
         }
       }
       return '';
@@ -3111,7 +3150,7 @@ function renderResumen(){
         var pct = ((vals[i]-vals[i-1])/Math.abs(vals[i-1]))*100;
         var up = pct >= 0;
         var good = kind==='ingreso' ? up : !up;
-        return '<span class="var-badge '+(good?'var-good':'var-bad')+'" title="vs. '+MESES[i-1]+'">'+(up?'▲':'▼')+' '+Math.abs(Math.round(pct))+'%</span>';
+        return '<span class="var-badge '+(good?'var-good':'var-bad')+'" title="Último mes con datos vs. '+MESES[i-1]+(good?' (a favor)':' (en contra)')+'">'+(up?'▲':'▼')+' '+Math.abs(Math.round(pct))+'%</span>';
       }
     }
     return '';
@@ -3139,6 +3178,7 @@ function renderResumen(){
     }).filter(function(r){ return r.tot !== 0; });
     rows.sort(function(a,b){ return b.tot - a.tot; });
     var maxTot = rows.reduce(function(m,r){return Math.max(m,r.tot);},0) || 1;
+    var groupTot = rows.reduce(function(sm,r){return sm+r.tot;},0) || 1;
     return rows.map(function(r){
       var presupuesto = DATA.presupuestos[presuKey(tipo, r.cat)];
       var barStyle, badge = '';
@@ -3155,8 +3195,17 @@ function renderResumen(){
         var pct = Math.max(4, Math.round((r.tot/maxTot)*100));
         barStyle = 'width:'+pct+'%;';
       }
+      var meterTxt, meterTitle;
+      if(presupuesto && curIdx>=0){
+        meterTxt = Math.round(((r.vals[curIdx]||0)/presupuesto)*100)+'%';
+        meterTitle = money(r.vals[curIdx]||0)+' de '+money(presupuesto)+' de presupuesto en '+MESES[curIdx];
+      } else {
+        var shareV = (r.tot/groupTot)*100;
+        meterTxt = (shareV<1 ? '<1' : Math.round(shareV))+'%';
+        meterTitle = meterTxt+' del total de gastos '+(tipo==='Fijo'?'fijos':'variables')+' del año (la barra es relativa a la categoría más grande)';
+      }
       var cells = '<td>'+catIconSvg(r.cat)+'<span class="cat-label"><span class="cat-name">'+r.cat+badge+'</span>'+
-        '<span class="cat-bar-wrap"><span class="cat-bar" style="'+barStyle+'"'+(presupuesto?' title="'+money(r.vals[curIdx]||0)+' de '+money(presupuesto)+' este mes"':'')+'></span></span></span></td>';
+        '<span class="cat-meter"><span class="cat-bar-wrap"><span class="cat-bar" style="'+barStyle+'"></span></span><span class="cat-pct" title="'+meterTitle+'">'+meterTxt+'</span></span></span></td>';
       r.vals.forEach(function(v){
         if(v===0){ cells += '<td class="zero">–</td>'; return; }
         cells += '<td>'+money(v)+'</td>';
@@ -3205,6 +3254,18 @@ function renderResumen(){
 
   html += '</tbody>';
   table.innerHTML = html;
+  (function(){
+    var yr=parseInt(STORE.activeEjercicio,10), now=new Date(), ny=now.getFullYear(), nm=now.getMonth();
+    var cur = yr===ny ? nm : -1;
+    for(var r=0;r<table.rows.length;r++){
+      var cs=table.rows[r].cells;
+      for(var i=0;i<12;i++){
+        var c=cs[i+1]; if(!c) continue;
+        if(i===cur) c.classList.add('m-cur');
+        else if(yr>ny || (yr===ny && i>nm)) c.classList.add('m-future');
+      }
+    }
+  })();
 
   if(!table.dataset.toggleBound){
     table.dataset.toggleBound = '1';
