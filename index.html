@@ -996,6 +996,22 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
   font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:100;
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.has-action{pointer-events:auto;display:flex;align-items:center;gap:14px;}
+#toast.has-action span{white-space:nowrap;}
+.toast-action{font:inherit;font-weight:700;background:transparent;color:inherit;border:1.5px solid currentColor;border-radius:6px;padding:4px 12px;cursor:pointer;}
+.toast-action:hover{opacity:.75;}
+.toast-action:focus-visible{outline:2px solid var(--dolar);outline-offset:2px;}
+/* Diálogo de confirmación propio (reemplaza confirm() nativo en acciones destructivas) */
+.confirm-box{width:440px;}
+.confirm-box p{font-size:13.5px;line-height:1.5;color:var(--text-dim);margin:0 0 10px;}
+.confirm-stats{display:grid;gap:6px;margin:12px 0 14px;padding:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;font-family:var(--font-mono);font-size:12px;}
+.confirm-stats div{display:flex;justify-content:space-between;gap:12px;}
+.confirm-stats span{color:var(--text-dim);}
+.confirm-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:16px;}
+.confirm-actions .ghost-btn{display:inline-flex;justify-content:center;padding:10px 16px;font-family:var(--font-body);font-size:13px;font-weight:600;}
+.confirm-actions .confirm-alt{flex:1 1 100%;}
+.btn.btn-danger{background:var(--neg);color:#2A0707;}
+html.theme-light .btn.btn-danger{color:#fff;}
 @media (max-width:860px){ #toast{bottom:calc(20px + 64px + env(safe-area-inset-bottom));} }
 
 /* ===== Encabezado solo-impresión ===== */
@@ -1094,6 +1110,7 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
         <button class="ghost-btn" id="btnImport">↑ Importar backup</button>
         <input type="file" id="fileImport" accept="application/json" style="display:none;">
         <button class="ghost-btn" id="btnReset">↻ Restaurar datos originales</button>
+        <button class="ghost-btn" id="btnRecoverSnapshot" style="display:none;">↶ Recuperar copia automática</button>
       </div>
       <div class="footer-group">
         <button class="ghost-btn danger-btn" id="btnDeleteEjercicio">✕ Eliminar ejercicio actual</button>
@@ -1373,7 +1390,7 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
     </section>
   </main>
 </div>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <div class="search-overlay" id="searchOverlay">
   <div class="search-box">
@@ -1947,18 +1964,29 @@ document.getElementById('btnDeleteEjercicio').addEventListener('click', function
     toast('No podés eliminar el único ejercicio');
     return;
   }
+  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés eliminar ejercicios.'); return; }
   var actual = STORE.activeEjercicio;
-  if(!confirm('¿Eliminar el ejercicio '+actual+' y todos sus datos? Esta acción no se puede deshacer.')) return;
-  delete STORE.ejercicios[actual];
-  STORE.activeEjercicio = ejercicioYears()[0];
-  DATA = STORE.ejercicios[STORE.activeEjercicio];
-  saveData();
-  resetCollapsedForActiveYear();
-  fillCatSelect(false);
-  if(typeof updateDescDatalist==='function') updateDescDatalist();
-  renderEjercicioSelect();
-  renderAll();
-  toast('Ejercicio '+actual+' eliminado');
+  askConfirm({
+    title: 'Eliminar el ejercicio ' + actual,
+    paragraphs: ['Se borran todos los ingresos, gastos, compras de dólares e inversiones de ese año. Antes se guarda una copia automática y vas a poder deshacerlo unos segundos.'],
+    stats: [['Registros que se borran', String(exerciseRecords(DATA))]],
+    confirmLabel: 'Eliminar ejercicio',
+    altLabel: 'Descargar copia y eliminar'
+  }).then(function(res){
+    if(!res) return;
+    if(res === 'alt') downloadBackupFile();
+    var snap = takeSnapshot('Antes de eliminar el ejercicio ' + actual);
+    delete STORE.ejercicios[actual];
+    STORE.activeEjercicio = ejercicioYears()[0];
+    DATA = STORE.ejercicios[STORE.activeEjercicio];
+    saveData();
+    resetCollapsedForActiveYear();
+    fillCatSelect(false);
+    if(typeof updateDescDatalist==='function') updateDescDatalist();
+    renderEjercicioSelect();
+    renderAll();
+    toast('Ejercicio '+actual+' eliminado', { action: undoFromSnapshot(snap, 'Ejercicio '+actual+' recuperado'), duration: 12000 });
+  });
 });
 renderEjercicioSelect();
 resetCollapsedForActiveYear();
@@ -1967,11 +1995,146 @@ resetCollapsedForActiveYear();
 /* ===================== TOAST ===================== */
 var toastEl = document.getElementById('toast');
 var toastTimer;
-function toast(msg){
-  toastEl.textContent = msg;
+function toast(msg, opts){
+  opts = opts || {};
+  toastEl.textContent = '';
+  var span = document.createElement('span');
+  span.textContent = msg;
+  toastEl.appendChild(span);
+  toastEl.classList.toggle('has-action', !!opts.action);
+  if(opts.action){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'toast-action';
+    b.textContent = opts.actionLabel || 'Deshacer';
+    b.addEventListener('click', function(){
+      clearTimeout(toastTimer);
+      toastEl.classList.remove('show', 'has-action');
+      opts.action();
+    });
+    toastEl.appendChild(b);
+  }
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2200);
+  toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, opts.duration || (opts.action ? 7000 : 2200));
+}
+
+/* ===================== COPIAS AUTOMÁTICAS + CONFIRMACIÓN ===================== */
+// Antes de cualquier operación que reemplaza datos (importar, restaurar, eliminar
+// ejercicio) se guarda una copia local (las últimas 3) y se ofrece "Deshacer".
+function snapKey(){ return STORAGE_KEY + '_snaps' + (cloudMode ? '_' + cloudUid : ''); }
+function exerciseRecords(e){
+  e = e || {};
+  return (e.ingresos||[]).length + (e.gastos||[]).length + (e.dolar||[]).length + (e.inversion||[]).length;
+}
+function storeStats(store){
+  var years = Object.keys((store && store.ejercicios) || {});
+  var regs = 0;
+  years.forEach(function(y){ regs += exerciseRecords(store.ejercicios[y]); });
+  return { ejercicios: years.length, registros: regs };
+}
+function statsText(st){ return st.ejercicios + ' ejercicio(s) · ' + st.registros + ' registros'; }
+function readSnaps(){
+  try{
+    var a = JSON.parse(localStorage.getItem(snapKey()) || '[]');
+    return Array.isArray(a) ? a : [];
+  }catch(e){ return []; }
+}
+function updateSnapshotButton(){
+  var el = document.getElementById('btnRecoverSnapshot');
+  if(el) el.style.display = readSnaps().length ? '' : 'none';
+}
+function takeSnapshot(reason){
+  var snap = { ts: Date.now(), reason: reason, json: JSON.stringify(STORE) };
+  var snaps = [snap].concat(readSnaps()).slice(0, 3);
+  // Si no entra en localStorage, se van soltando las copias más viejas.
+  while(snaps.length){
+    try{ localStorage.setItem(snapKey(), JSON.stringify(snaps)); break; }
+    catch(e){ snaps.pop(); }
+  }
+  updateSnapshotButton();
+  return snap; // siempre queda en memoria para el "Deshacer", aunque no entre en localStorage
+}
+function restoreFromJson(json){
+  var incoming = normalizeStoreObj(json);
+  if(!incoming){ toast('No se pudo restaurar la copia'); return false; }
+  STORE = incoming;
+  DATA = STORE.ejercicios[STORE.activeEjercicio];
+  saveData(); resetCollapsedForActiveYear(); fillCatSelect(false); updateDescDatalist(); renderEjercicioSelect(); renderAll();
+  return true;
+}
+function undoFromSnapshot(snap, okMsg){
+  return function(){ if(restoreFromJson(snap.json)) toast(okMsg); };
+}
+function downloadBackupFile(){
+  var blob = new Blob([JSON.stringify(STORE, null, 2)], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'gastos-backup-'+(new Date().toISOString().slice(0,10))+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+// Diálogo de confirmación accesible. Devuelve una Promesa: false (cancelar), true (confirmar)
+// o 'alt' (acción alternativa, p. ej. "Descargar copia y continuar").
+function askConfirm(o){
+  return new Promise(function(resolve){
+    var prev = document.activeElement;
+    var ov = document.createElement('div');
+    ov.className = 'account-overlay open';
+    var box = document.createElement('div');
+    box.className = 'account-box confirm-box';
+    box.setAttribute('role', 'alertdialog');
+    box.setAttribute('aria-modal', 'true');
+    var tid = 'confirmTitle' + Date.now();
+    box.setAttribute('aria-labelledby', tid);
+    var h = document.createElement('h3');
+    h.id = tid; h.textContent = o.title; h.style.marginBottom = '10px';
+    box.appendChild(h);
+    (o.paragraphs || []).forEach(function(t){
+      var p = document.createElement('p'); p.textContent = t; box.appendChild(p);
+    });
+    if(o.stats && o.stats.length){
+      var st = document.createElement('div'); st.className = 'confirm-stats';
+      o.stats.forEach(function(r){
+        var d = document.createElement('div');
+        var a = document.createElement('span'); a.textContent = r[0];
+        var b = document.createElement('strong'); b.textContent = r[1];
+        d.appendChild(a); d.appendChild(b); st.appendChild(d);
+      });
+      box.appendChild(st);
+    }
+    var act = document.createElement('div'); act.className = 'confirm-actions';
+    function mk(label, cls, val){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = cls; b.textContent = label;
+      b.addEventListener('click', function(){ done(val); });
+      act.appendChild(b);
+      return b;
+    }
+    if(o.altLabel) mk(o.altLabel, 'ghost-btn confirm-alt', 'alt');
+    var cancel = mk('Cancelar', 'ghost-btn', false);
+    mk(o.confirmLabel || 'Continuar', o.danger === false ? 'btn' : 'btn btn-danger', true);
+    box.appendChild(act); ov.appendChild(box); document.body.appendChild(ov);
+    function onKey(e){
+      if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(false); return; }
+      if(e.key === 'Tab'){
+        var f = box.querySelectorAll('button');
+        if(!f.length) return;
+        var first = f[0], last = f[f.length-1];
+        if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+      }
+    }
+    function done(val){
+      document.removeEventListener('keydown', onKey, true);
+      ov.remove();
+      if(prev && prev.focus) prev.focus();
+      resolve(val);
+    }
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', function(e){ if(e.target === ov) done(false); });
+    cancel.focus();
+  });
 }
 
 /* ===================== NAV ===================== */
@@ -2868,10 +3031,23 @@ function onDelClick(e){
     setFormEditMode(kind, false);
     resetFormDefaults(kind);
   }
+  var delYear = STORE.activeEjercicio;
+  var delIdx = DATA[kind].findIndex(function(x){return x.id===id;});
+  var delItem = delIdx >= 0 ? DATA[kind][delIdx] : null;
   DATA[kind] = DATA[kind].filter(function(x){return x.id!==id;});
   saveData();
   renderAll();
-  toast('Registro eliminado');
+  toast('Registro eliminado', delItem ? { action: function(){ restoreDeletedEntry(delYear, kind, delItem, delIdx); } } : undefined);
+}
+function restoreDeletedEntry(year, kind, item, idx){
+  var ex = STORE.ejercicios[year];
+  if(!ex || !ex[kind]){ toast('No se pudo deshacer: el ejercicio ya no existe'); return; }
+  if(!ex[kind].some(function(x){return x.id===item.id;})){
+    ex[kind].splice(Math.min(idx, ex[kind].length), 0, item);
+  }
+  DATA = STORE.ejercicios[STORE.activeEjercicio];
+  saveData(); renderAll();
+  toast('Registro restaurado');
 }
 
 /* ===================== FORMS ===================== */
@@ -3220,12 +3396,7 @@ document.addEventListener('keydown', function(e){
 
 /* ===================== BACKUP ===================== */
 document.getElementById('btnExport').addEventListener('click', function(){
-  var blob = new Blob([JSON.stringify(STORE, null, 2)], {type:'application/json'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url; a.download = 'gastos-backup-'+(new Date().toISOString().slice(0,10))+'.json';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBackupFile();
   toast('Backup descargado (todos los ejercicios)');
 });
 document.getElementById('btnImport').addEventListener('click', function(){
@@ -3233,49 +3404,104 @@ document.getElementById('btnImport').addEventListener('click', function(){
 });
 document.getElementById('fileImport').addEventListener('change', function(e){
   var file = e.target.files[0];
+  var input = e.target;
   if(!file) return;
+  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés importar backups.'); input.value = ''; return; }
   var reader = new FileReader();
   reader.onload = function(){
+    var incoming = null, scope = null;
     try{
       var parsed = JSON.parse(reader.result);
       if(parsed && parsed.ejercicios && Object.keys(parsed.ejercicios).length){
-        // Backup completo (multi-ejercicio)
-        Object.keys(parsed.ejercicios).forEach(function(y){ parsed.ejercicios[y] = normalizeExercise(parsed.ejercicios[y]); });
-        if(!parsed.activeEjercicio || !parsed.ejercicios[parsed.activeEjercicio]){
-          parsed.activeEjercicio = Object.keys(parsed.ejercicios).sort()[0];
-        }
-        STORE = parsed;
+        incoming = normalizeStoreObj(parsed); scope = 'all';   // backup completo (multi-ejercicio)
+      } else if(parsed && parsed.ingresos && parsed.gastos && parsed.dolar){
+        incoming = normalizeExercise(parsed); scope = 'one';   // un solo ejercicio: va sobre el activo
+      }
+    }catch(err){ incoming = null; }
+    if(!incoming){ toast('No se pudo leer el archivo'); return; }
+    var year = STORE.activeEjercicio;
+    var cfg = scope === 'all'
+      ? { paragraphs: ['Esto reemplaza TODOS los ejercicios actuales por los del archivo.'],
+          stats: [['Ahora en la app', statsText(storeStats(STORE))], ['El archivo trae', statsText(storeStats(incoming))]] }
+      : { paragraphs: ['Esto reemplaza solo el ejercicio ' + year + ' por el contenido del archivo. Los demás años no se tocan.'],
+          stats: [['Ejercicio ' + year + ' ahora', exerciseRecords(DATA) + ' registros'], ['El archivo trae', exerciseRecords(incoming) + ' registros']] };
+    askConfirm({
+      title: 'Importar backup',
+      paragraphs: cfg.paragraphs.concat(['Antes se guarda una copia automática y vas a poder deshacerlo.']),
+      stats: cfg.stats,
+      confirmLabel: 'Reemplazar',
+      altLabel: 'Descargar copia actual y reemplazar'
+    }).then(function(res){
+      if(!res) return;
+      if(res === 'alt') downloadBackupFile();
+      var snap = takeSnapshot('Antes de importar un backup');
+      if(scope === 'all'){
+        STORE = incoming;
         DATA = STORE.ejercicios[STORE.activeEjercicio];
         saveData(); resetCollapsedForActiveYear(); fillCatSelect(false); updateDescDatalist(); renderEjercicioSelect(); renderAll();
-        toast('Backup importado (todos los ejercicios)');
-      } else if(parsed && parsed.ingresos && parsed.gastos && parsed.dolar){
-        // Backup de un solo ejercicio: se importa sobre el ejercicio activo
-        STORE.ejercicios[STORE.activeEjercicio] = normalizeExercise(parsed);
-        DATA = STORE.ejercicios[STORE.activeEjercicio];
-        saveData(); fillCatSelect(false); updateDescDatalist(); renderAll();
-        toast('Backup importado en el ejercicio '+STORE.activeEjercicio);
+        toast('Backup importado (todos los ejercicios)', { action: undoFromSnapshot(snap, 'Importación deshecha'), duration: 12000 });
       } else {
-        throw new Error('formato inválido');
+        STORE.ejercicios[year] = incoming;
+        DATA = STORE.ejercicios[year];
+        saveData(); fillCatSelect(false); updateDescDatalist(); renderAll();
+        toast('Backup importado en el ejercicio ' + year, { action: undoFromSnapshot(snap, 'Importación deshecha'), duration: 12000 });
       }
-    }catch(err){
-      toast('No se pudo leer el archivo');
-    }
+    });
   };
   reader.readAsText(file);
-  e.target.value = '';
+  input.value = '';
 });
 document.getElementById('btnReset').addEventListener('click', function(){
-  var esAnioOriginal = STORE.activeEjercicio === DEFAULT_YEAR;
-  var msg = esAnioOriginal
-    ? 'Esto reemplaza los datos del ejercicio '+STORE.activeEjercicio+' por los datos originales del Excel. ¿Continuar?'
-    : 'El ejercicio '+STORE.activeEjercicio+' no tiene datos originales de fábrica: esto lo vacía por completo. ¿Continuar?';
-  if(!confirm(msg)) return;
+  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés restaurar datos.'); return; }
+  var year = STORE.activeEjercicio;
+  var esAnioOriginal = year === DEFAULT_YEAR;
   var nuevaData = esAnioOriginal ? JSON.parse(JSON.stringify(seed)) : {};
-  DATA = normalizeExercise(nuevaData);
-  STORE.ejercicios[STORE.activeEjercicio] = DATA;
-  saveData(); fillCatSelect(false); updateDescDatalist(); renderAll();
-  toast(esAnioOriginal ? 'Datos originales restaurados' : 'Ejercicio vaciado');
+  var nuevaN = exerciseRecords(normalizeExercise(JSON.parse(JSON.stringify(nuevaData))));
+  askConfirm({
+    title: esAnioOriginal ? 'Restaurar datos originales' : 'Vaciar el ejercicio ' + year,
+    paragraphs: [esAnioOriginal
+      ? 'Esto reemplaza los datos del ejercicio '+year+' por los datos originales del Excel.'
+      : 'El ejercicio '+year+' no tiene datos originales de fábrica: esto lo vacía por completo.',
+      'Antes se guarda una copia automática y vas a poder deshacerlo.'],
+    stats: [['Ejercicio ' + year + ' ahora', exerciseRecords(DATA) + ' registros'], ['Quedaría con', nuevaN + ' registros']],
+    confirmLabel: esAnioOriginal ? 'Restaurar' : 'Vaciar',
+    altLabel: 'Descargar copia y continuar'
+  }).then(function(res){
+    if(!res) return;
+    if(res === 'alt') downloadBackupFile();
+    var snap = takeSnapshot('Antes de ' + (esAnioOriginal ? 'restaurar datos originales' : 'vaciar el ejercicio ' + year));
+    DATA = normalizeExercise(nuevaData);
+    STORE.ejercicios[year] = DATA;
+    saveData(); fillCatSelect(false); updateDescDatalist(); renderAll();
+    toast(esAnioOriginal ? 'Datos originales restaurados' : 'Ejercicio vaciado', { action: undoFromSnapshot(snap, 'Cambio deshecho'), duration: 12000 });
+  });
 });
+
+/* Recuperar la última copia automática (guardada antes de importar / restaurar / eliminar) */
+document.getElementById('btnRecoverSnapshot').addEventListener('click', function(){
+  if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés recuperar copias.'); return; }
+  var snaps = readSnaps();
+  if(!snaps.length){ toast('No hay copias automáticas guardadas'); updateSnapshotButton(); return; }
+  var sn = snaps[0];
+  var snStore = normalizeStoreObj(sn.json);
+  if(!snStore){ toast('La copia guardada está dañada'); return; }
+  askConfirm({
+    title: 'Recuperar copia automática',
+    paragraphs: ['Vas a volver al estado que tenía la app antes de la última operación riesgosa. El estado actual también se guarda como copia, así que podés volver a él.'],
+    stats: [
+      ['Copia', new Date(sn.ts).toLocaleString('es-AR', {dateStyle:'short', timeStyle:'short'}) + ' · ' + sn.reason],
+      ['La copia contiene', statsText(storeStats(snStore))],
+      ['Ahora en la app', statsText(storeStats(STORE))]
+    ],
+    confirmLabel: 'Recuperar',
+    danger: false
+  }).then(function(ok){
+    if(!ok) return;
+    var cur = takeSnapshot('Antes de recuperar una copia');
+    if(restoreFromJson(sn.json)) toast('Copia recuperada', { action: undoFromSnapshot(cur, 'Recuperación deshecha'), duration: 12000 });
+  });
+});
+updateSnapshotButton();
 
 /* ===================== CHARTS ===================== */
 var CHART_COLORS = {
@@ -4221,6 +4447,13 @@ window.__gastosApplyRemoteStore = function(json){
 
   if(!configured || typeof firebase === 'undefined'){
     // Sin Firebase configurado (o el SDK no cargó): app 100% local, sin login.
+    // La pantalla de carga solo la oculta el flujo de login, así que acá hay que
+    // ocultarla a mano; si no, tapa la app para siempre.
+    var splashLocal = document.getElementById('authLoading');
+    if(splashLocal){
+      splashLocal.classList.add('fade-out');
+      setTimeout(function(){ splashLocal.style.display = 'none'; }, 350);
+    }
     startApp(null);
     return;
   }
