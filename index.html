@@ -1329,6 +1329,17 @@ html.privacy .chart-card svg{filter:blur(5px);}
 }
 @media print{.m-topbar,.more-sheet,.more-backdrop,.pivot-monthbar,#btnResumenMore{display:none !important;}
   .pivot[data-m] tr > *{display:table-cell !important;}}
+
+/* Mobile: fix de superposición ícono/texto en Resumen (vista por mes) y botones de acción más compactos */
+@media (max-width:640px){
+  .pivot[data-m]:not([data-m="all"]) .cat-row td:first-child{padding-left:40px;}
+  .pivot[data-m]:not([data-m="all"]) .cat-row td:first-child .cat-icon{left:20px;}
+
+  .entry-row{grid-template-columns:minmax(0,1fr) auto 32px 32px;gap:2px 2px;}
+  .entry-row.has-dup{grid-template-columns:minmax(0,1fr) auto 32px 32px 32px;}
+  .entry-row > .entry-dup,.entry-row > .entry-edit,.entry-row > .entry-del{width:32px;height:40px;border-radius:8px;}
+  .entry-row .entry-edit svg,.entry-row .entry-del svg,.entry-row .entry-dup svg{width:16px;height:16px;}
+}
 </style>
 </head>
 <body>
