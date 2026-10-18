@@ -963,6 +963,15 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 .entry-desc{color:var(--text);}
 .entry-desc small{display:block;color:var(--text-faint);font-size:11px;margin-top:1px;}
 .entry-amt{font-family:var(--font-mono);text-align:right;font-weight:500;}
+.usd-gasto{font-family:var(--font-mono);font-weight:500;color:var(--text);}
+.usd-gasto em{font-style:normal;font-family:var(--font-body);font-size:11px;color:var(--text-faint);margin-left:6px;font-weight:400;}
+.entry-desc small.usd-cot{display:flex;align-items:center;gap:6px;margin-top:3px;}
+.usd-cot .cot-chip{
+  font-family:var(--font-mono);font-size:10.5px;color:var(--dolar);
+  background:rgba(91,159,237,.10);border:1px solid rgba(91,159,237,.22);
+  padding:1px 7px;border-radius:999px;white-space:nowrap;
+}
+.usd-cot .cot-lbl{color:var(--text-faint);font-size:11px;}
 .entry-del{
   background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:15px;
   width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;
@@ -1606,6 +1615,15 @@ function money(n){
 function usd(n){
   if(n===null || n===undefined || isNaN(n)) return "-";
   return "US$" + fmtDec.format(n);
+}
+function fmtCot(n){
+  n = +n || 0;
+  return '$' + (Math.abs(n - Math.round(n)) < 0.005 ? fmt.format(Math.round(n)) : fmtDec.format(n));
+}
+function usdDetailHtml(it){
+  if(it.cant===null || it.cant===undefined) return '<span class="usd-gasto">Carga manual</span>';
+  return '<span class="usd-gasto">'+money(it.cant)+'<em>gastados</em></span>'+
+    '<small class="usd-cot"><span class="cot-lbl">Cotización</span><span class="cot-chip">'+fmtCot(it.valor)+'</span></small>';
 }
 function uid(prefix){ return prefix + "_" + Math.random().toString(36).slice(2,9); }
 function currentAutor(){ return window.__gastosCurrentUsername || null; }
@@ -2596,7 +2614,7 @@ function renderDolar(){
     var collapsed = collapsedGroups.has('dolar-'+mes);
     html += '<div class="month-group">'+monthHeadHtml('dolar', mes, usd(totalUsd))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
     items.forEach(function(it){
-      var detail = (it.cant!==null && it.cant!==undefined) ? (money(it.cant)+' @ '+fmtDec.format(it.valor||0)) : 'Carga manual';
+      var detail = usdDetailHtml(it);
       var isEd = editingId.dolar===it.id;
       html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag tag-usd">USD</span><span class="entry-desc">'+detail+'</span><span class="entry-amt">'+usd(it.total)+'</span><button class="entry-edit" data-kind="dolar" data-id="'+it.id+'" title="Editar" aria-label="Editar">✎</button><button class="entry-del" data-kind="dolar" data-id="'+it.id+'" title="Eliminar" aria-label="Eliminar">×</button></div>';
     });
@@ -4050,7 +4068,7 @@ function buildSearchIndex(){
       searchText:normalizeSearchText(x.mes+' '+x.cat+' '+(x.desc||'')+' '+x.tipo+' gasto '+x.monto+' '+(x.fecha||''))});
   });
   DATA.dolar.forEach(function(x){
-    var subtxt = (x.cant!==null && x.cant!==undefined) ? (money(x.cant)+' @ '+fmtDec.format(x.valor||0)) : 'Carga manual';
+    var subtxt = (x.cant!==null && x.cant!==undefined) ? (money(x.cant)+' gastados · cotización '+fmtCot(x.valor)) : 'Carga manual';
     idx.push({kind:'dolar', id:x.id, mes:x.mes, title:'Compra USD', sub:subtxt,
       amountText:usd(x.total),
       searchText:normalizeSearchText(x.mes+' dolar usd compra '+subtxt+' '+x.total)});
