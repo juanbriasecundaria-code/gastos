@@ -1188,6 +1188,23 @@ svg [data-tip][tabindex]:focus-visible{stroke:var(--text);stroke-width:2;}
 .pivot .cat-row td:first-child{display:table-cell;padding-left:44px;vertical-align:middle;}
 .pivot .cat-row td:first-child .cat-icon{position:absolute;left:24px;top:50%;margin-top:-7px;}
 .pivot .cat-row td:first-child .cat-label{display:block;}
+
+/* --- modo privacidad --- */
+.pv-eye-off,.privacy-float-btn{display:none;}
+html.privacy .pv-eye{display:none;}
+html.privacy .pv-eye-off{display:inline-block;}
+@media (max-width:860px){
+  .privacy-float-btn{display:flex;align-items:center;justify-content:center;position:fixed;top:14px;right:66px;z-index:35;width:44px;height:44px;border-radius:50%;background:var(--surface);border:1px solid var(--line);color:var(--text-dim);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);}
+  .privacy-float-btn .icon{width:18px;height:18px;}
+  html.privacy .privacy-float-btn{color:var(--dolar);border-color:var(--dolar);}
+  html.privacy .privacy-float-btn .pv-eye{display:none;}
+}
+html.privacy :is(.kpi-value,.entry-amt,.ss-value,.pivot td:not(:first-child),.pchart-vals,.hr-total,.usd-gasto,
+  .month-group-head > span:last-child,.heatmap-cell,.chart-card svg,.chart-tooltip,.money-preview,.confirm-stats strong,
+  .inv-accounts,#view-inversion .inv-history td,[class*="-amt"],[class*="amount"]){filter:blur(7px);}
+html.privacy :is(.money-input,#presupuestosOverlay input):not(:focus){filter:blur(6px);}
+html.privacy .chart-card svg{filter:blur(5px);}
+@media print{html.privacy *{filter:none !important;}}
 </style>
 </head>
 <body>
@@ -1198,6 +1215,7 @@ svg [data-tip][tabindex]:focus-visible{stroke:var(--text);stroke-width:2;}
     if(light){document.documentElement.classList.add('theme-light');}
   }catch(e){}
 })();</script>
+<script>try{if(localStorage.getItem('libroGastos_privacy')==='1')document.documentElement.classList.add('privacy');}catch(e){}</script>
 <div class="app">
   <div id="inviteBanner" class="invite-banner" style="display:none;"></div>
   <div class="mobile-sidebar-backdrop" id="mobileSidebarBackdrop"></div>
@@ -1206,6 +1224,7 @@ svg [data-tip][tabindex]:focus-visible{stroke:var(--text);stroke-width:2;}
     <span class="share-badge" id="shareFloatBadge" style="display:none;"></span>
   </button>
   <button id="btnMobileMenu" class="menu-float-btn" title="Menú" aria-label="Abrir menú" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:20px;height:20px;"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+  <button id="btnPrivacyFloat" class="privacy-float-btn" type="button" aria-pressed="false" aria-label="Ocultar montos" title="Ocultar montos"><svg class="icon pv-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon pv-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span>MiBudget</div>
     <div class="ejercicio-switch">
@@ -1213,6 +1232,7 @@ svg [data-tip][tabindex]:focus-visible{stroke:var(--text);stroke-width:2;}
       <button id="btnNuevoEjercicio" class="ejercicio-add" title="Nuevo ejercicio" aria-label="Nuevo ejercicio"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
     </div>
     <button class="ghost-btn theme-toggle-btn" id="btnThemeToggle"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg> Modo claro</button>
+    <button class="ghost-btn theme-toggle-btn" id="btnPrivacy" type="button" aria-pressed="false" title="Ocultar montos"><svg class="icon pv-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon pv-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg> <span id="btnPrivacyTxt">Ocultar montos</span></button>
     <button class="search-trigger" id="btnOpenSearch" aria-label="Buscar">
       <span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Buscar…</span><span class="search-kbd">Ctrl K</span>
     </button>
@@ -5916,6 +5936,26 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
   function pass(){ queued=false; obs.disconnect(); try{ labelsPass(); chartsPass(); }catch(_e){} obs.observe(document.body,{childList:true,subtree:true}); }
   obs=new MutationObserver(function(){ if(!queued){ queued=true; requestAnimationFrame(pass); } });
   pass();
+})();
+</script>
+<script>
+/* ===== Modo privacidad: difumina montos ===== */
+(function(){
+  var KEY='libroGastos_privacy';
+  function apply(on, persist){
+    document.documentElement.classList.toggle('privacy', on);
+    ['btnPrivacy','btnPrivacyFloat'].forEach(function(id){
+      var b=document.getElementById(id); if(!b) return;
+      b.setAttribute('aria-pressed', on?'true':'false');
+      var t=on?'Mostrar montos':'Ocultar montos';
+      b.title=t; if(id==='btnPrivacyFloat') b.setAttribute('aria-label',t);
+    });
+    var tx=document.getElementById('btnPrivacyTxt'); if(tx) tx.textContent=on?'Mostrar montos':'Ocultar montos';
+    if(persist){ try{ localStorage.setItem(KEY,on?'1':'0'); }catch(_e){} }
+  }
+  function toggle(){ apply(!document.documentElement.classList.contains('privacy'), true); }
+  ['btnPrivacy','btnPrivacyFloat'].forEach(function(id){ var b=document.getElementById(id); if(b) b.addEventListener('click',toggle); });
+  apply(document.documentElement.classList.contains('privacy'), false);
 })();
 </script>
 <script>
