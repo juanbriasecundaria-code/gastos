@@ -5463,7 +5463,9 @@ function flashEntry(kind, antes, editadoId, mesPref){
   function generarCodigoInvitacion(){
     var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin caracteres ambiguos (0/O, 1/I)
     var out = '';
-    for(var i=0;i<8;i++){ out += chars[Math.floor(Math.random()*chars.length)]; }
+    var rnd = new Uint32Array(8);
+    crypto.getRandomValues(rnd); // 32 caracteres divide justo 2^32: sin sesgo
+    for(var i=0;i<8;i++){ out += chars[rnd[i] % chars.length]; }
     return out;
   }
 
@@ -5589,7 +5591,16 @@ function flashEntry(kind, antes, editadoId, mesPref){
               updateConnStatus();
               watchLibroChanges();
               checkPendingInvites();
-            }).catch(manejarErrorInicio);
+            }).catch(function(err){
+              if(libroId !== user.uid && err && err.code === 'permission-denied'){
+                // Te quitaron del libro compartido: volvemos a tu libro personal
+                docRef(user.uid).set({ libroId: user.uid }, { merge: true })
+                  .then(function(){ location.reload(); })
+                  .catch(manejarErrorInicio);
+                return;
+              }
+              manejarErrorInicio(err);
+            });
           }
 
           if(userData.libroId){
@@ -5726,7 +5737,7 @@ function flashEntry(kind, antes, editadoId, mesPref){
   function unirseALibro(libroId, rol, invitacionId){
     if(!confirm('Al unirte vas a ver y compartir los datos de ese libro. Tu libro actual queda guardado y podés volver a él saliendo desde el mismo menú. ¿Continuar?')) return;
     var miembroUpdate = {};
-    miembroUpdate['miembros.'+currentUid] = { username: currentUsername || null, rol: rol };
+    miembroUpdate['miembros.'+currentUid] = { username: currentUsername || null, rol: rol, invitacion: invitacionId || null };
     libroRef(libroId).set(miembroUpdate, { merge: true }).then(function(){
       return docRef(currentUid).set({ libroId: libroId }, { merge: true });
     }).then(function(){
