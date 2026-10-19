@@ -2648,6 +2648,47 @@ function downloadBackupFile(){
   a.href = url; a.download = 'gastos-backup-'+(new Date().toISOString().slice(0,10))+'.json';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  markBackupDone();
+}
+
+/* ===================== AVISO DE RESPALDO ===================== */
+// Guarda (en este dispositivo) cuándo se descargó el último backup .json y,
+// si pasaron más de BACKUP_MAX_DAYS días, avisa una vez por día al abrir la app.
+var BACKUP_KEY = 'libroGastos_lastBackup';
+var BACKUP_REMIND_KEY = 'libroGastos_backupRemindedOn';
+var BACKUP_MAX_DAYS = 30;
+function markBackupDone(){
+  try{ localStorage.setItem(BACKUP_KEY, String(Date.now())); }catch(e){}
+}
+function storeHasData(){
+  try{
+    var ej = STORE.ejercicios || {};
+    return Object.keys(ej).some(function(y){
+      var e = ej[y] || {};
+      return ['ingresos','gastos','dolar','inversion'].some(function(k){ return e[k] && e[k].length; });
+    });
+  }catch(e){ return false; }
+}
+function checkBackupReminder(){
+  if(window.__backupChecked) return;
+  window.__backupChecked = true;
+  try{
+    var last = parseInt(localStorage.getItem(BACKUP_KEY), 10);
+    if(!last){ markBackupDone(); return; }   // primer uso con esta función: se empieza a contar desde hoy
+    var days = Math.floor((Date.now() - last) / 86400000);
+    if(days < BACKUP_MAX_DAYS) return;
+    var hoy = new Date().toISOString().slice(0,10);
+    if(localStorage.getItem(BACKUP_REMIND_KEY) === hoy) return;   // ya se avisó hoy
+    setTimeout(function(){
+      if(esSoloLectura() || !storeHasData()) return;
+      try{ localStorage.setItem(BACKUP_REMIND_KEY, hoy); }catch(e){}
+      toast('Hace ' + days + ' días que no descargás un backup', {
+        action: function(){ downloadBackupFile(); toast('Backup descargado (todos los ejercicios)'); },
+        actionLabel: 'Descargar',
+        duration: 12000
+      });
+    }, 4000);
+  }catch(e){}
 }
 // Diálogo de confirmación accesible. Devuelve una Promesa: false (cancelar), true (confirmar)
 // o 'alt' (acción alternativa, p. ej. "Descargar copia y continuar").
@@ -5128,6 +5169,8 @@ function flashEntry(kind, antes, editadoId, mesPref){
   });
 })();
 
+checkBackupReminder();
+
 } /* ===== fin de startApp() ===== */
 
 
@@ -5494,6 +5537,14 @@ function flashEntry(kind, antes, editadoId, mesPref){
   }
   window.addEventListener('online', updateConnStatus);
   window.addEventListener('offline', updateConnStatus);
+
+  // Tocar el avatar (donde está el punto) muestra el estado de sincronización.
+  // En el celular el tooltip (title) no aparece, por eso se avisa con el toast.
+  if(ubAvatar){
+    ubAvatar.addEventListener('click', function(){
+      if(syncDot) toastEl_fallback(syncDot.title || 'Estado de sincronización');
+    });
+  }
 
   function scheduleSync(store){
     if(!currentUid || !currentLibroId) return;
