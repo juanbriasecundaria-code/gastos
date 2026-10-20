@@ -1082,6 +1082,40 @@ function computeMonth(mes){
   };
 }
 
+
+/* ===================== PROYECCIÓN DE FIN DE MES =====================
+   Solo para el mes en curso del ejercicio del año actual.
+   - Fijos, recurrentes, cuotas y gastos con fecha futura: se toman tal como están cargados (ya están "comprometidos").
+   - Variables sueltos hasta hoy: se proyectan a ritmo lineal (gastado ÷ días transcurridos × días del mes).
+   - Dólares comprados e inversión: se toman como están.
+   Con menos de 3 días transcurridos no se extrapola (hay muy pocos datos). */
+function projectMonth(){
+  var now = new Date(), y = now.getFullYear();
+  if(String(STORE.activeEjercicio)!==String(y)) return null;
+  var mi = now.getMonth(), mes = MESES[mi], dias = new Date(y,mi+1,0).getDate(), hoy = now.getDate();
+  var hoyIso = y+'-'+String(mi+1).padStart(2,'0')+'-'+String(hoy).padStart(2,'0');
+  var cm = computeMonth(mes);
+  var confiable = hoy>=3 || hoy>=dias;
+  var factor = hoy>=dias ? 1 : dias/hoy;
+  var fijos = 0, varComprometido = 0, varRitmo = 0, porCat = {};
+  DATA.gastos.forEach(function(g){
+    if(g.mes!==mes) return;
+    var m = +g.monto||0;
+    if(g.tipo==='Fijo'){ fijos += m; return; }
+    var comprometido = !!(g.recurrente || g.cuotaGrupoId || (g.fecha && g.fecha>hoyIso));
+    var c = porCat[g.cat] || (porCat[g.cat] = {base:0, fijo:0});
+    if(comprometido){ varComprometido += m; c.fijo += m; } else { varRitmo += m; c.base += m; }
+  });
+  var catProy = {};
+  Object.keys(porCat).forEach(function(cat){ catProy[cat] = porCat[cat].fijo + (confiable ? porCat[cat].base*factor : porCat[cat].base); });
+  var varProy = varComprometido + (confiable ? varRitmo*factor : varRitmo);
+  var gastosProy = fijos + varProy;
+  var totalProy = gastosProy + cm.pesosGastadosUsd + cm.montoInversion;
+  return {mes:mes, mi:mi, dias:dias, hoy:hoy, confiable:confiable, ingresos:cm.totalIngresos,
+          gastosProy:gastosProy, totalProy:totalProy, restanteProy:cm.totalIngresos-totalProy,
+          real:cm.totalGastos, catProy:catProy};
+}
+
 /* ===================== RESUMEN VIEW ===================== */
 var pivotCollapsed = {}; // recuerda qué grupos (fijo/variable) están colapsados entre renders
 function renderResumen(){
@@ -1097,6 +1131,20 @@ function renderResumen(){
     '<div class="kpi k-gasto"><div class="kpi-label">Gastos del año</div><div class="kpi-value">'+money(yearGastos)+'</div><div class="kpi-sub">fijos + variables</div></div>'+
     '<div class="kpi k-restante kpi-hero"><div class="kpi-label">Restante del año</div><div class="kpi-value'+(yearRestante<0?' neg':'')+'">'+money(yearRestante)+'</div><div class="kpi-sub">ingresos − gastado total</div></div>'+
     '<div class="kpi k-usd"><div class="kpi-label">USD comprados</div><div class="kpi-value">'+usd(yearUsd)+'</div><div class="kpi-sub">total del año</div></div>';
+  (function(){
+    var p = null; try{ p = projectMonth(); }catch(_e){}
+    if(!p) return;
+    var sub;
+    if(!p.confiable) sub = 'Muy temprano para proyectar: faltan datos de los primeros días';
+    else if(p.ingresos>0) sub = p.restanteProy>=0
+      ? 'a este ritmo cerrás con '+money(p.restanteProy)+' libres'
+      : 'a este ritmo cerrás '+money(-p.restanteProy)+' en rojo';
+    else sub = 'a este ritmo, gasto total del mes';
+    kpiRow.insertAdjacentHTML('beforeend',
+      '<div class="kpi k-proyeccion" title="Los gastos fijos, las cuotas y los recurrentes se toman como están cargados; los variables se proyectan según el ritmo diario del mes.">'+
+      '<div class="kpi-label">Proyección de '+p.mes+'</div><div class="kpi-value'+(p.confiable && p.ingresos>0 && p.restanteProy<0?' neg':'')+'">'+money(p.totalProy)+'</div>'+
+      '<div class="kpi-sub'+(p.confiable && p.ingresos>0 ? ' kpi-proj-amt' : '')+'">'+sub+'</div></div>');
+  })();
   (function(){
     var comprometido = montoComprometidoCuotas();
     if(comprometido && comprometido.cuotas>0){
@@ -2861,14 +2909,23 @@ function buildPresupuestoChart(mesSel){
   }
   collect('Fijo', m.fijosPorCat);
   collect('Variable', m.variablesPorCat);
+  var proj = null; try{ proj = projectMonth(); }catch(_e){}
+  var usaProy = !!(proj && proj.confiable && proj.mes===mesSel && proj.hoy<proj.dias);
+  rows.forEach(function(r){
+    r.proy = (usaProy && r.tipo==='Variable' && proj.catProy[r.cat]!==undefined) ? proj.catProy[r.cat] : r.real;
+  });
   if(!rows.length){
     return '<div class="empty-state">No hay presupuestos definidos todavía (configuralos desde "Presupuestos" en Gastos).</div>';
   }
   rows.sort(function(a,b){ return (b.real/b.presu) - (a.real/a.presu); });
   var rowsHtml = rows.map(function(r){
     var pct = r.presu>0 ? (r.real/r.presu*100) : 0;
-    var barMax = Math.max(r.real, r.presu, 1);
+    var hayProy = usaProy && r.tipo==='Variable' && r.proy>r.real+0.5;
+    var barMax = Math.max(r.real, r.presu, hayProy?r.proy:0, 1);
     var wReal = Math.min(100, r.real/barMax*100);
+    var wProy = hayProy ? Math.min(100, r.proy/barMax*100) : wReal;
+    var pctProy = r.presu>0 ? r.proy/r.presu*100 : 0;
+    var proyTxt = hayProy ? '<div class="pchart-proj-line pchart-proj-amt'+(pctProy>100?' over':'')+'">Proyección: '+money(r.proy)+' ('+Math.round(pctProy)+'% del tope)</div>' : '';
     var wPresu = Math.min(100, r.presu/barMax*100);
     var color = pct>100 ? CHART_COLORS.neg : (pct>=80 ? CHART_COLORS.fijo : CHART_COLORS.ingreso);
     var badgeClass = pct>100 ? 'var-bad' : 'var-good';
@@ -2877,15 +2934,17 @@ function buildPresupuestoChart(mesSel){
       '<div class="pchart-top"><span class="pchart-cat">'+escapeHtml(r.cat)+' <span style="opacity:.55;font-size:12px;">('+r.tipo+')</span></span>'+
       '<span class="pchart-vals">'+money(r.real)+' / '+money(r.presu)+' <span class="var-badge '+badgeClass+'">'+badgeTxt+'</span></span></div>'+
       '<div class="pchart-track" data-tip="'+escapeHtml(r.cat+': '+money(r.real)+' de '+money(r.presu)+' presupuestados ('+Math.round(pct)+'%)')+'">'+
+        (hayProy ? '<div class="pchart-proj" style="left:'+wReal+'%;width:'+Math.max(0,wProy-wReal)+'%;"></div>' : '')+
         '<div class="pchart-fill" style="width:'+wReal+'%;background:'+color+';"></div>'+
         '<div class="pchart-marker" style="left:'+wPresu+'%;"></div>'+
-      '</div></div>';
+      '</div>'+proyTxt+'</div>';
   }).join('');
   var legend = '<div class="chart-legend-row">'+
       '<div class="chart-legend-item"><span class="chart-legend-swatch" style="background:'+CHART_COLORS.ingreso+';"></span>Bajo control (&lt;80%)</div>'+
       '<div class="chart-legend-item"><span class="chart-legend-swatch" style="background:'+CHART_COLORS.fijo+';"></span>Cerca del límite (80–100%)</div>'+
       '<div class="chart-legend-item"><span class="chart-legend-swatch" style="background:'+CHART_COLORS.neg+';"></span>Excedido (&gt;100%)</div>'+
       '<div class="chart-legend-item"><span style="width:2px;height:12px;background:var(--text-faint);display:inline-block;"></span>Tope del presupuesto</div>'+
+      (usaProy ? '<div class="chart-legend-item"><span class="chart-legend-swatch pchart-proj-swatch"></span>Proyección a fin de mes (ritmo actual)</div>' : '')+
     '</div>';
   return rowsHtml+legend;
 }
