@@ -303,6 +303,8 @@
           <p class="view-desc">Gastos fijos y variables, categorizados y con descripción.</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="ghost-btn no-print" id="btnImportCsv" type="button" title="Importar un extracto de banco o tarjeta (CSV), con vista previa y detección de duplicados"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Importar extracto</button>
+          <input type="file" id="fileImportCsv" accept=".csv,.txt,text/csv,text/plain" style="display:none;">
           <button class="ghost-btn no-print" id="btnReglas" type="button" title="Categorizar automáticamente según el texto de la descripción"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg> Reglas</button>
           <button class="ghost-btn no-print" id="btnReco" type="button" title="Avisos de vencimiento de luz, tarjeta, alquiler, etc."><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg> Recordatorios<span id="recoBtnCount"></span></button>
         </div>

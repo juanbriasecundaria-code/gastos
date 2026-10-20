@@ -2265,6 +2265,364 @@ function renderReglasModal(){
 function openReglasModal(){ renderReglasModal(); reglasOverlay.classList.add('open'); setTimeout(function(){ document.getElementById('reglaTexto').focus(); }, 50); }
 function closeReglasModal(){ reglasOverlay.classList.remove('open'); }
 document.getElementById('btnReglas').addEventListener('click', openReglasModal);
+
+/* ===================== IMPORTAR EXTRACTO (CSV de banco o tarjeta) =====================
+   Se lee en el navegador (el archivo no se sube a ningún lado). Propone las columnas, muestra una vista previa
+   editable, marca los posibles duplicados contra lo ya cargado y recién al confirmar agrega los gastos.
+   Antes de agregar se guarda una copia para poder "Deshacer". Solo entran los movimientos del año del ejercicio
+   activo; las acreditaciones y pagos (importes de signo contrario) se omiten. Las Reglas de categorización se aplican solas. */
+var IMP_MAX_BYTES = 3*1024*1024, IMP_MAX_FILAS = 600;
+function impPad(n){ return String(n).padStart(2,'0'); }
+function impDecode(buf){   // UTF-8 estricto; si falla, Windows-1252 (típico de los CSV de bancos argentinos)
+  var txt;
+  try{ txt = new TextDecoder('utf-8', {fatal:true}).decode(buf); }
+  catch(e){ txt = new TextDecoder('windows-1252').decode(buf); }
+  return txt.replace(/^\uFEFF/, '');
+}
+function impDetectDelim(text){   // elige el separador que aparece más seguido y con la misma cantidad en cada fila (las comas decimales no engañan)
+  var cands = [';', ',', '\t', '|'], perLine = [], cur = {';':0, ',':0, '\t':0, '|':0}, inQ = false;
+  for(var i=0; i<text.length && perLine.length<30; i++){
+    var ch = text[i];
+    if(ch==='"') inQ = !inQ;
+    else if(!inQ){
+      if(ch==='\n'){ perLine.push(cur); cur = {';':0, ',':0, '\t':0, '|':0}; }
+      else if(cur[ch]!==undefined) cur[ch]++;
+    }
+  }
+  perLine.push(cur);
+  var best = ',', bestScore = 0;
+  cands.forEach(function(c){
+    var freq = {}, top = 0, topCount = 0;
+    perLine.forEach(function(l){ if(l[c]>0){ freq[l[c]] = (freq[l[c]]||0)+1; } });
+    Object.keys(freq).forEach(function(k){ var sc = freq[k]*(+k); if(sc>top){ top = sc; topCount = +k; } });
+    if(top>bestScore){ bestScore = top; best = c; }
+  });
+  return best;
+}
+function impParseCSV(text){
+  var delim = impDetectDelim(text), rows = [], row = [], cell = '', inQ = false;
+  for(var i=0; i<text.length; i++){
+    var ch = text[i];
+    if(inQ){
+      if(ch==='"'){ if(text[i+1]==='"'){ cell += '"'; i++; } else inQ = false; }
+      else cell += ch;
+    } else if(ch==='"' && cell===''){ inQ = true; }
+    else if(ch===delim){ row.push(cell); cell = ''; }
+    else if(ch==='\r'){ /* se ignora: el salto lo marca \n */ }
+    else if(ch==='\n'){ row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  if(cell!=='' || row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(function(r){ return r.some(function(c){ return String(c).trim()!==''; }); });
+}
+var IMP_MESES_TXT = {ene:1,jan:1,feb:2,mar:3,abr:4,apr:4,may:5,jun:6,jul:7,ago:8,aug:8,sep:9,set:9,oct:10,nov:11,dic:12,dec:12};
+function impMkDate(y, m, d){
+  if(m<1 || m>12 || d<1 || d>31) return null;
+  var dt = new Date(y, m-1, d);
+  if(dt.getMonth()!==m-1) return null;
+  return y+'-'+impPad(m)+'-'+impPad(d);
+}
+function impParseDate(s){
+  s = String(s==null ? '' : s).trim(); if(!s) return null;
+  var m;
+  if((m = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(s))) return impMkDate(+m[1], +m[2], +m[3]);
+  if((m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/.exec(s))){
+    var y = +m[3]; if(y<100) y += 2000;
+    var a = +m[1], b = +m[2];
+    if(b>12 && a<=12) return impMkDate(y, a, b);   // m/d/a (el 2º número no puede ser mes)
+    return impMkDate(y, b, a);                      // d/m/a, lo normal en Argentina
+  }
+  if((m = /^(\d{1,2})[\s\-\/]+([A-Za-zÁÉÍÓÚáéíóú]{3,})\.?[\s\-\/,]+(\d{2,4})/.exec(s))){
+    var mm = IMP_MESES_TXT[normalizeSearchText(m[2]).slice(0,3)], yy = +m[3]; if(yy<100) yy += 2000;
+    return mm ? impMkDate(yy, mm, +m[1]) : null;
+  }
+  return null;
+}
+function impParseAmount(s){
+  s = String(s==null ? '' : s).trim(); if(!s) return null;
+  var neg = /-/.test(s) || /^\(.*\)$/.test(s);
+  s = s.replace(/[^\d.,]/g, '');
+  if(!s) return null;
+  var hasDot = s.indexOf('.')!==-1, hasCom = s.indexOf(',')!==-1;
+  if(hasDot && hasCom){
+    if(s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g,'').replace(',', '.');   // 1.234,56
+    else s = s.replace(/,/g,'');                                                              // 1,234.56
+  } else if(hasCom){
+    if(/^\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g,''); else s = s.replace(',', '.');
+  } else if(hasDot){
+    if(/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g,'');                                // 1.234 = mil doscientos treinta y cuatro
+  }
+  var v = parseFloat(s);
+  if(!isFinite(v)) return null;
+  return neg ? -v : v;
+}
+function impHeaderKind(h){
+  var t = normalizeSearchText(h||'').trim(); if(!t) return null;
+  if(/(debito|\bdebe\b|egreso|retiro|cargo|consumo|gasto)/.test(t)) return 'debito';
+  if(/(credito|\bhaber\b|ingreso|deposito|abono|acreditacion)/.test(t)) return 'credito';
+  if(/^(fecha|date|dia\b|f\.? ?(oper|mov|contab|compra|valor))/.test(t)) return 'fecha';
+  if(/(importe|monto|amount|valor|pesos)/.test(t)) return 'monto';
+  if(/(descrip|concepto|detalle|comercio|establec|movimiento|referencia|leyenda|nombre|merchant|payee|memo)/.test(t)) return 'desc';
+  return null;
+}
+function impGuessDescCol(rows, start, used){
+  var ncol = 0, best = -1, bestLen = 0;
+  rows.slice(start, start+30).forEach(function(r){ ncol = Math.max(ncol, r.length); });
+  for(var j=0; j<ncol; j++){
+    if(used.indexOf(j)!==-1) continue;
+    var n = 0, len = 0, nums = 0;
+    rows.slice(start, start+30).forEach(function(r){ var c = String(r[j]==null?'':r[j]).trim(); if(!c) return; n++; len += c.length; if(impParseAmount(c)!==null && /^[\s$\d.,()\-+]+$/.test(c)) nums++; });
+    if(!n || nums/n>0.5) continue;
+    if(len/n > bestLen){ bestLen = len/n; best = j; }
+  }
+  return best;
+}
+function impDetectLayout(rows){
+  var lim = Math.min(rows.length, 40), i;
+  for(i=0; i<lim; i++){
+    var map = {fecha:-1, desc:-1, monto:-1, debito:-1, credito:-1};
+    rows[i].forEach(function(c, j){ var k = impHeaderKind(c); if(k && map[k]===-1) map[k] = j; });
+    if(map.fecha!==-1 && (map.monto!==-1 || map.debito!==-1)){
+      if(map.desc===-1) map.desc = impGuessDescCol(rows, i+1, [map.fecha, map.monto, map.debito, map.credito]);
+      return {headerIdx:i, map:map};
+    }
+  }
+  // Sin encabezado reconocible: se deduce por el contenido de las primeras filas
+  var sample = rows.slice(0, 30), ncol = 0, map2 = {fecha:-1, desc:-1, monto:-1, debito:-1, credito:-1};
+  sample.forEach(function(r){ ncol = Math.max(ncol, r.length); });
+  for(var j=0; j<ncol; j++){
+    var n = 0, dates = 0, nums = 0;
+    sample.forEach(function(r){ var c = String(r[j]==null?'':r[j]).trim(); if(!c) return; n++; if(impParseDate(c)) dates++; else if(impParseAmount(c)!==null && /^[\s$\d.,()\-+]+$/.test(c)) nums++; });
+    if(!n) continue;
+    if(map2.fecha===-1 && dates/n>=0.7) map2.fecha = j;
+    else if(map2.monto===-1 && nums/n>=0.7) map2.monto = j;
+  }
+  map2.desc = impGuessDescCol(rows, 0, [map2.fecha, map2.monto]);
+  return {headerIdx:-1, map:map2};
+}
+function impDetectSign(rows, start, map){   // ¿los gastos vienen negativos o positivos? Gana el signo más frecuente
+  if(map.monto===-1) return 'neg';
+  var neg = 0, pos = 0;
+  for(var i=start; i<rows.length; i++){
+    var v = impParseAmount(rows[i][map.monto]); if(v===null || v===0) continue;
+    if(v<0) neg++; else pos++;
+  }
+  if(!neg) return 'pos';
+  if(!pos) return 'neg';
+  return neg>=pos ? 'neg' : 'pos';
+}
+function impBuild(S){
+  var year = +STORE.activeEjercicio, items = [], sk = {leidas:0, invalidas:0, otroAnio:0, creditos:0, truncadas:0}, map = S.map;
+  for(var i=S.headerIdx+1; i<S.rows.length; i++){
+    var r = S.rows[i]; sk.leidas++;
+    var fecha = map.fecha>=0 ? impParseDate(r[map.fecha]) : null, gasto = null, esCredito = false;
+    if(map.debito>=0){
+      var d = impParseAmount(r[map.debito]), c = map.credito>=0 ? impParseAmount(r[map.credito]) : null;
+      if(d!==null && d!==0) gasto = Math.abs(d); else if(c!==null && c!==0) esCredito = true;
+    } else if(map.monto>=0){
+      var v = impParseAmount(r[map.monto]);
+      if(v!==null && v!==0){ var esGasto = S.sign==='neg' ? v<0 : v>0; if(esGasto) gasto = Math.abs(v); else esCredito = true; }
+    }
+    if(!fecha || (gasto===null && !esCredito)){ sk.invalidas++; continue; }
+    if(+fecha.slice(0,4)!==year){ sk.otroAnio++; continue; }
+    if(esCredito){ sk.creditos++; continue; }
+    if(items.length>=IMP_MAX_FILAS){ sk.truncadas++; continue; }
+    var desc = map.desc>=0 ? String(r[map.desc]==null?'':r[map.desc]).replace(/\s+/g,' ').trim().slice(0,80) : '';
+    items.push({i:i, fecha:fecha, mes:MESES[+fecha.slice(5,7)-1], desc:desc, monto:Math.round(gasto*100)/100});
+  }
+  return {items:items, sk:sk};
+}
+// Marca como "posible duplicado" lo que ya está cargado: mismo monto y misma fecha (o, si el gasto cargado no tiene fecha,
+// mismo mes y descripción parecida). Cada gasto existente se empareja una sola vez, así dos compras iguales el mismo día
+// no se confunden entre sí pero reimportar el mismo archivo marca todo.
+function impMarkDuplicates(items){
+  var byMonto = {}, used = {};
+  DATA.gastos.forEach(function(g){ var k = Math.round((+g.monto||0)*100); (byMonto[k] = byMonto[k] || []).push(g); });
+  function similar(a, b){
+    var x = normalizeSearchText(a||'').trim(), y = normalizeSearchText(b||'').trim();
+    return !!x && !!y && (x.indexOf(y)!==-1 || y.indexOf(x)!==-1);
+  }
+  items.forEach(function(it){
+    it.dup = null;
+    var cands = (byMonto[Math.round(it.monto*100)] || []).filter(function(g){ return !used[g.id]; }), pick = null;
+    var porFecha = cands.filter(function(g){ return g.fecha && g.fecha===it.fecha; });
+    if(porFecha.length) pick = porFecha.filter(function(g){ return similar(g.desc, it.desc); })[0] || porFecha[0];
+    else pick = cands.filter(function(g){ return !g.fecha && g.mes===it.mes && similar(g.desc, it.desc); })[0] || null;
+    if(pick){ used[pick.id] = 1; it.dup = pick; }
+  });
+}
+function impDefaultCatKey(){
+  var v = catsFor('Variable'), f = catsFor('Fijo');
+  var pref = v.filter(function(c){ return /^(otros?|varios?|sin categor|miscel|general)/i.test(c); })[0];
+  if(pref) return 'Variable|'+pref;
+  if(v.length) return 'Variable|'+v[0];
+  if(f.length) return 'Fijo|'+f[0];
+  return null;
+}
+function impOpen(fileName, rows){
+  var lay = impDetectLayout(rows), prev = document.activeElement;
+  var S = {rows:rows, headerIdx:lay.headerIdx, map:lay.map, sign:impDetectSign(rows, lay.headerIdx+1, lay.map), over:{}, tag:'', defCat:impDefaultCatKey(), items:[]};
+  if(!S.defCat){ toast('Primero creá al menos una categoría de gastos.'); return; }
+  var ov = document.createElement('div'); ov.className = 'account-overlay open';
+  var box = document.createElement('div'); box.className = 'account-box import-box';
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-labelledby', 'impTitle');
+  box.innerHTML =
+    '<h3 id="impTitle">Importar extracto</h3><p class="reco-note imp-file"></p>'+
+    '<div class="imp-controls">'+
+      '<label>Fecha <select data-map="fecha"></select></label>'+
+      '<label>Descripción <select data-map="desc"></select></label>'+
+      '<label>Importe <select data-map="monto"></select></label>'+
+      '<label>Débito <select data-map="debito"></select></label>'+
+      '<label>Crédito <select data-map="credito"></select></label>'+
+      '<label>Los gastos vienen como <select id="impSign"><option value="neg">Valores negativos</option><option value="pos">Valores positivos</option></select></label>'+
+      '<label>Categoría por defecto <select id="impDefCat"></select></label>'+
+      '<label>Etiqueta para todo (opcional) <input type="text" id="impTag" maxlength="60" placeholder="Ej.: extracto-octubre" autocomplete="off"></label>'+
+    '</div>'+
+    '<div class="imp-summary" role="status"></div><div class="imp-warn" role="alert"></div>'+
+    '<div class="imp-scroll"><table class="imp-table"><thead><tr>'+
+      '<th><input type="checkbox" id="impAll" aria-label="Marcar o desmarcar todas" checked></th><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Monto</th><th>Estado</th>'+
+    '</tr></thead><tbody></tbody></table></div>'+
+    '<p class="reco-note">Revisá las categorías antes de importar. Si algo sale mal, vas a tener "Deshacer" unos segundos y la copia de seguridad en el menú Datos.</p>'+
+    '<div class="confirm-actions"><button type="button" class="ghost-btn" data-act="cancel">Cancelar</button><button type="button" class="btn" data-act="go" id="impGo">Importar</button></div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  box.querySelector('.imp-file').textContent = fileName;
+  var maxCol = 0; rows.slice(0, 60).forEach(function(r){ maxCol = Math.max(maxCol, r.length); });
+  var firstData = rows[S.headerIdx+1] || [];
+  function colOpts(allowNone){
+    var h = '<option value="-1">'+(allowNone ? 'No usar' : '—')+'</option>';
+    for(var j=0; j<maxCol; j++){
+      var lab = (S.headerIdx>=0 && rows[S.headerIdx][j]) ? String(rows[S.headerIdx][j]).trim() : '', ej = String(firstData[j]==null ? '' : firstData[j]).trim().slice(0,22);
+      h += '<option value="'+j+'">'+(j+1)+'. '+escapeHtml((lab || 'Columna '+(j+1)).slice(0,28))+(ej ? ' — '+escapeHtml(ej) : '')+'</option>';
+    }
+    return h;
+  }
+  ['fecha','desc','monto','debito','credito'].forEach(function(k){
+    var sel = box.querySelector('[data-map="'+k+'"]'); sel.innerHTML = colOpts(k!=='fecha'); sel.value = String(S.map[k]);
+  });
+  var selSign = box.querySelector('#impSign'), selDef = box.querySelector('#impDefCat'), tagIn = box.querySelector('#impTag'), tbody = box.querySelector('tbody');
+  selSign.value = S.sign;
+  function catGroups(selKey){
+    var h = '';
+    ['Fijo','Variable'].forEach(function(t){
+      var cs = catsFor(t); if(!cs.length) return;
+      h += '<optgroup label="'+t+'">'+cs.map(function(c){ var key = t+'|'+c; return '<option value="'+escapeHtml(key)+'"'+(key===selKey?' selected':'')+'>'+escapeHtml(c)+'</option>'; }).join('')+'</optgroup>';
+    });
+    return h;
+  }
+  selDef.innerHTML = catGroups(S.defCat);
+  function refresh(){
+    var warn = box.querySelector('.imp-warn'), go = box.querySelector('#impGo'), sum = box.querySelector('.imp-summary');
+    selSign.disabled = S.map.debito>=0;
+    if(S.map.fecha<0 || (S.map.monto<0 && S.map.debito<0)){
+      warn.textContent = 'Elegí al menos la columna de Fecha y la de Importe (o Débito).';
+      tbody.innerHTML = ''; sum.innerHTML = ''; S.items = []; go.disabled = true; go.textContent = 'Importar'; return;
+    }
+    warn.textContent = '';
+    var res = impBuild(S); S.items = res.items; impMarkDuplicates(S.items);
+    var base = catGroups(null), nDup = 0, html = '';
+    S.items.forEach(function(it){
+      var ov2 = S.over[it.i] || {}, reg = matchRegla(it.desc);
+      it.catKey = ov2.cat || (reg ? reg.tipo+'|'+reg.cat : S.defCat);
+      it.include = ov2.inc!==undefined ? ov2.inc : !it.dup;
+      if(it.dup) nDup++;
+      var needle = 'value="'+escapeHtml(it.catKey)+'"', opts = base.replace(needle, function(){ return needle+' selected'; });
+      var estado = it.dup ? '<span class="imp-badge imp-dup" title="'+escapeHtml('Coincide con: '+(it.dup.desc||it.dup.cat)+(it.dup.fecha?' · '+formatFechaCorta(it.dup.fecha):'')+' · '+money(it.dup.monto))+'">Posible duplicado</span>'
+                 : ((!ov2.cat && reg) ? '<span class="imp-badge">Regla</span>' : '');
+      html += '<tr class="imp-row'+(it.dup?' is-dup':'')+'"><td><input type="checkbox" data-inc="'+it.i+'" aria-label="'+escapeHtml('Importar: '+(it.desc||'sin descripción'))+'"'+(it.include?' checked':'')+'></td>'+
+        '<td>'+it.fecha.split('-').reverse().join('/')+'</td><td class="imp-desc" title="'+escapeHtml(it.desc)+'">'+escapeHtml(it.desc||'—')+'</td>'+
+        '<td><select data-cat="'+it.i+'" aria-label="'+escapeHtml('Categoría de '+(it.desc||'este movimiento'))+'">'+opts+'</select></td>'+
+        '<td class="imp-amt">'+money(it.monto)+'</td><td class="imp-state">'+estado+'</td></tr>';
+    });
+    tbody.innerHTML = html;
+    var sel = S.items.filter(function(it){ return it.include; }).length, sk = res.sk;
+    var pieces = ['Filas leídas: '+sk.leidas, 'Para importar: '+sel];
+    if(nDup) pieces.push('Posibles duplicados (desmarcados): '+nDup);
+    if(sk.otroAnio) pieces.push('De otro año (se omiten): '+sk.otroAnio);
+    if(sk.creditos) pieces.push('Acreditaciones o pagos (se omiten): '+sk.creditos);
+    if(sk.invalidas) pieces.push('Sin fecha o importe válido (se omiten): '+sk.invalidas);
+    if(sk.truncadas) pieces.push('Pasan el máximo de '+IMP_MAX_FILAS+' (se omiten): '+sk.truncadas);
+    sum.innerHTML = pieces.map(function(p){ return '<span>'+escapeHtml(p)+'</span>'; }).join('');
+    updateGo();
+  }
+  function updateGo(){
+    var go = box.querySelector('#impGo'), n = S.items.filter(function(it){ return it.include; }).length;
+    go.disabled = n===0; go.textContent = n ? (n===1 ? 'Importar 1 gasto' : 'Importar '+n+' gastos') : 'Importar';
+    var all = box.querySelector('#impAll'); all.checked = S.items.length>0 && n===S.items.length;
+    var span = box.querySelector('.imp-summary span:nth-child(2)'); if(span) span.textContent = 'Para importar: '+n;
+  }
+  box.addEventListener('change', function(e){
+    var t = e.target;
+    if(t.hasAttribute('data-map')){ S.map[t.getAttribute('data-map')] = +t.value; S.over = {}; if(S.map.monto>=0 && S.map.debito<0) S.sign = impDetectSign(rows, S.headerIdx+1, S.map); selSign.value = S.sign; refresh(); }
+    else if(t===selSign){ S.sign = t.value; S.over = {}; refresh(); }
+    else if(t===selDef){ S.defCat = t.value; refresh(); }
+    else if(t.hasAttribute('data-inc')){
+      var it = S.items.filter(function(x){ return String(x.i)===t.getAttribute('data-inc'); })[0]; if(!it) return;
+      it.include = t.checked; (S.over[it.i] = S.over[it.i] || {}).inc = t.checked; updateGo();
+    }
+    else if(t.hasAttribute('data-cat')){
+      var i2 = t.getAttribute('data-cat'); (S.over[i2] = S.over[i2] || {}).cat = t.value;
+      var it2 = S.items.filter(function(x){ return String(x.i)===i2; })[0]; if(it2) it2.catKey = t.value;
+      var badge = t.closest('tr').querySelector('.imp-state .imp-badge:not(.imp-dup)'); if(badge) badge.remove();
+    }
+    else if(t.id==='impAll'){
+      S.items.forEach(function(it){ it.include = t.checked; (S.over[it.i] = S.over[it.i] || {}).inc = t.checked; });
+      tbody.querySelectorAll('[data-inc]').forEach(function(cb){ cb.checked = t.checked; }); updateGo();
+    }
+  });
+  tagIn.addEventListener('input', function(){ S.tag = tagIn.value; });
+  function close(){
+    document.removeEventListener('keydown', onKey, true); ov.remove();
+    if(prev && prev.focus) try{ prev.focus(); }catch(e){}
+  }
+  function onKey(e){
+    if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); return; }
+    if(e.key==='Tab'){
+      var f = [].filter.call(box.querySelectorAll('button, select, input'), function(x){ return !x.disabled && x.offsetParent!==null; });
+      if(!f.length) return;
+      var first = f[0], last = f[f.length-1];
+      if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+    }
+  }
+  document.addEventListener('keydown', onKey, true);
+  box.addEventListener('click', function(e){
+    var b = e.target.closest('[data-act]'); if(!b) return;
+    if(b.getAttribute('data-act')==='cancel'){ close(); return; }
+    var sel = S.items.filter(function(it){ return it.include; });
+    if(!sel.length){ toast('No hay gastos marcados para importar.'); return; }
+    var tags = parseTags(S.tag), snap = takeSnapshot('Importar extracto');
+    sel.forEach(function(it){
+      var p = it.catKey.indexOf('|');
+      var g = {id:uid('gas'), mes:it.mes, fecha:it.fecha, tipo:it.catKey.slice(0,p), cat:it.catKey.slice(p+1), desc:it.desc, monto:it.monto, autor:currentAutor()};
+      setTags(g, tags); DATA.gastos.push(g);
+    });
+    saveData(); updateDescDatalist(); renderAll(); close();
+    toast('Gastos importados: '+sel.length, { action: undoFromSnapshot(snap, 'Importación deshecha'), duration: 12000 });
+  });
+  refresh();
+  var first = box.querySelector('select, input, button'); if(first) first.focus();
+}
+(function setupImportarExtracto(){
+  var btn = document.getElementById('btnImportCsv'), fileIn = document.getElementById('fileImportCsv');
+  if(!btn || !fileIn) return;
+  btn.addEventListener('click', function(){
+    if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés importar.'); return; }
+    fileIn.value = ''; fileIn.click();
+  });
+  fileIn.addEventListener('change', function(){
+    var f = fileIn.files && fileIn.files[0]; if(!f) return;
+    if(f.size > IMP_MAX_BYTES){ toast('El archivo es muy grande (máx. 3 MB).'); return; }
+    var fr = new FileReader();
+    fr.onload = function(){
+      var rows = []; try{ rows = impParseCSV(impDecode(fr.result)); }catch(e){}
+      if(rows.length < 2){ toast('No se pudo leer el archivo: no parece un CSV con filas de datos.'); return; }
+      impOpen(f.name, rows);
+    };
+    fr.onerror = function(){ toast('No se pudo leer el archivo.'); };
+    fr.readAsArrayBuffer(f);
+  });
+})();
+
 document.getElementById('reglasClose').addEventListener('click', closeReglasModal);
 reglasOverlay.addEventListener('click', function(e){ if(e.target===reglasOverlay) closeReglasModal(); });
 document.addEventListener('keydown', function(e){ if(e.key==='Escape' && reglasOverlay.classList.contains('open')) closeReglasModal(); });
