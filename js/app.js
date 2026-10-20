@@ -2840,7 +2840,7 @@ function buildDolarRefChart(valores, fuentes){
   fuentes = fuentes || valores.map(function(v){ return (v===null||v===undefined) ? null : 'compra'; });
   var known = valores.filter(function(v){return v!==null && v!==undefined;});
   if(!known.length){
-    return '<div class="empty-state">Todavía no registraste compras de dólares ni se pudo traer la cotización oficial (necesitás conexión a internet al menos una vez).</div>';
+    return '<div class="empty-state">Todavía no registraste compras de dólares ni se pudo traer la cotización del dólar (necesitás conexión a internet al menos una vez).</div>';
   }
   var W=860,H=260,padL=58,padR=14,padT=14,padB=40;
   var innerW=W-padL-padR, innerH=H-padT-padB;
@@ -2875,7 +2875,7 @@ function buildDolarRefChart(valores, fuentes){
   var dots = valores.map(function(v,i){
     if(v===null||v===undefined) return '';
     var esOficial = fuentes[i]==='oficial';
-    var tip = esOficial ? (MESES[i]+': '+money(v)+' /USD (promedio oficial del mes)') : (MESES[i]+': '+money(v)+' /USD (tu compra registrada, sin cotización oficial disponible)');
+    var tip = esOficial ? (MESES[i]+': '+money(v)+' /USD (promedio '+usdNombre()+' del mes)') : (MESES[i]+': '+money(v)+' /USD (tu compra registrada, sin cotización '+usdNombre()+' disponible)');
     return esOficial
       ? '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'" data-tip="'+escapeHtml(tip)+'"/>'
       : '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="var(--surface)" stroke="'+CHART_COLORS.dolar+'" stroke-width="2" data-tip="'+escapeHtml(tip)+'"/>';
@@ -2890,8 +2890,8 @@ function buildDolarRefChart(valores, fuentes){
     '</linearGradient></defs>'+
     gridLines+yLabels+areas+lines+dots+xlabels+'</svg>';
   var legend = '<div class="chart-legend-row">'+
-      '<div class="chart-legend-item"><span style="width:9px;height:9px;border-radius:50%;background:'+CHART_COLORS.dolar+';display:inline-block;"></span>Promedio oficial del mes</div>'+
-      '<div class="chart-legend-item"><span style="width:9px;height:9px;border-radius:50%;background:var(--surface);border:2px solid '+CHART_COLORS.dolar+';display:inline-block;"></span>Tu compra (sin cotización oficial disponible)</div>'+
+      '<div class="chart-legend-item"><span style="width:9px;height:9px;border-radius:50%;background:'+CHART_COLORS.dolar+';display:inline-block;"></span>Promedio '+usdNombre()+' del mes</div>'+
+      '<div class="chart-legend-item"><span style="width:9px;height:9px;border-radius:50%;background:var(--surface);border:2px solid '+CHART_COLORS.dolar+';display:inline-block;"></span>Tu compra (sin cotización '+usdNombre()+' disponible)</div>'+
     '</div>';
   return svg+legend;
 }
@@ -3076,31 +3076,56 @@ function buildHeatmapChart(months, opts){
   return '<div class="heatmap-wrap"><table class="heatmap-table">'+head+body+'</table></div>'+legend;
 }
 
-/* ----- Gasto mensual en USD equivalente, con dólar OFICIAL histórico (ArgentinaDatos) -----
+/* ----- Dólar de referencia elegible (oficial / blue / MEP) y pesos constantes (inflación) — ArgentinaDatos -----
    A diferencia de "Evolución del dólar (referencia)" (que usa TU precio de compra cargado
    a mano), esto usa la cotización de mercado real de cada mes, así que sirve para ver si
-   perdiste o ganaste poder adquisitivo en dólares, más allá de a cuánto compraste vos. */
-var USD_OFICIAL_CACHE_KEY = 'libroGastos_usdOficialCache_v1';
-var usdOficialCache = {}; // {"2026-03": 1032.5, ...} promedio mensual del dólar oficial (venta)
-var usdOficialFetchState = 'idle'; // idle | loading | done | error
-function cargarUsdOficialCache(){
+   perdiste o ganaste poder adquisitivo en dólares, más allá de a cuánto compraste vos.
+   Todo se guarda en caché local y se pide una vez por sesión. Los accesos son "perezosos" (leen de
+   localStorage cuando hace falta) para no depender del orden en que se ejecuta el resto del archivo. */
+var USD_CACHE_KEY = 'libroGastos_usdCache_v2';               // {oficial:{'2026-03':1032.5,…}, blue:{…}, bolsa:{…}}
+var USD_OFICIAL_CACHE_KEY = 'libroGastos_usdOficialCache_v1'; // versión anterior (solo oficial): se migra sola
+var USD_TIPO_KEY = 'libroGastos_usdTipo';
+var CONST_KEY = 'libroGastos_pesosConstantes';
+var USD_TIPOS = {oficial:{nombre:'oficial'}, blue:{nombre:'blue'}, bolsa:{nombre:'MEP'}};
+var _usdCacheAll = null, _usdStates = null;
+function usdCacheAll(){
+  if(_usdCacheAll) return _usdCacheAll;
+  var all = {oficial:{}, blue:{}, bolsa:{}};
   try{
-    var raw = localStorage.getItem(USD_OFICIAL_CACHE_KEY);
-    if(raw) usdOficialCache = JSON.parse(raw) || {};
-  }catch(e){ usdOficialCache = {}; }
+    var raw = localStorage.getItem(USD_CACHE_KEY);
+    if(raw){
+      var p = JSON.parse(raw) || {};
+      Object.keys(all).forEach(function(t){ if(p[t] && typeof p[t]==='object') all[t] = p[t]; });
+    } else {
+      var old = localStorage.getItem(USD_OFICIAL_CACHE_KEY);
+      if(old) all.oficial = JSON.parse(old) || {};
+    }
+  }catch(e){}
+  _usdCacheAll = all;
+  return all;
 }
+function usdTipoActual(){
+  var t = 'oficial';
+  try{ t = localStorage.getItem(USD_TIPO_KEY) || 'oficial'; }catch(e){}
+  return USD_TIPOS[t] ? t : 'oficial';
+}
+function usdNombre(){ return USD_TIPOS[usdTipoActual()].nombre; }
+function usdFetchState(tipo){ _usdStates = _usdStates || {}; return _usdStates[tipo || usdTipoActual()] || 'idle'; }
+function usdSetFetchState(tipo, st){ _usdStates = _usdStates || {}; _usdStates[tipo] = st; }
+function cargarUsdOficialCache(){ usdCacheAll(); }
 function guardarUsdOficialCache(){
-  try{ localStorage.setItem(USD_OFICIAL_CACHE_KEY, JSON.stringify(usdOficialCache)); }catch(e){}
+  try{ localStorage.setItem(USD_CACHE_KEY, JSON.stringify(usdCacheAll())); }catch(e){}
 }
 function usdOficialKey(anio, mesIdx){ return anio+'-'+String(mesIdx+1).padStart(2,'0'); }
-function usdOficialPromedioMes(anio, mesIdx){
-  var v = usdOficialCache[usdOficialKey(anio, mesIdx)];
+function usdOficialPromedioMes(anio, mesIdx){   // promedio mensual (venta) del dólar elegido
+  var v = usdCacheAll()[usdTipoActual()][usdOficialKey(anio, mesIdx)];
   return (v===undefined) ? null : v;
 }
 function fetchUsdOficialHistorico(onDone){
-  if(usdOficialFetchState==='loading') return;
-  usdOficialFetchState = 'loading';
-  fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial')
+  var tipo = usdTipoActual();
+  if(usdFetchState(tipo)==='loading') return;
+  usdSetFetchState(tipo, 'loading');
+  fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/'+tipo)
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(rows){
       var sums={}, counts={};
@@ -3110,18 +3135,77 @@ function fetchUsdOficialHistorico(onDone){
         sums[key] = (sums[key]||0) + (+r.venta);
         counts[key] = (counts[key]||0) + 1;
       });
-      Object.keys(sums).forEach(function(key){
-        usdOficialCache[key] = sums[key]/counts[key];
-      });
+      var cache = usdCacheAll()[tipo];
+      Object.keys(sums).forEach(function(key){ cache[key] = sums[key]/counts[key]; });
       guardarUsdOficialCache();
-      usdOficialFetchState = 'done';
+      usdSetFetchState(tipo, 'done');
       if(onDone) onDone(null);
     })
     .catch(function(err){
-      usdOficialFetchState = 'error';
+      usdSetFetchState(tipo, 'error');
       if(onDone) onDone(err);
     });
 }
+
+/* Pesos constantes: se llevan los montos de cada mes a pesos del último mes con inflación publicada.
+   Índice encadenado con la inflación mensual (%); un mes sin dato en el medio cuenta como 0 %. */
+var IPC_CACHE_KEY = 'libroGastos_ipcCache_v1';
+var _ipcData = null, _ipcState = 'idle', _ipcMemo = null;
+function ipcData(){
+  if(_ipcData) return _ipcData;
+  var d = {};
+  try{ var raw = localStorage.getItem(IPC_CACHE_KEY); if(raw) d = JSON.parse(raw) || {}; }catch(e){}
+  _ipcData = d;
+  return d;
+}
+function constantesOn(){ try{ return localStorage.getItem(CONST_KEY)==='1'; }catch(e){ return false; } }
+function fetchIpc(onDone){
+  if(_ipcState==='loading') return;
+  _ipcState = 'loading';
+  fetch('https://api.argentinadatos.com/v1/finanzas/indices/inflacion')
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(rows){
+      var tmp = {}, maxAbs = 0;
+      (rows||[]).forEach(function(r){
+        if(!r || !r.fecha) return;
+        var v = +r.valor; if(!isFinite(v)) return;
+        tmp[String(r.fecha).slice(0,7)] = v;
+        maxAbs = Math.max(maxAbs, Math.abs(v));
+      });
+      // Por si la API entregara fracciones (0,025) en vez de porcentajes (2,5): ninguna serie argentina real tiene todos los meses por debajo de 1 %.
+      if(maxAbs>0 && maxAbs<1) Object.keys(tmp).forEach(function(k){ tmp[k] = tmp[k]*100; });
+      if(!Object.keys(tmp).length) throw new Error('sin datos');
+      _ipcData = tmp; _ipcMemo = null;
+      try{ localStorage.setItem(IPC_CACHE_KEY, JSON.stringify(tmp)); }catch(e){}
+      _ipcState = 'done';
+      if(onDone) onDone(null);
+    })
+    .catch(function(err){ _ipcState = 'error'; if(onDone) onDone(err); });
+}
+function ipcIndice(){
+  if(_ipcMemo) return _ipcMemo;
+  var d = ipcData(), keys = Object.keys(d).sort();
+  if(!keys.length) return null;
+  var first = keys[0], last = keys[keys.length-1], idx = {}, y = +first.slice(0,4), m = +first.slice(5,7), acum = 1, k = first;
+  for(var guard=0; guard<1200; guard++){
+    acum *= 1 + (+d[k]||0)/100; idx[k] = acum;
+    if(k===last) break;
+    m++; if(m>12){ m = 1; y++; }
+    k = y+'-'+String(m).padStart(2,'0');
+  }
+  _ipcMemo = {idx:idx, first:first, last:last};
+  return _ipcMemo;
+}
+// Factor para llevar un monto de ese mes a pesos del último mes con dato. null = sin dato (mes anterior a la serie o sin cargar).
+function ipcFactorMes(anio, mesIdx){
+  var t = ipcIndice(); if(!t) return null;
+  var key = usdOficialKey(anio, mesIdx);
+  if(key < t.first) return null;
+  var base = t.idx[t.last], i = key > t.last ? base : t.idx[key];   // meses todavía sin inflación publicada: sin ajuste
+  return base/i;
+}
+function ipcBaseLabel(){ var t = ipcIndice(); return t ? MESES[+t.last.slice(5,7)-1]+' '+t.last.slice(0,4) : ''; }
+
 function buildUsdOficialChart(gastosPesos, usdEquivArr){
   var known = usdEquivArr.filter(function(v){return v!==null && v!==undefined;});
   if(!known.length){
@@ -3158,7 +3242,7 @@ function buildUsdOficialChart(gastosPesos, usdEquivArr){
   }).join('');
   var usdDots = usdEquivArr.map(function(v,i){
     if(v===null||v===undefined) return '';
-    return '<circle cx="'+xFor(i)+'" cy="'+yForUsd(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'" data-tip="'+escapeHtml(MESES[i]+': '+usd(v)+' equivalentes (dólar oficial)')+'"/>';
+    return '<circle cx="'+xFor(i)+'" cy="'+yForUsd(v)+'" r="3.5" fill="'+CHART_COLORS.dolar+'" data-tip="'+escapeHtml(MESES[i]+': '+usd(v)+' equivalentes (dólar '+usdNombre()+')')+'"/>';
   }).join('');
   var xlabels = MESES.map(function(mes,i){
     return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="11" fill="'+CHART_COLORS.textFaint+'">'+mes.slice(0,3)+'</text>';
@@ -3166,7 +3250,7 @@ function buildUsdOficialChart(gastosPesos, usdEquivArr){
   var legend = '<g transform="translate('+padL+','+(H-8)+')">'+
       '<rect width="10" height="10" fill="'+CHART_COLORS.neg+'" rx="2"/><text x="14" y="9" font-size="11" fill="'+CHART_COLORS.textDim+'">Gasto en pesos</text>'+
     '</g><g transform="translate('+(padL+150)+','+(H-8)+')">'+
-      '<rect width="10" height="10" fill="'+CHART_COLORS.dolar+'" rx="2"/><text x="14" y="9" font-size="11" fill="'+CHART_COLORS.textDim+'">Gasto en USD oficial (eje der.)</text>'+
+      '<rect width="10" height="10" fill="'+CHART_COLORS.dolar+'" rx="2"/><text x="14" y="9" font-size="11" fill="'+CHART_COLORS.textDim+'">Gasto en USD '+usdNombre()+' (eje der.)</text>'+
     '</g>';
   return '<svg viewBox="0 0 '+W+' '+(H+8)+'" style="width:100%;height:auto">'+gridLines+yLabelsL+yLabelsR+
     '<polyline points="'+pesosPts+'" fill="none" stroke="'+CHART_COLORS.neg+'" stroke-width="2"/>'+
@@ -3232,13 +3316,18 @@ function renderGraficos(){
   var months = MESES.map(computeMonth);
   var enUsd = document.getElementById('toggleUsdEquiv').checked;
   var anioActivo = STORE.activeEjercicio;
+  var constOn = constantesOn();
   var valores = dolarValorMensual();
   var valoresConv = dolarValorConCarry(valores);
   // Siempre preferimos el promedio oficial de ese mes (API ArgentinaDatos);
   // solo si todavía no lo tenemos, usamos como respaldo la cotización de
   // compra propia (con arrastre) para no dejar el mes en cero.
   function convUsd(v, i, on){
-    if(!on) return v;
+    if(!on){
+      if(!constOn) return v;
+      var f = ipcFactorMes(anioActivo, i);        // pesos constantes (solo donde no se eligió USD)
+      return (f===null || f===undefined) ? v : v*f;
+    }
     var rate = usdOficialPromedioMes(anioActivo, i);
     if(rate===null || rate===undefined) rate = valoresConv[i];
     return rate ? v/rate : 0;
@@ -3261,16 +3350,17 @@ function renderGraficos(){
       months.map(function(m){return m.totalGastos;}), usdOfEquivArr
     );
     var hasAnyUsdOf = usdOfEquivArr.some(function(v){return v!==null;});
-    if(usdOficialFetchState==='loading'){
-      noteEl.textContent = 'Actualizando cotización histórica del dólar oficial...';
-    } else if(usdOficialFetchState==='error' && !hasAnyUsdOf){
+    var usdSt = usdFetchState();
+    if(usdSt==='loading'){
+      noteEl.textContent = 'Actualizando cotización histórica del dólar '+usdNombre()+'...';
+    } else if(usdSt==='error' && !hasAnyUsdOf){
       noteEl.textContent = 'No se pudo traer la cotización (sin conexión) y todavía no hay datos guardados.';
-    } else if(usdOficialFetchState==='error'){
+    } else if(usdSt==='error'){
       noteEl.textContent = 'No se pudo actualizar recién (sin conexión) — mostrando la última cotización guardada.';
     } else if(!hasAnyUsdOf){
       noteEl.textContent = 'Necesitás conexión a internet al menos una vez para traer la cotización histórica.';
     } else {
-      noteEl.textContent = 'Fuente: promedio mensual del dólar oficial (venta), vía ArgentinaDatos.';
+      noteEl.textContent = 'Fuente: promedio mensual del dólar '+usdNombre()+' (venta), vía ArgentinaDatos.';
     }
   } else {
     fijoVarUsdLabel.style.display = '';
@@ -3314,20 +3404,49 @@ function renderGraficos(){
   renderPresupuestoChart();
   renderAhorroChart();
   var enUsdHeatmap = document.getElementById('toggleUsdHeatmap').checked;
-  var monthsHeatmap = !enUsdHeatmap ? months : months.map(function(m,i){
+  var monthsHeatmap = (!enUsdHeatmap && !constOn) ? months : months.map(function(m,i){
     var fijosPorCat={}, variablesPorCat={};
-    Object.keys(m.fijosPorCat).forEach(function(c){ fijosPorCat[c]=convUsd(m.fijosPorCat[c],i,true); });
-    Object.keys(m.variablesPorCat).forEach(function(c){ variablesPorCat[c]=convUsd(m.variablesPorCat[c],i,true); });
+    Object.keys(m.fijosPorCat).forEach(function(c){ fijosPorCat[c]=convUsd(m.fijosPorCat[c],i,enUsdHeatmap); });
+    Object.keys(m.variablesPorCat).forEach(function(c){ variablesPorCat[c]=convUsd(m.variablesPorCat[c],i,enUsdHeatmap); });
     return Object.assign({}, m, {fijosPorCat:fijosPorCat, variablesPorCat:variablesPorCat});
   });
   document.getElementById('chartHeatmap').innerHTML = buildHeatmapChart(monthsHeatmap, {usd:enUsdHeatmap});
 
-  if(usdOficialFetchState==='idle'){
+  if(usdFetchState()==='idle'){
     fetchUsdOficialHistorico(function(){ renderGraficos(); });
   }
+  if(constOn && _ipcState==='idle'){
+    fetchIpc(function(){ renderGraficos(); });
+  }
+  renderChartPrefsNote(constOn);
 
   renderHormiga();
 }
+
+/* Aviso bajo los controles de moneda (pesos constantes) */
+function renderChartPrefsNote(constOn){
+  var el = document.getElementById('chartPrefsNote'); if(!el) return;
+  if(!constOn){ el.textContent = ''; return; }
+  var t = ipcIndice();
+  if(_ipcState==='loading' && !t) el.textContent = 'Trayendo la inflación mensual...';
+  else if(!t) el.textContent = 'No se pudo traer la inflación (sin conexión) y todavía no hay datos guardados.';
+  else el.textContent = 'Pesos constantes de '+ipcBaseLabel()+', último mes con inflación publicada (vía ArgentinaDatos). Los meses sin dato publicado quedan sin ajustar, y donde elegís USD se usa el dólar sin ajuste por inflación.';
+}
+(function setupMonedaGraficos(){
+  var sel = document.getElementById('usdTipoSel'), tg = document.getElementById('toggleConstantes');
+  if(!sel || !tg) return;
+  sel.value = usdTipoActual(); tg.checked = constantesOn();
+  sel.addEventListener('change', function(){
+    try{ localStorage.setItem(USD_TIPO_KEY, sel.value); }catch(e){}
+    if(usdFetchState()==='error') usdSetFetchState(usdTipoActual(), 'idle');   // reintenta si la última vez falló
+    renderGraficos();
+  });
+  tg.addEventListener('change', function(){
+    try{ localStorage.setItem(CONST_KEY, tg.checked ? '1' : '0'); }catch(e){}
+    if(_ipcState==='error') _ipcState = 'idle';
+    renderGraficos();
+  });
+})();
 
 /* ----- Tarjetas de gráficos colapsables ----- */
 (function setupChartCollapse(){

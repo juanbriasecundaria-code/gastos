@@ -154,6 +154,17 @@
           <p class="view-desc">Panel visual: ingresos vs. gastos, composición y evolución del saldo.</p>
         </div>
       </div>
+      <div class="chart-prefs no-print">
+        <label class="chart-pref" for="usdTipoSel">Dólar de referencia
+          <select id="usdTipoSel">
+            <option value="oficial">Oficial</option>
+            <option value="blue">Blue</option>
+            <option value="bolsa">MEP (bolsa)</option>
+          </select>
+        </label>
+        <label class="chart-toggle"><input type="checkbox" id="toggleConstantes"> Pesos constantes (ajustados por inflación)</label>
+      </div>
+      <div class="usd-oficial-note chart-prefs-note" id="chartPrefsNote" role="status"></div>
       <div class="chart-grid">
         <h2 class="chart-section">Ingresos y gastos</h2>
         <div class="chart-card chart-card-wide">
@@ -169,7 +180,7 @@
             <div class="chart-toggle-group" onclick="event.stopPropagation()">
               <select id="fijoVarChartMode" title="Forma del gráfico">
                 <option value="fijovar">Fijos vs. Variables</option>
-                <option value="usdoficial">Pesos vs. USD oficial</option>
+                <option value="usdoficial">Pesos vs. USD (dólar elegido)</option>
               </select>
               <label class="chart-toggle" id="fijoVarUsdLabel"><input type="checkbox" id="toggleUsdFijoVar"> Ver en USD equivalente</label>
             </div>

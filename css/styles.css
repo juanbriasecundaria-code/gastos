@@ -615,6 +615,12 @@ main{
 }
 .chart-toggle-group select:focus{outline:none;border-color:var(--dolar);}
 .usd-oficial-note{font-size:12px;color:var(--text-faint);margin-top:10px;}
+.chart-prefs{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap;margin:0 0 6px;}
+.chart-pref{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);}
+.chart-pref select{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:6px 8px;min-height:32px;cursor:pointer;}
+.chart-pref select:focus-visible{outline:2px solid var(--dolar);outline-offset:2px;}
+.chart-prefs-note{margin:0 0 14px;min-height:0;}
+.chart-prefs-note:empty{display:none;}
 
 /* Presupuesto vs. Real */
 .pchart-row{padding:9px 0;border-bottom:1px solid var(--line-soft);}
