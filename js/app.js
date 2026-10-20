@@ -205,6 +205,18 @@ function normalizeExercise(data){
   if(!data.deletedBaseCategorias.Variable) data.deletedBaseCategorias.Variable = [];
   if(!data.presupuestos) data.presupuestos = {};
   sanitizeEntryIds(data);
+  data.gastos.forEach(function(g){            // etiquetas libres: lista de textos cortos, máx. 8 por gasto
+    if(g.etiquetas===undefined) return;
+    var seen = {}, out = [];
+    (Array.isArray(g.etiquetas) ? g.etiquetas : []).forEach(function(t){
+      if(typeof t !== 'string') return;
+      t = t.replace(/\s+/g,' ').trim().slice(0,24);
+      var k = t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(!t || seen[k] || out.length>=8) return;
+      seen[k] = 1; out.push(t);
+    });
+    if(out.length) g.etiquetas = out; else delete g.etiquetas;
+  });
   return data;
 }
 
@@ -1376,6 +1388,58 @@ function renderIngresos(){
   container.innerHTML = any ? html : (DATA.ingresos.length ? '<div class="empty-state">No hay ingresos que coincidan con el filtro.</div>' : '<div class="empty-state">Todavía no cargaste ingresos.<button type="button" class="btn btn-accent-ingreso empty-cta" data-focus="ingMonto">Cargar mi primer ingreso</button></div>');
 }
 
+/* ===================== ETIQUETAS LIBRES =====================
+   g.etiquetas = ['vacaciones','regalo'] (opcional). Se comparan sin distinguir mayúsculas ni tildes,
+   y al escribir una que ya existe se reutiliza su forma original (así "Vacaciones" y "vacaciones" son una sola). */
+function tagKey(t){ return normalizeSearchText(t); }
+function allTagsIndex(){   // etiquetas de todos los ejercicios: {clave:{nombre, n}}
+  var idx = {};
+  Object.keys(STORE.ejercicios||{}).forEach(function(y){
+    ((STORE.ejercicios[y]||{}).gastos||[]).forEach(function(g){
+      (g.etiquetas||[]).forEach(function(t){ var k = tagKey(t); if(!idx[k]) idx[k] = {nombre:t, n:0}; idx[k].n++; });
+    });
+  });
+  return idx;
+}
+function parseTags(str){
+  var idx = allTagsIndex(), seen = {}, out = [];
+  String(str||'').split(/[,;\n]/).forEach(function(t){
+    t = t.replace(/^[#\s]+/,'').replace(/\s+/g,' ').trim().slice(0,24);
+    if(!t) return;
+    var k = tagKey(t); if(seen[k] || out.length>=8) return;
+    seen[k] = 1; out.push(idx[k] ? idx[k].nombre : t);
+  });
+  return out;
+}
+function setTags(g, tags){ if(tags && tags.length) g.etiquetas = tags.slice(); else delete g.etiquetas; }
+function gastoTieneTag(g, key){ return (g.etiquetas||[]).some(function(t){ return tagKey(t)===key; }); }
+function tagChipsHtml(g){
+  if(!g.etiquetas || !g.etiquetas.length) return '';
+  return '<span class="tag-chips">'+g.etiquetas.map(function(t){
+    return '<button type="button" class="tag-chip" data-tag="'+escapeHtml(tagKey(t))+'" title="Ver solo gastos con esta etiqueta">#'+escapeHtml(t)+'</button>';
+  }).join('')+'</span>';
+}
+// Etiquetas más usadas como atajos bajo el campo del formulario (las que ya están escritas no se repiten)
+function renderTagSug(){
+  var box = document.getElementById('gasEtiquetasSug'), inp = document.getElementById('gasEtiquetas'); if(!box || !inp) return;
+  var ya = {}; parseTags(inp.value).forEach(function(t){ ya[tagKey(t)] = 1; });
+  var arr = Object.keys(allTagsIndex()).map(function(k){ var o = allTagsIndex()[k]; return {k:k, nombre:o.nombre, n:o.n}; })
+    .filter(function(o){ return !ya[o.k]; })
+    .sort(function(a,b){ return b.n-a.n || a.nombre.localeCompare(b.nombre); }).slice(0,8);
+  box.innerHTML = arr.map(function(o){ return '<button type="button" class="tag-chip tag-sug-btn" data-sug="'+escapeHtml(o.nombre)+'" aria-label="Agregar la etiqueta '+escapeHtml(o.nombre)+'">+ '+escapeHtml(o.nombre)+'</button>'; }).join('');
+}
+(function(){
+  var inp = document.getElementById('gasEtiquetas'), box = document.getElementById('gasEtiquetasSug');
+  if(!inp || !box) return;
+  inp.addEventListener('input', renderTagSug);
+  box.addEventListener('click', function(e){
+    var b = e.target.closest('[data-sug]'); if(!b) return;
+    var cur = inp.value.replace(/[,;\s]+$/,'');
+    inp.value = (cur ? cur+', ' : '') + b.getAttribute('data-sug');
+    renderTagSug(); inp.focus();
+  });
+})();
+
 function renderGastos(){
   var container = document.getElementById('listGastos');
   var filtMes = document.getElementById('filtMes').value;
@@ -1387,7 +1451,7 @@ function renderGastos(){
     if(filtTipo && g.tipo!==filtTipo) return false;
     if(!gastoPasaFiltrosExtra(g)) return false;
     if(filtBusq){
-      var hay = (g.cat+' '+(g.desc||'')).toLowerCase();
+      var hay = (g.cat+' '+(g.desc||'')+' '+(g.etiquetas||[]).join(' ')).toLowerCase();
       if(hay.indexOf(filtBusq)===-1) return false;
     }
     return true;
@@ -1410,7 +1474,7 @@ function renderGastos(){
       var subLine = [it.fecha?formatFechaCorta(it.fecha):null, it.desc?escapeHtml(it.desc):null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
       var cuotaBadge = it.cuotaGrupoId ? '<span class="cuota-badge" title="Cuota '+it.cuotaNum+' de '+it.cuotaTotal+' — compra total '+money(it.cuotaMontoTotal)+'">Cuota '+it.cuotaNum+'/'+it.cuotaTotal+'</span>' : '';
       var recurBadge = (it.recurrente && !it.cuotaGrupoId) ? '<span class="recur-badge" title="Gasto recurrente"><svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>' : '';
-      html += '<div class="entry-row has-dup'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+cuotaBadge+recurBadge+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-dup" data-dup="'+escapeHtml(it.id)+'" title="Duplicar" aria-label="Duplicar">'+ICON_DUP+'</button><button class="entry-edit" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
+      html += '<div class="entry-row has-dup'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+cuotaBadge+recurBadge+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+tagChipsHtml(it)+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-dup" data-dup="'+escapeHtml(it.id)+'" title="Duplicar" aria-label="Duplicar">'+ICON_DUP+'</button><button class="entry-edit" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
     });
     html += '</div></div>';
   });
@@ -1593,7 +1657,7 @@ function resetFormDefaults(kind){
   var idx = new Date().getMonth();
   document.getElementById(cfg.mesId).value = MESES[idx] || 'Enero';
   if(kind==='gastos'){
-    fillCatSelect(false); updateDescDatalist();
+    fillCatSelect(false); updateDescDatalist(); renderTagSug();
     var ro = document.getElementById('gasRepeatOptions');
     var rd = document.getElementById('gasRepeatDias');
     if(ro) ro.style.display = 'none';
@@ -1629,6 +1693,7 @@ function populateFormForEdit(kind, item){
     updateDelCatButton();
     updateDescDatalist();
     document.getElementById('gasDesc').value = item.desc||'';
+    document.getElementById('gasEtiquetas').value = (item.etiquetas||[]).join(', '); renderTagSug();
     setMoneyInputValue(document.getElementById('gasMonto'), item.monto);
     hideMoneyPreview('gasMontoPreview');
   } else if(kind==='dolar'){
@@ -1765,6 +1830,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
   var gasFechaVal = fd.get('fecha') || '';
   var _antes = new Set(DATA.gastos.map(function(x){return x.id;}));
   var _editado = editingId.gastos;
+  var _tags = parseTags(fd.get('etiquetas'));
   if(editingId.gastos){
     var item = DATA.gastos.filter(function(x){return x.id===editingId.gastos;})[0];
     if(item){
@@ -1778,8 +1844,8 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
         if(!_alc) return;
       }
       var _montoFinal = (_esCuotaItem && _alc==='alt') ? item.monto : monto; // en cuotas, "y las siguientes" no toca el monto
-      item.mes=fd.get('mes'); item.fecha=gasFechaVal; item.tipo=fd.get('tipo'); item.cat=cat; item.desc=fd.get('desc')||''; item.monto=_montoFinal; item.autor=currentAutor();
-      if(_alc==='alt') _sig.forEach(function(g){ g.tipo=item.tipo; g.cat=cat; g.desc=item.desc; if(!_esCuotaItem) g.monto=monto; g.autor=currentAutor(); });
+      item.mes=fd.get('mes'); item.fecha=gasFechaVal; item.tipo=fd.get('tipo'); item.cat=cat; item.desc=fd.get('desc')||''; item.monto=_montoFinal; item.autor=currentAutor(); setTags(item,_tags);
+      if(_alc==='alt') _sig.forEach(function(g){ g.tipo=item.tipo; g.cat=cat; g.desc=item.desc; if(!_esCuotaItem) g.monto=monto; g.autor=currentAutor(); setTags(g,_tags); });
     }
     editingId.gastos = null;
     setFormEditMode('gastos', false);
@@ -1863,11 +1929,13 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
       toast('Gasto agregado');
     }
   }
+  if(!_editado && _tags.length) DATA.gastos.forEach(function(g){ if(!_antes.has(g.id)) g.etiquetas = _tags.slice(); });
   saveData(); updateDescDatalist(); renderAll();
   flashEntry('gastos', _antes, _editado, fd.get('mes'));
   try{ budgetAlert(fd.get('tipo'), cat, fd.get('mes')); }catch(_e){}
   if(window.innerWidth<=860 && window.setGasFormOpen) window.setGasFormOpen(false);
   document.getElementById('gasDesc').value='';
+  document.getElementById('gasEtiquetas').value=''; renderTagSug();
   document.getElementById('gasMonto').value='';
   document.getElementById('gasFecha').value='';
   document.getElementById('gasRepeat').checked = false;
@@ -2953,6 +3021,42 @@ function renderPresupuestoChart(){
   document.getElementById('chartPresupuesto').innerHTML = buildPresupuestoChart(sel.value || MESES[0]);
 }
 
+/* ----- Gastos por etiqueta (corte transversal a las categorías) ----- */
+function renderEtiquetasChart(){
+  var host = document.getElementById('chartEtiquetas'), sel = document.getElementById('etiquetasChartMes');
+  if(!host || !sel) return;
+  if(!sel.options.length){
+    sel.innerHTML = '<option value="">Todo el año</option>'+MESES.map(function(m){ return '<option>'+m+'</option>'; }).join('');
+  }
+  var mes = sel.value, anio = STORE.activeEjercicio, conConst = constantesOn(), porTag = {}, sinTag = {total:0, n:0};
+  DATA.gastos.forEach(function(g){
+    if(mes && g.mes!==mes) return;
+    var m = +g.monto || 0;
+    if(conConst){ var f = ipcFactorMes(anio, MESES.indexOf(g.mes)); if(f) m = m*f; }
+    if(!g.etiquetas || !g.etiquetas.length){ sinTag.total += m; sinTag.n++; return; }
+    g.etiquetas.forEach(function(t){
+      var k = tagKey(t), o = porTag[k] || (porTag[k] = {nombre:t, total:0, n:0});
+      o.total += m; o.n++;
+    });
+  });
+  var rows = Object.keys(porTag).map(function(k){ return porTag[k]; }).sort(function(a,b){ return b.total-a.total; });
+  if(!rows.length){
+    host.innerHTML = '<div class="empty-state">Todavía no etiquetaste ningún gasto'+(mes?' en '+mes:'')+'. Agregá etiquetas desde el formulario de Gastos (ej.: vacaciones, regalo).</div>';
+    return;
+  }
+  var max = Math.max.apply(null, rows.map(function(r){ return r.total; }).concat([1]));
+  host.innerHTML = rows.map(function(r){
+    var w = Math.max(2, Math.round(Math.abs(r.total)/max*100));
+    var tip = '#'+r.nombre+': '+money(r.total)+' en '+r.n+' gasto(s)';
+    return '<div class="pchart-row"><div class="pchart-top"><span class="pchart-cat">#'+escapeHtml(r.nombre)+' <span style="opacity:.55;font-size:12px;">('+r.n+')</span></span>'+
+      '<span class="pchart-vals">'+money(r.total)+'</span></div>'+
+      '<div class="pchart-track" data-tip="'+escapeHtml(tip)+'"><div class="pchart-fill" style="width:'+w+'%;background:'+CHART_COLORS.variable+';"></div></div></div>';
+  }).join('') +
+  '<div class="reco-note">Un gasto con varias etiquetas suma en cada una, por eso los totales pueden superar el gasto real.'+
+  (sinTag.n ? ' Sin etiqueta: '+money(sinTag.total)+' en '+sinTag.n+' gasto(s).' : '')+(conConst ? ' Valores en pesos constantes.' : '')+'</div>';
+}
+document.getElementById('etiquetasChartMes').addEventListener('change', renderEtiquetasChart);
+
 /* ----- Tasa de ahorro mensual ----- */
 function buildSavingsRateChart(months, metaPct){
   var data = months.map(function(m){
@@ -3402,6 +3506,7 @@ function renderGraficos(){
 
 
   renderPresupuestoChart();
+  try{ renderEtiquetasChart(); }catch(_e){}
   renderAhorroChart();
   var enUsdHeatmap = document.getElementById('toggleUsdHeatmap').checked;
   var monthsHeatmap = (!enUsdHeatmap && !constOn) ? months : months.map(function(m,i){
@@ -3810,12 +3915,22 @@ function syncMesFromFecha(form){
 document.addEventListener('submit',function(e){
   if(e.target&&(e.target.id==='formIngreso'||e.target.id==='formGasto')) syncMesFromFecha(e.target);
 },true);
+/* Clic en una etiqueta del listado: filtra por ella (otro clic en la misma la quita) */
+document.getElementById('listGastos').addEventListener('click',function(e){
+  var c=e.target.closest('.tag-chip[data-tag]'); if(!c) return;
+  var se=document.getElementById('filtEtiqueta'); if(!se) return;
+  var k=c.getAttribute('data-tag');
+  se.value = (se.value===k) ? '' : k;
+  se.dispatchEvent(new Event('change',{bubbles:true}));
+  toast(se.value ? 'Mostrando solo #'+c.textContent.replace(/^#/,'') : 'Filtro de etiqueta quitado');
+});
 /* Duplicar gasto */
 document.getElementById('listGastos').addEventListener('click',function(e){
   var b=e.target.closest('[data-dup]'); if(!b) return;
   if(esSoloLectura()){ toast('Estás en modo solo lectura.'); return; }
   var it=DATA.gastos.filter(function(x){return x.id===b.getAttribute('data-dup');})[0]; if(!it) return;
-  DATA.gastos.push({id:uid('gas'),mes:it.mes,fecha:it.fecha||'',tipo:it.tipo,cat:it.cat,desc:it.desc||'',monto:it.monto,autor:currentAutor()});
+  var _dup={id:uid('gas'),mes:it.mes,fecha:it.fecha||'',tipo:it.tipo,cat:it.cat,desc:it.desc||'',monto:it.monto,autor:currentAutor()};
+  setTags(_dup,it.etiquetas); DATA.gastos.push(_dup);
   saveData(); renderAll(); toast('Gasto duplicado');
 });
 /* Carga rápida: botón flotante + */
@@ -3892,6 +4007,7 @@ function montoComprometidoCuotas(){
 function gastoPasaFiltrosExtra(g){
   var cat=document.getElementById('filtCat').value, d=document.getElementById('filtDesde').value, h=document.getElementById('filtHasta').value;
   if(cat && g.cat!==cat) return false;
+  var et=document.getElementById('filtEtiqueta').value; if(et && !gastoTieneTag(g,et)) return false;
   if(d||h){ if(!g.fecha) return false; if(d && g.fecha<d) return false; if(h && g.fecha>h) return false; }
   return true;
 }
@@ -3912,12 +4028,21 @@ function fillFiltCat(){
   var cats=Object.keys(set).sort(function(a,b){return a.localeCompare(b);});
   sel.innerHTML='<option value="">Todas las categorías</option>'+cats.map(function(c){return '<option>'+escapeHtml(c)+'</option>';}).join('');
   sel.value=cats.indexOf(prev)!==-1?prev:'';
+  var se=document.getElementById('filtEtiqueta');
+  if(se){
+    var prevE=se.value, cnt={}, nom={};
+    DATA.gastos.forEach(function(g){ (g.etiquetas||[]).forEach(function(t){ var k=tagKey(t); cnt[k]=(cnt[k]||0)+1; if(!nom[k]) nom[k]=t; }); });
+    var ks=Object.keys(cnt).sort(function(a,b){ return cnt[b]-cnt[a] || nom[a].localeCompare(nom[b]); });
+    se.innerHTML='<option value="">Todas las etiquetas</option>'+ks.map(function(k){ return '<option value="'+escapeHtml(k)+'">#'+escapeHtml(nom[k])+' ('+cnt[k]+')</option>'; }).join('');
+    se.value=cnt[prevE]?prevE:'';
+    se.style.display=ks.length?'':'none';   // sin etiquetas todavía: el filtro no estorba
+  }
 }
 var _renderGastosBase=renderGastos;
 renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
 /* Filtros que se recuerdan al cambiar de pestaña y al recargar */
 (function(){
-  var ids=['filtIngMes','filtIngTipo','filtMes','filtTipo','filtBusqueda','filtCat','filtDesde','filtHasta','filtOrden','filtUsdMes'], KEY='lg_filtros_v1', mem={};
+  var ids=['filtIngMes','filtIngTipo','filtMes','filtTipo','filtBusqueda','filtCat','filtEtiqueta','filtDesde','filtHasta','filtOrden','filtUsdMes'], KEY='lg_filtros_v1', mem={};
   function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(_e){ return mem; } }
   function save(){
     var o={}; ids.forEach(function(id){ var el=document.getElementById(id); if(el) o[id]=el.value; });
@@ -3926,7 +4051,7 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
   ids.forEach(function(id){
     var el=document.getElementById(id); if(!el) return;
     el.addEventListener('change',save); el.addEventListener('input',save);
-    if(id==='filtCat'||id==='filtDesde'||id==='filtHasta'||id==='filtOrden') el.addEventListener('change',function(){ renderGastos(); });
+    if(id==='filtCat'||id==='filtEtiqueta'||id==='filtDesde'||id==='filtHasta'||id==='filtOrden') el.addEventListener('change',function(){ renderGastos(); });
   });
   var o=load(); fillFiltCat();
   ids.forEach(function(id){ var el=document.getElementById(id); if(el && o[id]!==undefined) el.value=o[id]; });

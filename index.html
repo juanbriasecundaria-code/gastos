@@ -203,6 +203,15 @@
           </div>
           <div class="chart-card-body"><div id="chartPresupuesto"></div></div>
         </div>
+        <div class="chart-card collapsed">
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Gastos por etiqueta</h3>
+            <div class="hormiga-controls" onclick="event.stopPropagation()">
+              <select id="etiquetasChartMes" aria-label="Período"></select>
+            </div>
+          </div>
+          <div class="chart-card-body"><div id="chartEtiquetas"></div></div>
+        </div>
         <div class="chart-card collapsed chart-card-wide">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Mapa de calor: gasto por categoría y mes</h3>
@@ -319,6 +328,11 @@
             <input type="text" name="desc" id="gasDesc" placeholder="Opcional" autocomplete="off">
             <div id="gasDescSuggest" class="suggest-list"></div>
           </div>
+          <div class="field">
+            <label for="gasEtiquetas">Etiquetas (opcional)</label>
+            <input type="text" name="etiquetas" id="gasEtiquetas" placeholder="Ej.: vacaciones, regalo" autocomplete="off" maxlength="200">
+            <div id="gasEtiquetasSug" class="tag-sug"></div>
+          </div>
           <div class="field"><label id="gasMontoLabel">Monto</label><input type="text" inputmode="decimal" name="monto" id="gasMonto" class="money-input" placeholder="0, o 1500+2300+800" required><div class="money-preview" id="gasMontoPreview"></div></div>
           <details class="field-more" id="gasMore">
             <summary>Más opciones: fecha y repetición</summary>
@@ -360,8 +374,9 @@
           <option value="Fijo">Fijo</option>
           <option value="Variable">Variable</option>
         </select>
-        <input type="text" id="filtBusqueda" placeholder="Buscar categoría o descripción…">
+        <input type="text" id="filtBusqueda" placeholder="Buscar categoría, descripción o etiqueta…">
         <select id="filtCat" aria-label="Categoría"><option value="">Todas las categorías</option></select>
+        <select id="filtEtiqueta" aria-label="Etiqueta" style="display:none;"><option value="">Todas las etiquetas</option></select>
         <input type="date" id="filtDesde" aria-label="Desde" title="Desde">
         <input type="date" id="filtHasta" aria-label="Hasta" title="Hasta">
         <select id="filtOrden" aria-label="Orden"><option value="">Orden: como se cargó</option><option value="fecha">Más reciente primero</option><option value="mayor">Mayor monto primero</option><option value="menor">Menor monto primero</option></select>
