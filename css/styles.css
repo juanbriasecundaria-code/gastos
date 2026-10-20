@@ -1138,6 +1138,12 @@ details.data-menu{display:block;}
   min-height:40px;justify-content:flex-start;
 }
 .data-summary::-webkit-details-marker{display:none;}
+.data-summary.backup-due::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--fijo);flex:none;margin-left:8px;}
+.backup-status{display:flex;flex-direction:column;gap:4px;margin:6px 0 2px;}
+.backup-status .reco-note{margin:0;}
+.backup-days-label{font-size:12px;color:var(--text-dim);}
+.backup-status select{font:inherit;font-size:13px;min-height:40px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--text);}
+.backup-status select:focus-visible{outline:2px solid var(--dolar);outline-offset:2px;}
 .data-summary .chev{margin-left:auto;transition:transform .2s;}
 details.data-menu[open] .data-summary .chev{transform:rotate(180deg);}
 .data-menu-body{display:flex;flex-direction:column;gap:6px;margin-top:8px;}

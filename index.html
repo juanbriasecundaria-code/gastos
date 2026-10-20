@@ -90,6 +90,17 @@
           <button class="ghost-btn" id="btnImport"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Importar backup</button>
           <input type="file" id="fileImport" accept="application/json" style="display:none;">
           <button class="ghost-btn" id="btnRecoverSnapshot" style="display:none;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Recuperar copia automática</button>
+          <div class="backup-status">
+            <div class="reco-note" id="backupStatus" role="status"></div>
+            <label for="backupDays" class="backup-days-label">Avisar si pasan más de</label>
+            <select id="backupDays">
+              <option value="7">7 días</option>
+              <option value="15">15 días</option>
+              <option value="30">30 días</option>
+              <option value="60">60 días</option>
+              <option value="0">No avisar</option>
+            </select>
+          </div>
           <div class="data-danger-zone">
             <span class="data-danger-label">Zona delicada</span>
             <button class="ghost-btn danger-btn" id="btnReset"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Restaurar datos originales</button>

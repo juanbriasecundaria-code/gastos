@@ -543,7 +543,7 @@ function downloadBackupFile(){
   a.href = url; a.download = 'gastos-backup-'+(new Date().toISOString().slice(0,10))+'.json';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  markBackupDone();
+  markBackupDone(true);
 }
 
 /* ===================== AVISO DE RESPALDO ===================== */
@@ -551,10 +551,54 @@ function downloadBackupFile(){
 // si pasaron más de BACKUP_MAX_DAYS días, avisa una vez por día al abrir la app.
 var BACKUP_KEY = 'libroGastos_lastBackup';
 var BACKUP_REMIND_KEY = 'libroGastos_backupRemindedOn';
+var BACKUP_DAYS_KEY = 'libroGastos_backupDays';   // cada cuántos días avisar (0 = no avisar)
+var BACKUP_REAL_KEY = 'libroGastos_lastBackupReal'; // última descarga real (BACKUP_KEY también se siembra al primer uso)
 var BACKUP_MAX_DAYS = 30;
-function markBackupDone(){
-  try{ localStorage.setItem(BACKUP_KEY, String(Date.now())); }catch(e){}
+function getBackupDays(){
+  try{
+    var v = localStorage.getItem(BACKUP_DAYS_KEY);
+    if(v===null) return BACKUP_MAX_DAYS;
+    var n = parseInt(v,10);
+    return (n===0 || (n>0 && n<=365)) ? n : BACKUP_MAX_DAYS;
+  }catch(e){ return BACKUP_MAX_DAYS; }
 }
+function markBackupDone(real){
+  try{
+    localStorage.setItem(BACKUP_KEY, String(Date.now()));
+    if(real) localStorage.setItem(BACKUP_REAL_KEY, String(Date.now()));
+  }catch(e){}
+  renderBackupStatus();
+}
+// Muestra en el menú «Datos» cuándo fue el último backup y marca el menú con un punto si ya toca respaldar.
+function renderBackupStatus(){
+  var st = document.getElementById('backupStatus'), sum = document.querySelector('.data-summary'), sel = document.getElementById('backupDays');
+  if(!st) return;
+  try{
+    var real = parseInt(localStorage.getItem(BACKUP_REAL_KEY),10), last = parseInt(localStorage.getItem(BACKUP_KEY),10);
+    var max = getBackupDays();
+    if(sel) sel.value = String(max);
+    if(real){
+      var d = Math.floor((Date.now()-real)/86400000);
+      st.textContent = d<=0 ? 'Último backup: hoy' : (d===1 ? 'Último backup: ayer' : 'Último backup: hace '+d+' días');
+    } else {
+      st.textContent = 'Todavía no descargaste un backup desde este dispositivo';
+    }
+    var dias = last ? Math.floor((Date.now()-last)/86400000) : 0;
+    var due = max>0 && dias>=max && storeHasData();
+    if(sum){
+      sum.classList.toggle('backup-due', due);
+      if(due) sum.setAttribute('title','Hace '+dias+' días que no descargás un backup'); else sum.removeAttribute('title');
+    }
+  }catch(e){}
+}
+(function(){
+  var sel = document.getElementById('backupDays'); if(!sel) return;
+  sel.addEventListener('change', function(){
+    try{ localStorage.setItem(BACKUP_DAYS_KEY, sel.value); localStorage.removeItem(BACKUP_REMIND_KEY); }catch(e){}
+    renderBackupStatus();
+    toast(sel.value==='0' ? 'No se avisará por backups' : 'Te avisaré si pasan más de '+sel.value+' días sin backup');
+  });
+})();
 function storeHasData(){
   try{
     var ej = STORE.ejercicios || {};
@@ -570,8 +614,11 @@ function checkBackupReminder(){
   try{
     var last = parseInt(localStorage.getItem(BACKUP_KEY), 10);
     if(!last){ markBackupDone(); return; }   // primer uso con esta función: se empieza a contar desde hoy
+    renderBackupStatus();
+    var maxDias = getBackupDays();
+    if(maxDias===0) return;                  // el usuario eligió no recibir avisos
     var days = Math.floor((Date.now() - last) / 86400000);
-    if(days < BACKUP_MAX_DAYS) return;
+    if(days < maxDias) return;
     var hoy = new Date().toISOString().slice(0,10);
     if(localStorage.getItem(BACKUP_REMIND_KEY) === hoy) return;   // ya se avisó hoy
     setTimeout(function(){
