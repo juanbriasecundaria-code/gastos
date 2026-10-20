@@ -2216,6 +2216,7 @@ function recoPendientes(hoy){
   hoy = hoy || new Date();
   var h0 = new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()), out = [];
   getRecordatorios().forEach(function(r){
+    if(r.activo===false) return;                               // pausado por el usuario
     for(var k=0;k<2;k++){
       var d0 = new Date(h0.getFullYear(),h0.getMonth()+k,1), y = d0.getFullYear(), m = d0.getMonth();
       var due = recoDueDate(y,m,r.dia), left = Math.round((due-h0)/86400000);
@@ -2268,7 +2269,7 @@ function recoGuardarSnapshot(){
   clearTimeout(_recoSnapTimer);
   _recoSnapTimer = setTimeout(function(){
     var hoy = new Date();
-    var items = getRecordatorios().map(function(r){
+    var items = getRecordatorios().filter(function(r){ return r.activo!==false; }).map(function(r){
       var paid = {};
       for(var k=0;k<3;k++){
         var d0 = new Date(hoy.getFullYear(),hoy.getMonth()+k,1);
@@ -2351,13 +2352,25 @@ function renderRecoModal(){
   var rs = getRecordatorios().slice().sort(function(a,b){ return (+a.dia)-(+b.dia); });
   document.getElementById('recoList').innerHTML = rs.length ? rs.map(function(r){
     var pag = recoPagado(r, hoy.getFullYear(), hoy.getMonth());
-    var det = 'día '+r.dia+' · avisa '+(+r.antes||0)+' día(s) antes'+(r.cat ? ' · '+r.tipo+' › '+r.cat : '')+(pag ? ' · ✓ pagado este mes' : '');
-    return '<div class="presu-row"><span class="presu-name" title="'+escapeHtml(r.nombre+' — '+det)+'"><strong>'+escapeHtml(r.nombre)+'</strong> — '+escapeHtml(det)+'</span>'+
-      '<button type="button" class="ghost-btn reco-del" data-id="'+escapeHtml(r.id)+'" aria-label="Eliminar recordatorio" title="Eliminar recordatorio">✕</button></div>';
+    var pausado = r.activo===false;
+    var det = 'día '+r.dia+' · avisa '+(+r.antes||0)+' día(s) antes'+(r.cat ? ' · '+r.tipo+' › '+r.cat : '')+(pausado ? ' · en pausa' : (pag ? ' · ✓ pagado este mes' : ''));
+    var id = escapeHtml(r.id);
+    return '<div class="presu-row"'+(pausado ? ' style="opacity:.6;"' : '')+'><span class="presu-name" title="'+escapeHtml(r.nombre+' — '+det)+'"><strong>'+escapeHtml(r.nombre)+'</strong> — '+escapeHtml(det)+'</span>'+
+      '<button type="button" class="ghost-btn reco-edit" data-id="'+id+'" aria-label="Editar recordatorio '+escapeHtml(r.nombre)+'">Editar</button>'+
+      '<button type="button" class="ghost-btn reco-toggle" data-id="'+id+'" aria-pressed="'+(pausado?'true':'false')+'" aria-label="'+(pausado?'Reactivar':'Pausar')+' recordatorio '+escapeHtml(r.nombre)+'">'+(pausado?'Activar':'Pausar')+'</button>'+
+      '<button type="button" class="ghost-btn reco-del" data-id="'+id+'" aria-label="Eliminar recordatorio '+escapeHtml(r.nombre)+'" title="Eliminar recordatorio">✕</button></div>';
   }).join('') : '<div class="empty-state">Todavía no hay recordatorios.</div>';
 }
-function openRecoModal(){ renderRecoModal(); recoOverlay.classList.add('open'); }
-function closeRecoModal(){ recoOverlay.classList.remove('open'); }
+var recoEditId = null;
+function recoResetForm(){
+  recoEditId = null;
+  ['recoNombre','recoDia','recoTexto'].forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('recoGasto').value = ''; document.getElementById('recoAntes').value = '3';
+  document.getElementById('recoAdd').textContent = 'Agregar recordatorio';
+  var c = document.getElementById('recoCancelEdit'); if(c) c.style.display = 'none';
+}
+function openRecoModal(){ recoResetForm(); renderRecoModal(); recoOverlay.classList.add('open'); }
+function closeRecoModal(){ recoOverlay.classList.remove('open'); recoResetForm(); }
 document.getElementById('btnReco').addEventListener('click', openRecoModal);
 document.getElementById('recoClose').addEventListener('click', closeRecoModal);
 recoOverlay.addEventListener('click', function(e){ if(e.target===recoOverlay) closeRecoModal(); });
@@ -2375,15 +2388,43 @@ document.getElementById('recoAdd').addEventListener('click', function(){
   if(!nombre){ toast('Escribí un nombre para el recordatorio.'); return; }
   if(!(dia>=1 && dia<=31)){ toast('El día del mes tiene que estar entre 1 y 31.'); return; }
   if(isNaN(antes) || antes<0 || antes>14) antes = 3;
-  getRecordatorios().push({id:uid('rec'), nombre:nombre, tipo:g[0]||'', cat:g[1]||'', texto:document.getElementById('recoTexto').value.trim(), dia:dia, antes:antes, pagados:{}});
+  var texto = document.getElementById('recoTexto').value.trim();
+  var editando = recoEditId ? getRecordatorios().filter(function(x){ return x.id===recoEditId; })[0] : null;
+  if(editando){
+    editando.nombre = nombre; editando.tipo = g[0]||''; editando.cat = g[1]||''; editando.texto = texto; editando.dia = dia; editando.antes = antes;
+  } else {
+    getRecordatorios().push({id:uid('rec'), nombre:nombre, tipo:g[0]||'', cat:g[1]||'', texto:texto, dia:dia, antes:antes, pagados:{}});
+  }
   saveData();
-  ['recoNombre','recoDia','recoTexto'].forEach(function(id){ document.getElementById(id).value = ''; });
-  document.getElementById('recoGasto').value = ''; document.getElementById('recoAntes').value = '3';
-  renderRecoModal(); renderRecoBanner(); toast('Recordatorio agregado');
+  recoResetForm();
+  renderRecoModal(); renderRecoBanner(); toast(editando ? 'Recordatorio actualizado' : 'Recordatorio agregado');
 });
+document.getElementById('recoCancelEdit').addEventListener('click', recoResetForm);
 document.getElementById('recoList').addEventListener('click', function(e){
+  var be = e.target.closest('.reco-edit'), bt = e.target.closest('.reco-toggle');
+  if(be || bt){
+    var rid = (be||bt).getAttribute('data-id');
+    var r = getRecordatorios().filter(function(x){ return x.id===rid; })[0]; if(!r) return;
+    if(bt){
+      if(esSoloLectura()){ toast('Estás en modo solo lectura.'); return; }
+      r.activo = (r.activo===false); saveData(); renderRecoModal(); renderRecoBanner();
+      toast(r.activo===false ? '«'+r.nombre+'» en pausa' : '«'+r.nombre+'» reactivado');
+      return;
+    }
+    recoEditId = r.id;
+    document.getElementById('recoNombre').value = r.nombre;
+    document.getElementById('recoGasto').value = r.cat ? r.tipo+'|'+r.cat : '';
+    document.getElementById('recoDia').value = r.dia;
+    document.getElementById('recoAntes').value = (+r.antes||0);
+    document.getElementById('recoTexto').value = r.texto||'';
+    document.getElementById('recoAdd').textContent = 'Guardar cambios';
+    var c = document.getElementById('recoCancelEdit'); if(c) c.style.display = '';
+    document.getElementById('recoNombre').focus();
+    return;
+  }
   var b = e.target.closest('.reco-del'); if(!b) return;
   if(esSoloLectura()){ toast('Estás en modo solo lectura.'); return; }
+  if(recoEditId===b.getAttribute('data-id')) recoResetForm();
   STORE.recordatorios = getRecordatorios().filter(function(r){ return r.id!==b.getAttribute('data-id'); });
   saveData(); renderRecoModal(); renderRecoBanner(); toast('Recordatorio eliminado');
 });
