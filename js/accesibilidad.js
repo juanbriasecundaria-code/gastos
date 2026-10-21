@@ -7,7 +7,7 @@
   document.addEventListener('focusin',function(e){
     if(!e.target.closest || !e.target.closest('.account-overlay.open,.search-overlay.open')) lastOutside=e.target;
   },true);
-  [['presupuestosOverlay','Presupuestos'],['accountOverlay','Cuenta'],['shareOverlay','Compartir'],['searchOverlay','Búsqueda']].forEach(function(sp){
+  [['presupuestosOverlay','Presupuestos'],['reglasOverlay','Reglas'],['recoOverlay','Recordatorios'],['accountOverlay','Cuenta'],['shareOverlay','Compartir'],['searchOverlay','Búsqueda']].forEach(function(sp){
     var ov=document.getElementById(sp[0]); if(!ov) return;
     var box=ov.querySelector('.account-box,.search-box')||ov.firstElementChild||ov;
     box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true'); box.setAttribute('tabindex','-1');
@@ -30,6 +30,76 @@
       var a=f[0], z=f[f.length-1], cur=document.activeElement;
       if(e.shiftKey && (cur===a || !box.contains(cur) || cur===box)){ e.preventDefault(); z.focus(); }
       else if(!e.shiftKey && cur===z){ e.preventDefault(); a.focus(); }
+    });
+  });
+
+  /* 1b) Modales creados desde JS (confirmar, pedir texto, gasto rápido, importar extracto…): nombre accesible,
+         foco inicial y foco atrapado. Los que ya manejan su propio Tab no se pisan (e.defaultPrevented). */
+  var dlgN=0;
+  function enhanceDynamicModal(ov){
+    if(ov.getAttribute('data-a11y-dlg')) return; ov.setAttribute('data-a11y-dlg','1');
+    var box=ov.querySelector('.account-box,.search-box')||ov.firstElementChild; if(!box) return;
+    if(!box.getAttribute('role')) box.setAttribute('role','dialog');
+    box.setAttribute('aria-modal','true');
+    if(!box.hasAttribute('tabindex')) box.setAttribute('tabindex','-1');
+    if(!box.hasAttribute('aria-labelledby') && !box.hasAttribute('aria-label')){
+      var h=box.querySelector('h1,h2,h3');
+      if(h){ if(!h.id) h.id='a11yDlgTitle'+(++dlgN); box.setAttribute('aria-labelledby',h.id); }
+    }
+    setTimeout(function(){
+      if(!document.contains(box) || box.contains(document.activeElement)) return;
+      var f=[].filter.call(box.querySelectorAll(FOC),vis)[0]; (f||box).focus();
+    },40);
+    ov.addEventListener('keydown',function(e){
+      if(e.key!=='Tab' || e.defaultPrevented) return;
+      var f=[].filter.call(box.querySelectorAll(FOC),vis);
+      if(!f.length){ e.preventDefault(); box.focus(); return; }
+      var first=f[0], last=f[f.length-1], cur=document.activeElement;
+      if(e.shiftKey && (cur===first || !box.contains(cur) || cur===box)){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && cur===last){ e.preventDefault(); first.focus(); }
+    });
+  }
+  new MutationObserver(function(muts){
+    muts.forEach(function(m){ [].forEach.call(m.addedNodes,function(n){
+      if(n.nodeType===1 && n.classList.contains('account-overlay') && !n.id) enhanceDynamicModal(n);
+    }); });
+  }).observe(document.body,{childList:true});
+
+  /* 1c) Encabezados desplegables que solo respondían al mouse:
+         - tarjetas de Gráficos: el título pasa a ser un <button> real (Enter/Espacio nativos) con aria-expanded;
+         - grupos por mes de Gastos/Ingresos: role=button + teclado, y el foco vuelve al encabezado tras redibujar. */
+  function discPass(){
+    document.querySelectorAll('#view-graficos [data-chart-toggle]').forEach(function(head){
+      var h=head.querySelector('h3'); if(!h || h.querySelector('button.a11y-disc')) return;
+      var btn=document.createElement('button'); btn.type='button'; btn.className='a11y-disc';
+      while(h.firstChild) btn.appendChild(h.firstChild);
+      var chev=btn.querySelector('.grp-chevron'); if(chev) chev.setAttribute('aria-hidden','true');
+      h.appendChild(btn);
+    });
+    document.querySelectorAll('.month-group-head').forEach(function(h){
+      h.setAttribute('role','button'); h.setAttribute('tabindex','0');
+      h.setAttribute('aria-expanded', h.classList.contains('is-collapsed') ? 'false' : 'true');
+    });
+    syncDisc();
+  }
+  function syncDisc(){
+    document.querySelectorAll('#view-graficos [data-chart-toggle]').forEach(function(head){
+      var b=head.querySelector('button.a11y-disc'), card=head.closest('.chart-card'); if(!b||!card) return;
+      var v=card.classList.contains('collapsed') ? 'false' : 'true';
+      if(b.getAttribute('aria-expanded')!==v) b.setAttribute('aria-expanded',v);
+    });
+  }
+  var gv=document.getElementById('view-graficos');
+  if(gv) new MutationObserver(syncDisc).observe(gv,{attributes:true,attributeFilter:['class'],subtree:true});
+  document.addEventListener('keydown',function(e){
+    var h=e.target.closest && e.target.closest('.month-group-head');
+    if(!h || e.target!==h || (e.key!=='Enter' && e.key!==' ')) return;
+    e.preventDefault();
+    var sec=h.getAttribute('data-sec'), mes=h.getAttribute('data-mes');
+    h.click();
+    requestAnimationFrame(function(){   // la lista se redibuja entera: se devuelve el foco al mismo encabezado
+      var n=document.querySelector('.month-group-head[data-sec="'+sec+'"][data-mes="'+mes+'"]');
+      if(n){ n.setAttribute('tabindex','0'); if(document.activeElement!==n) n.focus(); }
     });
   });
 
@@ -126,7 +196,7 @@
 
   /* Pasadas iniciales y tras cada re-render */
   var obs, queued=false;
-  function pass(){ queued=false; obs.disconnect(); try{ labelsPass(); chartsPass(); }catch(_e){} obs.observe(document.body,{childList:true,subtree:true}); }
+  function pass(){ queued=false; obs.disconnect(); try{ labelsPass(); chartsPass(); discPass(); }catch(_e){} obs.observe(document.body,{childList:true,subtree:true}); }
   obs=new MutationObserver(function(){ if(!queued){ queued=true; requestAnimationFrame(pass); } });
   pass();
 })();

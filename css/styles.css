@@ -1423,3 +1423,25 @@ html.privacy .chart-card svg{filter:blur(5px);}
 .import-box .confirm-actions{margin-top:12px;}
 .import-box .btn:disabled{opacity:.5;cursor:not-allowed;}
 @media (max-width:600px){.import-box{padding:14px;max-height:96vh;}.imp-controls{grid-template-columns:1fr 1fr;}}
+
+/* ===== Accesibilidad (contraste, foco, controles) =====
+   Medido con WCAG 2.1: texto normal >= 4,5:1 y bordes de controles >= 3:1 sobre cada fondo de la app. */
+:root{--text-faint:#84909D;--line-ctl:#667381;}
+html.theme-light{--text-faint:#5F6674;--line-ctl:#7B8594;--ingreso:#087A59;--fijo:#8A5A00;--neg:#C1272A;--inversion:#B8345F;}
+/* En el tema claro los fondos de color son más oscuros: el texto encima pasa a blanco (más de 5:1) */
+html.theme-light .btn-accent-ingreso,html.theme-light .btn-accent-fijo,html.theme-light .btn-accent-dolar,html.theme-light .btn-danger,
+html.theme-light .btn.btn-danger,html.theme-light .share-badge,html.theme-light ::selection{color:#fff;}
+/* Bordes de los campos de formulario visibles (antes ~1,3:1); al enfocar mandan los estilos de foco existentes */
+input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=hidden]):not(:focus),select:not(:focus),textarea:not(:focus){border-color:var(--line-ctl);}
+/* Anillo de foco por defecto para todo lo que se pueda enfocar con teclado (los estilos específicos siguen mandando) */
+:where(a,button,input,select,textarea,summary,[role=button],[tabindex]):focus-visible{outline:2px solid var(--dolar);outline-offset:2px;}
+.bottom-nav .nav-btn:focus-visible{outline:2px solid var(--dolar);outline-offset:-3px;background:var(--surface-2);}
+.account-box:focus,.search-box:focus,main:focus{outline:none;}
+/* Título de las tarjetas de Gráficos convertido en botón real */
+.a11y-disc{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:inherit;cursor:pointer;font:inherit;color:inherit;border-radius:6px;}
+.a11y-disc:focus-visible{outline:2px solid var(--dolar);outline-offset:3px;}
+.month-group-head:focus-visible{outline:2px solid var(--dolar);outline-offset:-2px;border-radius:6px;}
+/* Enlace para saltar la navegación */
+.skip-link{position:fixed;left:12px;top:-60px;z-index:1000;background:var(--surface);color:var(--text);border:2px solid var(--dolar);border-radius:8px;padding:10px 14px;font-size:14px;text-decoration:none;transition:top .15s;}
+.skip-link:focus{top:12px;}
+@media (prefers-reduced-motion:reduce){.skip-link{transition:none;}}
