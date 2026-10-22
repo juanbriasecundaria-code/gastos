@@ -51,6 +51,17 @@ function usd(n){
   if(n===null || n===undefined || isNaN(n)) return "-";
   return "US$" + fmtDec.format(n);
 }
+// Variantes para usar dentro de innerHTML: envuelven el valor en un <span>
+// con color de alerta cuando es negativo (saldo en contra, USD netos
+// negativos, etc). No usar en textContent ni dentro de <text> de SVG.
+function moneyNeg(n){
+  var s = money(n);
+  return (typeof n === 'number' && n < 0) ? '<span class="neg-amt">'+s+'</span>' : s;
+}
+function usdNeg(n){
+  var s = usd(n);
+  return (typeof n === 'number' && n < 0) ? '<span class="neg-amt">'+s+'</span>' : s;
+}
 function fmtCot(n){
   n = +n || 0;
   return '$' + (Math.abs(n - Math.round(n)) < 0.005 ? fmt.format(Math.round(n)) : fmtDec.format(n));
@@ -713,6 +724,7 @@ function askConfirm(o){
 function activarTab(tab){
   var view = document.getElementById('view-'+tab);
   if(!view || view.classList.contains('active')) return !!view;
+  document.body.dataset.tab = tab;
   document.querySelectorAll('.nav-btn[data-tab]').forEach(function(b){
     b.classList.toggle('active', b.dataset.tab === tab);
   });
@@ -1210,9 +1222,9 @@ function renderResumen(){
     var vals = months.map(valuesFn);
     var tot = vals.reduce(function(a,b){return a+b;},0);
     var r = '<tr class="'+(cls||'')+'"'+delayAttr()+'><td>'+label+'</td>';
-    vals.forEach(function(v){ r += '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':money(v))+'</td>'; });
+    vals.forEach(function(v){ r += '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':moneyNeg(v))+'</td>'; });
     var badge = variationKind ? variationBadge(vals, variationKind) : '';
-    r += '<td class="col-total">'+money(tot)+badge+'</td></tr>';
+    r += '<td class="col-total">'+moneyNeg(tot)+badge+'</td></tr>';
     return r;
   }
 
@@ -1291,7 +1303,7 @@ function renderResumen(){
   html += rowFor('$ Gastados', function(m){return m.pesosGastadosUsd;});
   var dolarRowVals = months.map(function(m){return m.totalUsd;});
   var dolarTot = dolarRowVals.reduce(function(a,b){return a+b;},0);
-  html += '<tr'+delayAttr()+'><td>USD Totales</td>'+dolarRowVals.map(function(v){return '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':usd(v))+'</td>';}).join('')+'<td class="col-total">'+usd(dolarTot)+'</td></tr>';
+  html += '<tr'+delayAttr()+'><td>USD Totales</td>'+dolarRowVals.map(function(v){return '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':usdNeg(v))+'</td>';}).join('')+'<td class="col-total">'+usdNeg(dolarTot)+'</td></tr>';
 
   if(DATA.inversion.length){
     html += grpRowHtml('Inversión', 'inversion', false);
@@ -1494,7 +1506,7 @@ function renderDolar(){
     any = true;
     var totalUsd = items.reduce(function(s,x){return s+(+x.total||0);},0);
     var collapsed = collapsedGroups.has('dolar-'+mes);
-    html += '<div class="month-group">'+monthHeadHtml('dolar', mes, usd(totalUsd))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
+    html += '<div class="month-group">'+monthHeadHtml('dolar', mes, usdNeg(totalUsd))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
     items.forEach(function(it){
       var detail = usdDetailHtml(it);
       var isEd = editingId.dolar===it.id;

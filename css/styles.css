@@ -557,6 +557,8 @@ main{
 .kpi-label{font-size:13px;color:var(--text-dim);margin-bottom:8px;font-family:var(--font-body);font-weight:500;}
 .kpi-value{font-family:var(--font-mono);font-size:22px;font-weight:600;letter-spacing:-0.01em;}
 .kpi-value.neg{color:var(--neg);}
+/* Cualquier monto negativo en tablas/listas (USD netos, restante en contra, etc.) */
+.neg-amt{color:var(--neg);}
 .kpi-sub{font-size:12px;color:var(--text-faint);margin-top:4px;}
 
 /* El KPI principal (restante/saldo) se destaca del resto en vez de pesar igual */
@@ -1217,8 +1219,13 @@ details.data-menu[open] .data-summary .chev{transform:rotate(180deg);}
   .entry-row > .entry-dup{grid-area:dup;width:44px;height:44px;border-radius:10px;}
 }
 .prompt-input{width:100%;margin-top:6px;}
-.qa-fab{position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:60;width:56px;height:56px;border-radius:50%;border:none;background:var(--dolar);color:#06121f;font-size:30px;line-height:1;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;}
+.qa-fab{position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:60;width:56px;height:56px;border-radius:50%;border:none;background:var(--ingreso);color:#08221A;font-size:30px;line-height:1;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;transition:background .15s;}
 .qa-fab.show{display:flex;}
+/* El FAB toma el acento de la sección activa, igual que el botón
+   "Agregar" de cada vista, para que no se sienta pegado encima. */
+body[data-tab="gastos"] .qa-fab{background:var(--fijo);color:#241900;}
+body[data-tab="dolar"] .qa-fab{background:var(--dolar);color:#071B33;}
+body[data-tab="inversion"] .qa-fab{background:var(--ingreso);color:#08221A;}
 @media (max-width:860px){.qa-fab{bottom:calc(76px + env(safe-area-inset-bottom));}}
 @media print{.qa-fab{display:none !important;}}
 .qa-row{display:grid;gap:10px;margin:12px 0;}
