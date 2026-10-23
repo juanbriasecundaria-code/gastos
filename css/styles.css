@@ -671,6 +671,9 @@ main{
 .donut-slice:hover{opacity:.82;}
 .donut-legend-row.clickable{cursor:pointer;border-radius:6px;margin:0 -6px;padding-left:6px;padding-right:6px;transition:background .15s;}
 .donut-legend-row.clickable:hover{background:var(--surface-2);}
+/* Aprovecha el ancho libre al lado del donut: 2 columnas cuando entra,
+   1 columna en mobile o cards angostas. */
+.donut-legend-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0 18px;}
 .hormiga-controls{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
 }
@@ -951,6 +954,21 @@ main{max-width:2200px;margin-left:auto;margin-right:auto;}
   background:var(--surface);border:1px solid var(--line);border-radius:7px;
   color:var(--text-dim);padding:7px 10px;font-size:13px;font-family:var(--font-body);
 }
+/* Filtros secundarios plegados (Gastos): mes + buscador quedan a la vista,
+   el resto se abre bajo un resumen tipo botón para no saturar la fila. */
+.filters-more{flex:1 1 100%;order:3;}
+.filters-more summary{
+  display:inline-flex;align-items:center;gap:6px;list-style:none;cursor:pointer;
+  width:auto;padding:7px 12px;font-size:13px;
+}
+.filters-more summary::-webkit-details-marker{display:none;}
+.filters-more summary .icon{width:13px;height:13px;}
+.filters-more[open] summary{border-color:var(--text-dim);color:var(--text);}
+.filters-more-grid{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.filters-more-grid select,.filters-more-grid input{
+  background:var(--surface);border:1px solid var(--line);border-radius:7px;
+  color:var(--text-dim);padding:7px 10px;font-size:13px;font-family:var(--font-body);
+}
 .month-group{margin-bottom:18px;}
 .month-group-head{
   display:flex;justify-content:space-between;align-items:center;
@@ -1206,6 +1224,18 @@ details.data-menu[open] .data-summary .chev{transform:rotate(180deg);}
 
 /* Estados vacíos con acción */
 .empty-state .empty-cta{margin-top:4px;min-height:44px;}
+/* Variante compacta: para cards vacías dentro de Gráficos, donde no hace
+   falta el ícono grande ni tanto padding al lado de un gráfico con datos. */
+.empty-state.compact{
+  padding:14px 16px;flex-direction:row;align-items:center;justify-content:space-between;
+  text-align:left;gap:12px;flex-wrap:wrap;
+}
+.empty-state.compact::before{display:none;}
+.empty-state.compact .empty-link{
+  flex:none;background:none;border:none;color:var(--dolar);font-size:13px;font-weight:600;
+  cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px;
+}
+.empty-state.compact .empty-link:hover{color:var(--text);}
 
 /* --- mejoras: duplicar, prompt propio, carga rápida --- */
 .entry-row.has-dup{grid-template-columns:64px minmax(0,1fr) 100px 28px 28px 28px;}

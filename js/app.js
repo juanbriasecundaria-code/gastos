@@ -22,6 +22,15 @@ function isActiveYearCurrent(){
 function currentMonthIdxForDisplay(){
   return isActiveYearCurrent() ? new Date().getMonth() : -1;
 }
+// Último índice de mes con datos "reales" para el ejercicio activo:
+// 11 si es un año ya cerrado, el mes actual si es el año en curso,
+// -1 si el ejercicio todavía no empezó.
+function lastRealMonthIdx(){
+  var yr=parseInt(STORE.activeEjercicio,10), now=new Date(), ny=now.getFullYear(), nm=now.getMonth();
+  if(yr<ny) return 11;
+  if(yr>ny) return -1;
+  return nm;
+}
 function resetCollapsedForActiveYear(){
   collapsedGroups.clear();
   var yearNum = parseInt(STORE.activeEjercicio, 10);
@@ -3222,9 +3231,9 @@ function buildDonutChart(catTotals, opts){
       '<span style="flex:1;">'+escapeHtml(e.cat)+'</span>'+
       '<span style="font-family:var(--font-mono);color:var(--text);">'+pct+'%</span></div>';
   }).join('');
-  return '<div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;">'+
-    '<svg viewBox="0 0 220 220" style="width:200px;height:200px;flex-shrink:0;">'+arcs+'</svg>'+
-    '<div style="flex:0 1 260px;min-width:160px;max-width:280px;">'+legend+'</div></div>';
+  return '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'+
+    '<svg viewBox="0 0 220 220" style="width:230px;height:230px;flex-shrink:0;">'+arcs+'</svg>'+
+    '<div class="donut-legend-grid" style="flex:1 1 260px;min-width:220px;">'+legend+'</div></div>';
 }
 
 function buildLineChart(data, opts){
@@ -3239,23 +3248,30 @@ function buildLineChart(data, opts){
   function xFor(i){return padL+stepX*i;}
   function yFor(v){return padT+innerH-(v-minVal)/range*innerH;}
   var zeroY=yFor(0);
+  // cutoffIdx = último índice con dato real (resto del array todavía no
+  // transcurrió). Sin esto, los meses futuros se dibujaban como si el
+  // saldo cayera a $0, lo cual es engañoso. -1 = ningún mes con datos aún.
+  var cutoff = (opts.cutoffIdx===undefined || opts.cutoffIdx===null) ? n-1 : Math.max(-1, Math.min(n-1, opts.cutoffIdx));
   var gridLines='<line x1="'+padL+'" y1="'+zeroY+'" x2="'+(W-padR)+'" y2="'+zeroY+'" stroke="'+CHART_COLORS.textFaint+'" stroke-width="1" stroke-dasharray="3,3"/>';
-  var points=data.map(function(v,i){return xFor(i)+','+yFor(v);}).join(' ');
-  var areaPts = 'M'+xFor(0)+','+zeroY+' '+data.map(function(v,i){return 'L'+xFor(i)+','+yFor(v);}).join(' ')+' L'+xFor(n-1)+','+zeroY+' Z';
+  var realPts = cutoff>=0 ? data.slice(0,cutoff+1).map(function(v,i){return xFor(i)+','+yFor(v);}).join(' ') : '';
+  var futurePts = (cutoff>=0 && cutoff<n-1) ? data.slice(cutoff).map(function(v,i){return xFor(cutoff+i)+','+yFor(v);}).join(' ') : '';
+  var areaPts = cutoff>=0 ? ('M'+xFor(0)+','+zeroY+' '+data.slice(0,cutoff+1).map(function(v,i){return 'L'+xFor(i)+','+yFor(v);}).join(' ')+' L'+xFor(cutoff)+','+zeroY+' Z') : '';
   var dots=data.map(function(v,i){
+    if(i>cutoff) return ''; // mes todavía no transcurrido: sin punto, para no sugerir un dato real
     return '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="3.5" fill="'+(v>=0?CHART_COLORS.ingreso:CHART_COLORS.neg)+'" data-tip="'+escapeHtml(MESES[i]+': '+tipFmt(v))+'"/>';
   }).join('');
   var xlabels=MESES.map(function(m,i){
-    return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="11" fill="'+CHART_COLORS.textFaint+'">'+m.slice(0,3)+'</text>';
+    return '<text x="'+xFor(i)+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="11" fill="'+CHART_COLORS.textFaint+'"'+(i>cutoff?' opacity="0.45"':'')+'>'+m.slice(0,3)+'</text>';
   }).join('');
   return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">'+
     '<defs><linearGradient id="gRestArea" x1="0" y1="0" x2="0" y2="1">'+
       '<stop offset="0%" stop-color="'+CHART_COLORS.dolar+'" stop-opacity="0.32"/>'+
       '<stop offset="100%" stop-color="'+CHART_COLORS.dolar+'" stop-opacity="0"/>'+
     '</linearGradient></defs>'+
-    '<path d="'+areaPts+'" fill="url(#gRestArea)"/>'+
+    (areaPts ? '<path d="'+areaPts+'" fill="url(#gRestArea)"/>' : '')+
     gridLines+
-    '<polyline points="'+points+'" fill="none" stroke="'+CHART_COLORS.dolar+'" stroke-width="2"/>'+
+    (futurePts ? '<polyline points="'+futurePts+'" fill="none" stroke="'+CHART_COLORS.textFaint+'" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.55"/>' : '')+
+    (realPts ? '<polyline points="'+realPts+'" fill="none" stroke="'+CHART_COLORS.dolar+'" stroke-width="2"/>' : '')+
     dots+xlabels+'</svg>';
 }
 
@@ -3353,7 +3369,7 @@ function buildPresupuestoChart(mesSel){
     r.proy = (usaProy && r.tipo==='Variable' && proj.catProy[r.cat]!==undefined) ? proj.catProy[r.cat] : r.real;
   });
   if(!rows.length){
-    return '<div class="empty-state">No hay presupuestos definidos todavía (configuralos desde "Presupuestos" en Gastos).</div>';
+    return '<div class="empty-state compact">No hay presupuestos definidos todavía.<button type="button" class="empty-link" onclick="document.getElementById(\'btnPresupuestos\').click()">Configurar presupuestos</button></div>';
   }
   rows.sort(function(a,b){ return (b.real/b.presu) - (a.real/a.presu); });
   var rowsHtml = rows.map(function(r){
@@ -3411,7 +3427,7 @@ function renderEtiquetasChart(){
   });
   var rows = Object.keys(porTag).map(function(k){ return porTag[k]; }).sort(function(a,b){ return b.total-a.total; });
   if(!rows.length){
-    host.innerHTML = '<div class="empty-state">Todavía no etiquetaste ningún gasto'+(mes?' en '+mes:'')+'. Agregá etiquetas desde el formulario de Gastos (ej.: vacaciones, regalo).</div>';
+    host.innerHTML = '<div class="empty-state compact">Todavía no etiquetaste ningún gasto'+(mes?' en '+mes:'')+'.<button type="button" class="empty-link" data-goto-tab="gastos">Ir a Gastos</button></div>';
     return;
   }
   var max = Math.max.apply(null, rows.map(function(r){ return r.total; }).concat([1]));
@@ -3856,7 +3872,7 @@ function renderGraficos(){
 
   var enUsdRestante = document.getElementById('toggleUsdRestante').checked;
   document.getElementById('chartRestante').innerHTML = buildLineChart(
-    months.map(function(m,i){return convUsd(m.totalRestante,i,enUsdRestante);}), {usd:enUsdRestante}
+    months.map(function(m,i){return convUsd(m.totalRestante,i,enUsdRestante);}), {usd:enUsdRestante, cutoffIdx: lastRealMonthIdx()}
   );
 
   // "Evolución del dólar (referencia)": siempre usa el promedio oficial
@@ -4220,6 +4236,8 @@ function flashEntry(kind, antes, editadoId, mesPref){
   if(window.__ctaBound) return;
   window.__ctaBound = true;
   document.addEventListener('click', function(e){
+    var tabLink = e.target.closest('.empty-link[data-goto-tab]');
+    if(tabLink){ activarTab(tabLink.getAttribute('data-goto-tab')); return; }
     var b = e.target.closest('.empty-cta');
     if(!b) return;
     var f = document.getElementById(b.getAttribute('data-focus'));
@@ -4316,7 +4334,7 @@ document.getElementById('listGastos').addEventListener('click',function(e){
       '<div class="field"><label>Tipo</label><select id="qaTipo"><option>Variable</option><option>Fijo</option></select></div>'+
       '<div class="field"><label>Categoría</label><select id="qaCat"></select></div>'+
       '<div class="field"><label>Descripción</label><input type="text" id="qaDesc" placeholder="Opcional" autocomplete="off"></div>'+
-      '</div><div class="confirm-actions"><button type="button" class="ghost-btn" id="qaCancel">Cancelar</button><button type="submit" class="btn">Guardar</button></div></form>';
+      '</div><div class="confirm-actions"><button type="button" class="ghost-btn" id="qaCancel">Cancelar</button><button type="submit" class="btn btn-accent-fijo">Guardar</button></div></form>';
     ov.appendChild(box); document.body.appendChild(ov);
     var tipo=box.querySelector('#qaTipo'), cat=box.querySelector('#qaCat'), monto=box.querySelector('#qaMonto');
     function fill(){ cat.innerHTML=catsFor(tipo.value).map(function(c){return '<option>'+escapeHtml(c)+'</option>';}).join(''); }

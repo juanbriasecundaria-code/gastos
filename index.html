@@ -372,17 +372,22 @@
       </div>
       <div class="filters-row">
         <select id="filtMes"><option value="">Todos los meses</option></select>
-        <select id="filtTipo">
-          <option value="">Fijo y Variable</option>
-          <option value="Fijo">Fijo</option>
-          <option value="Variable">Variable</option>
-        </select>
         <input type="text" id="filtBusqueda" placeholder="Buscar categoría, descripción o etiqueta…">
-        <select id="filtCat" aria-label="Categoría"><option value="">Todas las categorías</option></select>
-        <select id="filtEtiqueta" aria-label="Etiqueta" style="display:none;"><option value="">Todas las etiquetas</option></select>
-        <input type="date" id="filtDesde" aria-label="Desde" title="Desde">
-        <input type="date" id="filtHasta" aria-label="Hasta" title="Hasta">
-        <select id="filtOrden" aria-label="Orden"><option value="">Orden: como se cargó</option><option value="fecha">Más reciente primero</option><option value="mayor">Mayor monto primero</option><option value="menor">Menor monto primero</option></select>
+        <details class="filters-more">
+          <summary class="ghost-btn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Más filtros</summary>
+          <div class="filters-more-grid">
+            <select id="filtTipo">
+              <option value="">Fijo y Variable</option>
+              <option value="Fijo">Fijo</option>
+              <option value="Variable">Variable</option>
+            </select>
+            <select id="filtCat" aria-label="Categoría"><option value="">Todas las categorías</option></select>
+            <select id="filtEtiqueta" aria-label="Etiqueta" style="display:none;"><option value="">Todas las etiquetas</option></select>
+            <input type="date" id="filtDesde" aria-label="Desde" title="Desde">
+            <input type="date" id="filtHasta" aria-label="Hasta" title="Hasta">
+            <select id="filtOrden" aria-label="Orden"><option value="">Orden: como se cargó</option><option value="fecha">Más reciente primero</option><option value="mayor">Mayor monto primero</option><option value="menor">Menor monto primero</option></select>
+          </div>
+        </details>
       </div>
       <div id="listGastos"></div>
     </section>
@@ -571,7 +576,7 @@
       <div class="acc-photo-row">
         <div class="acc-avatar-preview" id="accAvatarPreview">·</div>
         <div class="acc-photo-actions">
-          <label class="btn" id="btnAccPhotoPick">
+          <label class="btn btn-accent-dolar" id="btnAccPhotoPick">
             Subir foto
             <input type="file" id="accPhotoInput" accept="image/*" style="display:none;">
           </label>
@@ -586,7 +591,7 @@
       <form id="accPassForm">
         <div class="field"><input type="password" id="accPassCurrent" placeholder="Contraseña actual" required autocomplete="current-password"></div>
         <div class="field"><input type="password" id="accPassNew" placeholder="Contraseña nueva (mín. 6 caracteres)" required minlength="6" autocomplete="new-password"></div>
-        <button type="submit" class="btn">Actualizar contraseña</button>
+        <button type="submit" class="btn btn-accent-dolar">Actualizar contraseña</button>
       </form>
     </div>
 
@@ -596,7 +601,7 @@
       <form id="accEmailForm">
         <div class="field"><input type="email" id="accEmailNew" placeholder="Nuevo email" required autocomplete="email"></div>
         <div class="field"><input type="password" id="accEmailPass" placeholder="Contraseña actual" required autocomplete="current-password"></div>
-        <button type="submit" class="btn">Actualizar email</button>
+        <button type="submit" class="btn btn-accent-dolar">Actualizar email</button>
       </form>
     </div>
 
@@ -632,7 +637,7 @@
           <option value="lector">Solo puede ver</option>
         </select>
       </div>
-      <button type="button" class="btn" id="btnShareInviteUsername">Invitar</button>
+      <button type="button" class="btn btn-accent-ingreso" id="btnShareInviteUsername">Invitar</button>
     </div>
 
     <div class="account-section" id="shareCodeSection" style="display:none;">
@@ -643,14 +648,14 @@
           <option value="lector">Solo puede ver</option>
         </select>
       </div>
-      <button type="button" class="btn" id="btnShareGenCode">Generar código</button>
+      <button type="button" class="ghost-btn" id="btnShareGenCode">Generar código</button>
       <div id="shareCodeResult" style="display:none;margin-top:10px;font-size:13px;"></div>
     </div>
 
     <div class="account-section">
       <h4>Unirme con un código</h4>
       <div class="field"><input type="text" id="shareJoinCode" placeholder="Código de invitación" autocomplete="off" style="text-transform:uppercase;"></div>
-      <button type="button" class="btn" id="btnShareJoinCode">Unirme</button>
+      <button type="button" class="btn btn-accent-dolar" id="btnShareJoinCode">Unirme</button>
     </div>
 
     <div class="account-section danger" id="shareLeaveSection" style="display:none;">
