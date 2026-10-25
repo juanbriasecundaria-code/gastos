@@ -493,6 +493,49 @@ document.getElementById('btnDeleteEjercicio').addEventListener('click', function
 renderEjercicioSelect();
 resetCollapsedForActiveYear();
 
+/* ===== Ejercicio nuevo automático =====
+   Si el año actual todavía no tiene ejercicio (p. ej. el 1/01), se crea solo al abrir la app,
+   igual que «Nuevo ejercicio»: hereda las categorías propias, no los presupuestos ni los registros.
+   Si se saltearon años, también se crean los intermedios para no cortar el arrastre del saldo. */
+function ensureEjercicioActual(){
+  try{
+    if(esSoloLectura()) return false;
+    var cy = new Date().getFullYear();
+    var years = ejercicioYears().map(Number);
+    if(!years.length) return false;
+    var max = Math.max.apply(null, years);
+    if(max >= cy || STORE.ejercicios[String(cy)]) return false;
+    var activoEraUltimo = STORE.activeEjercicio === String(max);
+    var snap = takeSnapshot('Antes de crear el ejercicio ' + cy);
+    var molde = STORE.ejercicios[String(max)];
+    var creados = [];
+    for(var y = max+1; y <= cy; y++){
+      STORE.ejercicios[String(y)] = normalizeExercise({
+        customCategorias:{
+          Fijo: ((molde.customCategorias||{}).Fijo||[]).slice(),
+          Variable: ((molde.customCategorias||{}).Variable||[]).slice()
+        }
+      });
+      molde = STORE.ejercicios[String(y)];
+      creados.push(y);
+    }
+    if(activoEraUltimo){
+      STORE.activeEjercicio = String(cy);
+      DATA = STORE.ejercicios[STORE.activeEjercicio];
+      resetCollapsedForActiveYear();
+      fillCatSelect(false);
+      if(typeof updateDescDatalist==='function') updateDescDatalist();
+    }
+    saveData();
+    renderEjercicioSelect();
+    renderAll();
+    toast('Se creó el ejercicio ' + cy + (creados.length>1 ? ' (y los años intermedios)' : ''), { action: undoFromSnapshot(snap, 'Ejercicio ' + cy + ' deshecho'), duration: 12000 });
+    return true;
+  }catch(e){ console.error('No se pudo crear el ejercicio automático:', e); return false; }
+}
+setTimeout(ensureEjercicioActual, 800);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) ensureEjercicioActual(); });
+
 
 /* ===================== TOAST ===================== */
 var toastEl = document.getElementById('toast');
@@ -1070,7 +1113,7 @@ updateDescSuggestSource();
 })();
 
 /* ===================== COMPUTATION ===================== */
-function computeMonth(mes){
+function computeMonthBase(mes){
   var ingresos = DATA.ingresos.filter(function(x){return x.mes===mes;});
   var totalIngresos = ingresos.reduce(function(s,x){return Math.round((s+(+x.monto||0))*100)/100;},0);
 
@@ -1115,6 +1158,46 @@ function computeMonth(mes){
   };
 }
 
+/* ===================== ARRASTRE DE SALDO ENTRE MESES =====================
+   El saldo restante de cada mes pasa solo al mes siguiente (también de diciembre a enero
+   si existe el ejercicio anterior). Config en STORE.arrastre = {activo, desde:'AAAA-MM'};
+   «desde» es el primer mes que recibe saldo, para no duplicar los que ya cargaste a mano como ingreso extra. */
+var ARRASTRE_DESDE_DEFAULT = '2026-11';
+function arrastreCfg(){
+  var c = STORE.arrastre;
+  if(!c || typeof c!=='object') return {activo:true, desde:ARRASTRE_DESDE_DEFAULT};
+  return {activo:c.activo!==false, desde:/^\d{4}-\d{2}$/.test(c.desde||'') ? c.desde : ARRASTRE_DESDE_DEFAULT};
+}
+function arrastreInto(year, mi){
+  // Saldo que entra al mes «mi» del ejercicio «year» = suma de (ingresos − gastado) de todos los
+  // meses desde el anterior a «desde» hasta el mes previo al pedido.
+  var cfg = arrastreCfg();
+  if(!cfg.activo) return 0;
+  var desde = parseInt(cfg.desde.slice(0,4),10)*12 + (parseInt(cfg.desde.slice(5,7),10)-1);
+  var target = parseInt(year,10)*12 + mi;
+  if(target < desde) return 0;
+  var carry = 0, prevDATA = DATA;
+  try{
+    for(var k=desde-1; k<target; k++){
+      var ex = STORE.ejercicios[String(Math.floor(k/12))];
+      if(!ex) continue;
+      DATA = ex;
+      carry += computeMonthBase(MESES[((k%12)+12)%12]).totalRestante;
+    }
+  } finally { DATA = prevDATA; }
+  return carry;
+}
+function computeMonth(mes, idx){
+  var m = computeMonthBase(mes);
+  var mi = MESES.indexOf(mes);
+  var a = mi>=0 ? arrastreInto(STORE.activeEjercicio, mi) : 0;
+  a = Math.round(a*100)/100;
+  m.arrastre = a;
+  m.restanteMes = m.totalRestante;        // ingresos − gastado, sin el saldo que viene del mes anterior
+  m.totalRestante = m.totalRestante + a;  // saldo disponible al cierre del mes (incluye lo arrastrado)
+  return m;
+}
+
 
 /* ===================== PROYECCIÓN DE FIN DE MES =====================
    Solo para el mes en curso del ejercicio del año actual.
@@ -1145,7 +1228,7 @@ function projectMonth(){
   var gastosProy = fijos + varProy;
   var totalProy = gastosProy + cm.pesosGastadosUsd + cm.montoInversion;
   return {mes:mes, mi:mi, dias:dias, hoy:hoy, confiable:confiable, ingresos:cm.totalIngresos,
-          gastosProy:gastosProy, totalProy:totalProy, restanteProy:cm.totalIngresos-totalProy,
+          gastosProy:gastosProy, totalProy:totalProy, restanteProy:cm.totalIngresos+cm.arrastre-totalProy,
           real:cm.totalGastos, catProy:catProy};
 }
 
@@ -1155,7 +1238,7 @@ function renderResumen(){
   var months = MESES.map(computeMonth);
   var yearIngresos = months.reduce(function(s,m){return s+m.totalIngresos;},0);
   var yearGastos = months.reduce(function(s,m){return s+m.totalGastos;},0);
-  var yearRestante = months.reduce(function(s,m){return s+m.totalRestante;},0);
+  var yearRestante = months.reduce(function(s,m){return s+m.restanteMes;},0);
   var yearUsd = months.reduce(function(s,m){return s+m.totalUsd;},0);
 
   var kpiRow = document.getElementById('kpiRow');
@@ -1227,13 +1310,13 @@ function renderResumen(){
     return '';
   }
 
-  function rowFor(label, valuesFn, cls, variationKind){
+  function rowFor(label, valuesFn, cls, variationKind, sinTotal, totalFn){
     var vals = months.map(valuesFn);
-    var tot = vals.reduce(function(a,b){return a+b;},0);
+    var tot = totalFn ? totalFn() : vals.reduce(function(a,b){return a+b;},0);
     var r = '<tr class="'+(cls||'')+'"'+delayAttr()+'><td>'+label+'</td>';
     vals.forEach(function(v){ r += '<td class="'+(v===0?'zero':'')+'">'+(v===0?'–':moneyNeg(v))+'</td>'; });
     var badge = variationKind ? variationBadge(vals, variationKind) : '';
-    r += '<td class="col-total">'+moneyNeg(tot)+badge+'</td></tr>';
+    r += '<td class="col-total">'+(sinTotal?'–':moneyNeg(tot))+badge+'</td></tr>';
     return r;
   }
 
@@ -1297,6 +1380,8 @@ function renderResumen(){
 
   html += grpRowHtml('Ingresos', 'ingreso', false);
   html += rowFor('Total Ingresos', function(m){return m.totalIngresos;}, '', 'ingreso');
+  var hayArrastre = months.some(function(m){return m.arrastre!==0;});
+  if(hayArrastre) html += rowFor('Saldo del mes anterior', function(m){return m.arrastre;}, '', null, true);
 
   html += grpRowHtml('Gastos fijos', 'fijo', true);
   html += catRowsHtml(catsFor('Fijo'), function(m,cat){return m.fijosPorCat[cat]||0;}, 'fijo');
@@ -1321,7 +1406,7 @@ function renderResumen(){
 
   html += grpRowHtml('Resumen', 'resumen', false);
   html += rowFor('Total Gastado', function(m){return m.totalGastado;});
-  html += rowFor('Total Restante', function(m){return m.totalRestante;}, 'total-row', 'ingreso');
+  html += rowFor('Total Restante', function(m){return m.totalRestante;}, 'total-row', 'ingreso', false, function(){return months.reduce(function(a,m){return a+m.restanteMes;},0);});
 
   html += '</tbody>';
   table.innerHTML = html;
@@ -2173,6 +2258,7 @@ function exportResumenCSV(){
   }
 
   addRow('Total Ingresos', function(m){return m.totalIngresos;});
+  if(months.some(function(m){return m.arrastre!==0;})) addRow('Saldo del mes anterior', function(m){return m.arrastre;});
 
   sortedCatsByTotal(catsFor('Fijo'), months, function(m,cat){return m.fijosPorCat[cat]||0;}).forEach(function(cat){
     addRow(cat, function(m){return m.fijosPorCat[cat]||0;});
@@ -3024,10 +3110,11 @@ document.getElementById('fileImport').addEventListener('change', function(e){
       if(res === 'alt') downloadBackupFile();
       var snap = takeSnapshot('Antes de importar un backup');
       if(scope === 'all'){
-        var _reglasPrev = getReglas(), _recoPrev = getRecordatorios();
+        var _reglasPrev = getReglas(), _recoPrev = getRecordatorios(), _arrPrev = STORE.arrastre;
         STORE = incoming;
         if(!getReglas().length) STORE.reglas = _reglasPrev; // backups viejos no traen reglas: se conservan las actuales
         if(!getRecordatorios().length) STORE.recordatorios = _recoPrev;
+        if(!STORE.arrastre && _arrPrev) STORE.arrastre = _arrPrev;
         DATA = STORE.ejercicios[STORE.activeEjercicio];
         saveData(); resetCollapsedForActiveYear(); fillCatSelect(false); updateDescDatalist(); renderEjercicioSelect(); renderAll();
         toast('Backup importado (todos los ejercicios)', { action: undoFromSnapshot(snap, 'Importación deshecha'), duration: 12000 });
@@ -3446,7 +3533,7 @@ document.getElementById('etiquetasChartMes').addEventListener('change', renderEt
 /* ----- Tasa de ahorro mensual ----- */
 function buildSavingsRateChart(months, metaPct){
   var data = months.map(function(m){
-    return m.totalIngresos>0 ? (m.totalRestante/m.totalIngresos*100) : null;
+    return m.totalIngresos>0 ? (m.restanteMes/m.totalIngresos*100) : null;
   });
   var W=860,H=280,padL=50,padR=14,padT=14,padB=40;
   var innerW=W-padL-padR, innerH=H-padT-padB;
@@ -4009,7 +4096,7 @@ function renderSidebarSummary(){
   if(idx < 0){
     var yearMonths = MESES.map(computeMonth);
     var gastado = yearMonths.reduce(function(s,m){return s+m.totalGastado;},0);
-    var restante = yearMonths.reduce(function(s,m){return s+m.totalRestante;},0);
+    var restante = yearMonths.reduce(function(s,m){return s+m.restanteMes;},0);
     box.innerHTML =
       '<div class="ss-title">Ejercicio '+escapeHtml(STORE.activeEjercicio)+'</div>'+
       '<div class="ss-row"><span class="ss-label">Gastado</span><span class="ss-value">'+money(gastado)+'</span></div>'+
@@ -4025,10 +4112,42 @@ function renderSidebarSummary(){
     '<div class="ss-row"><span class="ss-label">Saldo</span><span class="ss-value '+(m.totalRestante<0?'neg':'pos')+'">'+money(m.totalRestante)+'</span></div>';
 }
 
+
+/* ----- Arrastre de saldo: controles en la vista Ingresos ----- */
+function renderArrastreCfg(){
+  var box = document.getElementById('arrastreBox'); if(!box) return;
+  var cfg = arrastreCfg();
+  var chk = document.getElementById('arrastreOn'), selM = document.getElementById('arrastreMes'), selY = document.getElementById('arrastreAnio');
+  if(!selM.options.length){
+    selM.innerHTML = MESES.map(function(m,i){return '<option value="'+String(i+1).padStart(2,'0')+'">'+m+'</option>';}).join('');
+  }
+  var years = ejercicioYears().slice(); var cy = cfg.desde.slice(0,4);
+  if(years.indexOf(cy)===-1) years.push(cy);
+  years.sort();
+  selY.innerHTML = years.map(function(y){return '<option value="'+y+'">'+y+'</option>';}).join('');
+  chk.checked = cfg.activo; selM.value = cfg.desde.slice(5,7); selY.value = cy;
+  selM.disabled = selY.disabled = !cfg.activo;
+  var ro = esSoloLectura(); chk.disabled = ro; if(ro) selM.disabled = selY.disabled = true;
+  var mi = parseInt(cfg.desde.slice(5,7),10)-1;
+  document.getElementById('arrastreHelp').textContent = cfg.activo
+    ? 'El saldo restante de cada mes se suma solo al mes siguiente, desde '+MESES[mi]+' '+cy+'. Los meses anteriores no cambian: si ya cargaste ese saldo a mano como ingreso Extra, no lo repitas desde la fecha elegida.'
+    : 'Desactivado: cada mes empieza de cero, salvo que cargues el saldo a mano como ingreso Extra.';
+}
+function guardarArrastreCfg(){
+  if(esSoloLectura()){ toast('Estás en modo solo lectura.'); renderArrastreCfg(); return; }
+  STORE.arrastre = {
+    activo: document.getElementById('arrastreOn').checked,
+    desde: document.getElementById('arrastreAnio').value+'-'+document.getElementById('arrastreMes').value
+  };
+  saveData(); renderAll();
+}
+['arrastreOn','arrastreMes','arrastreAnio'].forEach(function(id){ document.getElementById(id).addEventListener('change', guardarArrastreCfg); });
+
 function renderAll(){
   renderResumen();
   renderGraficos();
   renderIngresos();
+  renderArrastreCfg();
   renderGastos();
   renderDolar();
   renderInversion();
@@ -4197,6 +4316,7 @@ window.__gastosApplyRemoteStore = function(json){
   if(cloudMode){ localStorage.setItem(cloudCacheKey(), JSON.stringify(STORE)); }
   renderEjercicioSelect();
   renderAll();
+  ensureEjercicioActual();
 };
 
 /* ===== Revisión UI/UX: helpers ===== */

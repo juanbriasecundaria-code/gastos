@@ -285,6 +285,15 @@
           <button type="button" class="btn btn-cancel-edit" id="ingCancelEdit" style="display:none;">Cancelar</button>
         </form>
       </div>
+      <div class="form-card" id="arrastreBox">
+        <h3>Saldo del mes anterior</h3>
+        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="arrastreOn"> Pasar automáticamente el saldo restante al mes siguiente</label>
+        <div class="form-grid" style="margin-top:10px;">
+          <div class="field"><label for="arrastreMes">Desde el mes</label><select id="arrastreMes"></select></div>
+          <div class="field"><label for="arrastreAnio">Año</label><select id="arrastreAnio"></select></div>
+        </div>
+        <p class="reco-note" id="arrastreHelp"></p>
+      </div>
       <div class="filters-row">
         <select id="filtIngMes"><option value="">Todos los meses</option></select>
         <select id="filtIngTipo">
