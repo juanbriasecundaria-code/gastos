@@ -1538,8 +1538,9 @@ function renderIngresos(){
     items.forEach(function(it){
       var tagClass = it.tipo==='Sueldo' ? 'tag-sueldo' : 'tag-extra';
       var isEd = editingId.ingresos===it.id;
+      var ingRecurBadge = it.recurrente ? '<span class="recur-badge" title="Ingreso recurrente"><svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>' : '';
       var ingSub = [it.fecha?formatFechaCorta(it.fecha):null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+(ingSub?('<small>'+ingSub+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+ingRecurBadge+(ingSub?('<small>'+ingSub+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
     });
     html += '</div></div>';
   });
@@ -1803,6 +1804,12 @@ function setFormEditMode(kind, isEditing){
     var cuotasOptions = document.getElementById('gasCuotasOptions');
     if(cuotasOptions) cuotasOptions.style.display = isEditing ? 'none' : (document.getElementById('gasCuotas').checked ? '' : 'none');
   }
+  if(kind==='ingresos'){
+    var ingRepeatWrap = document.getElementById('ingRepeatWrap');
+    if(ingRepeatWrap) ingRepeatWrap.style.display = isEditing ? 'none' : '';
+    var ingRepeatOptions = document.getElementById('ingRepeatOptions');
+    if(ingRepeatOptions) ingRepeatOptions.style.display = isEditing ? 'none' : (document.getElementById('ingRepeat').checked ? '' : 'none');
+  }
 }
 
 function hideMoneyPreview(id){
@@ -1824,7 +1831,13 @@ function resetFormDefaults(kind){
     if(cc){ cc.checked = false; if(window.__syncGasCuotas) window.__syncGasCuotas(); }
   }
   if(kind==='inversion'){ invDefaultDate(); invFormMode(); }
-  if(kind==='ingresos') hideMoneyPreview('ingMontoPreview');
+  if(kind==='ingresos'){
+    hideMoneyPreview('ingMontoPreview');
+    var iro = document.getElementById('ingRepeatOptions');
+    var ird = document.getElementById('ingRepeatDias');
+    if(iro) iro.style.display = 'none';
+    if(ird) ird.style.display = 'none';
+  }
   if(kind==='gastos') hideMoneyPreview('gasMontoPreview');
 }
 
@@ -1924,9 +1937,17 @@ async function onDelClick(e){
     var sig = gastosSiguientes(delItem);
     if(sig.length){
       var esCuotaDel = !!delItem.cuotaGrupoId;
-      var r = await askConfirm({title: esCuotaDel?'Cuota de compra':'Gasto recurrente', paragraphs:[esCuotaDel?('Esta compra tiene '+sig.length+' cuota(s) más adelante.'):('Este gasto se repite: hay '+sig.length+' más adelante.')], altLabel:(esCuotaDel?'Esta':'Este')+' y las siguientes ('+(sig.length+1)+')', confirmLabel:esCuotaDel?'Solo esta':'Solo este', danger:false});
+      var r = await askConfirm({title: esCuotaDel?'Cuota de compra':'Gasto recurrente', paragraphs:[esCuotaDel?('Esta compra tiene '+sig.length+' cuota(s) más adelante.'):('Este gasto se repite: hay '+sig.length+' más adelante.')], altLabel:(esCuotaDel?'Esta':'Este')+' y las siguientes ('+(sig.length+1)+')', confirmLabel:esCuotaDel?'Solo esta':'Solo este', level:'neutral'});
       if(!r) return;
       if(r==='alt') delExtra = sig.map(function(g){ return {item:g, idx:DATA.gastos.indexOf(g)}; });
+    }
+  }
+  if(kind==='ingresos' && delItem && delItem.recurrente){
+    var sigI2 = ingresosSiguientes(delItem);
+    if(sigI2.length){
+      var rI = await askConfirm({title:'Ingreso recurrente', paragraphs:['Este ingreso se repite: hay '+sigI2.length+' más adelante.'], altLabel:'Este y los siguientes ('+(sigI2.length+1)+')', confirmLabel:'Solo este', level:'neutral'});
+      if(!rI) return;
+      if(rI==='alt') delExtra = sigI2.map(function(g){ return {item:g, idx:DATA.ingresos.indexOf(g)}; });
     }
   }
   var delIds = [id].concat(delExtra.map(function(x){return x.item.id;}));
@@ -1951,7 +1972,7 @@ function restoreDeletedEntry(year, kind, item, idx){
 }
 
 /* ===================== FORMS ===================== */
-document.getElementById('formIngreso').addEventListener('submit', function(e){
+document.getElementById('formIngreso').addEventListener('submit', async function(e){
   e.preventDefault();
   if(esSoloLectura()){ toast('Estás en modo solo lectura: no podés cargar ingresos.'); return; }
   var fd = new FormData(e.target);
@@ -1962,20 +1983,92 @@ document.getElementById('formIngreso').addEventListener('submit', function(e){
   var _editadoI = editingId.ingresos;
   if(editingId.ingresos){
     var item = DATA.ingresos.filter(function(x){return x.id===editingId.ingresos;})[0];
-    if(item){ item.mes=fd.get('mes'); item.fecha=ingFecha; item.tipo=fd.get('tipo'); item.monto=monto; item.autor=currentAutor(); }
+    if(item){
+      var _sigI = item.recurrente ? ingresosSiguientes(item) : [];
+      var _alcI = false;
+      if(_sigI.length){
+        _alcI = await askConfirm({title:'Editar ingreso recurrente', paragraphs:['Podés aplicar tipo y monto a los '+_sigI.length+' siguientes. La fecha y el mes de cada uno no cambian.'], altLabel:'Este y los siguientes ('+(_sigI.length+1)+')', confirmLabel:'Solo este', level:'neutral'});
+        if(!_alcI) return;
+      }
+      item.mes=fd.get('mes'); item.fecha=ingFecha; item.tipo=fd.get('tipo'); item.monto=monto; item.autor=currentAutor();
+      if(_alcI==='alt') _sigI.forEach(function(g){ g.tipo=item.tipo; g.monto=monto; g.autor=currentAutor(); });
+    }
     editingId.ingresos = null;
     setFormEditMode('ingresos', false);
     toast('Ingreso actualizado');
   } else {
-    DATA.ingresos.push({id:uid('ing'), mes:fd.get('mes'), fecha:ingFecha, tipo:fd.get('tipo'), monto:monto, autor:currentAutor()});
-    toast('Ingreso agregado');
+    var mes = fd.get('mes');
+    var tipo = fd.get('tipo');
+    var repetir = fd.get('repetir') === 'on';
+    if(repetir){
+      var freq = document.getElementById('ingRepeatFreq').value || 'mensual';
+      var creadosI = 0;
+      if(freq === 'mensual'){
+        var startIdxI = MESES.indexOf(mes);
+        var fechaBaseI = ingFecha ? parseFechaLocal(ingFecha) : null;
+        MESES.forEach(function(m, i){
+          if(i < startIdxI) return;
+          var yaExiste = DATA.ingresos.some(function(x){ return x.mes===m && x.tipo===tipo; });
+          if(yaExiste) return;
+          var fechaOcurrencia = '';
+          if(fechaBaseI) fechaOcurrencia = formatFechaISO(new Date(fechaBaseI.getFullYear(), i, fechaBaseI.getDate()));
+          DATA.ingresos.push({id:uid('ing'), mes:m, fecha:fechaOcurrencia, tipo:tipo, monto:monto, recurrente:true, autor:currentAutor()});
+          creadosI++;
+        });
+        toast(creadosI>1 ? 'Ingreso agregado y repetido en '+(creadosI-1)+' mes(es) más' : 'Ingreso agregado');
+      } else if(!ingFecha){
+        toast('Para repetir de forma semanal, quincenal o cada N días, completá la Fecha.');
+        return;
+      } else {
+        var intervaloI = freq==='semanal' ? 7 : freq==='quincenal' ? 15 : Math.max(1, parseInt(document.getElementById('ingRepeatDias').value,10) || 1);
+        var yearNumI = parseInt(STORE.activeEjercicio, 10);
+        var finEjercicioI = new Date(yearNumI, 11, 31);
+        var cursorI = parseFechaLocal(ingFecha);
+        if(!cursorI){ toast('Fecha inválida.'); return; }
+        var salvaguardaI = 0;
+        while(cursorI.getTime() <= finEjercicioI.getTime() && salvaguardaI < 500){
+          salvaguardaI++;
+          var fechaIsoI = formatFechaISO(cursorI);
+          var mesOcurrenciaI = MESES[cursorI.getMonth()];
+          var yaExisteI = DATA.ingresos.some(function(x){ return x.fecha===fechaIsoI && x.tipo===tipo; });
+          if(!yaExisteI){
+            DATA.ingresos.push({id:uid('ing'), mes:mesOcurrenciaI, fecha:fechaIsoI, tipo:tipo, monto:monto, recurrente:true, recurrenciaFreq:freq, autor:currentAutor()});
+            creadosI++;
+          }
+          cursorI = new Date(cursorI.getFullYear(), cursorI.getMonth(), cursorI.getDate()+intervaloI);
+        }
+        toast(creadosI>1 ? 'Ingreso agregado y repetido '+(creadosI-1)+' vez(es) más' : 'Ingreso agregado');
+      }
+    } else {
+      DATA.ingresos.push({id:uid('ing'), mes:mes, fecha:ingFecha, tipo:tipo, monto:monto, autor:currentAutor()});
+      toast('Ingreso agregado');
+    }
   }
   saveData(); renderAll();
   flashEntry('ingresos', _antesI, _editadoI, fd.get('mes'));
   document.getElementById('ingMonto').value = '';
   document.getElementById('ingFecha').value = '';
+  document.getElementById('ingRepeat').checked = false;
+  document.getElementById('ingRepeatOptions').style.display = 'none';
+  document.getElementById('ingRepeatDias').style.display = 'none';
   hideMoneyPreview('ingMontoPreview');
 });
+
+/* Mostrar/ocultar las opciones de frecuencia según el checkbox (Ingresos) */
+(function(){
+  var chk = document.getElementById('ingRepeat');
+  var opts = document.getElementById('ingRepeatOptions');
+  var freqSel = document.getElementById('ingRepeatFreq');
+  var diasInput = document.getElementById('ingRepeatDias');
+  if(!chk || !opts || !freqSel || !diasInput) return;
+  function sync(){
+    opts.style.display = chk.checked ? '' : 'none';
+    diasInput.style.display = (chk.checked && freqSel.value==='personalizado') ? '' : 'none';
+  }
+  chk.addEventListener('change', sync);
+  freqSel.addEventListener('change', sync);
+  sync();
+})();
 
 document.getElementById('formGasto').addEventListener('submit', async function(e){
   e.preventDefault();
@@ -1997,8 +2090,8 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
       var _alc = false;
       if(_sig.length){
         _alc = _esCuotaItem
-          ? await askConfirm({title:'Editar cuota', paragraphs:['Esta compra tiene '+_sig.length+' cuota(s) más adelante. El monto de cada cuota no se puede editar en bloque (quedó fijado al cargar la compra); se puede aplicar tipo, categoría y descripción a las siguientes.'], altLabel:'Esta y las siguientes ('+(_sig.length+1)+')', confirmLabel:'Solo esta', danger:false})
-          : await askConfirm({title:'Editar gasto recurrente', paragraphs:['Podés aplicar tipo, categoría, descripción y monto a los '+_sig.length+' siguientes. La fecha y el mes de cada uno no cambian.'], altLabel:'Este y los siguientes ('+(_sig.length+1)+')', confirmLabel:'Solo este', danger:false});
+          ? await askConfirm({title:'Editar cuota', paragraphs:['Esta compra tiene '+_sig.length+' cuota(s) más adelante. El monto de cada cuota no se puede editar en bloque (quedó fijado al cargar la compra); se puede aplicar tipo, categoría y descripción a las siguientes.'], altLabel:'Esta y las siguientes ('+(_sig.length+1)+')', confirmLabel:'Solo esta', level:'neutral'})
+          : await askConfirm({title:'Editar gasto recurrente', paragraphs:['Podés aplicar tipo, categoría, descripción y monto a los '+_sig.length+' siguientes. La fecha y el mes de cada uno no cambian.'], altLabel:'Este y los siguientes ('+(_sig.length+1)+')', confirmLabel:'Solo este', level:'neutral'});
         if(!_alc) return;
       }
       var _montoFinal = (_esCuotaItem && _alc==='alt') ? item.monto : monto; // en cuotas, "y las siguientes" no toca el monto
@@ -4551,6 +4644,12 @@ function gastosSiguientes(it){
   }
   var k=function(g){ return g.tipo+'|'+g.cat+'|'+(g.desc||''); }, key=k(it);
   return DATA.gastos.filter(function(g){ return g.id!==it.id && g.recurrente && !g.cuotaGrupoId && k(g)===key && ordenGasto(g)>ref; });
+}
+function ordenIngreso(g){ return g.fecha ? parseFechaLocal(g.fecha).getTime() : new Date(+STORE.activeEjercicio, Math.max(0,MESES.indexOf(g.mes)), 1).getTime(); }
+function ingresosSiguientes(it){
+  var ref=ordenIngreso(it);
+  var key=it.tipo;
+  return DATA.ingresos.filter(function(g){ return g.id!==it.id && g.recurrente && g.tipo===key && ordenIngreso(g)>ref; });
 }
 function montoComprometidoCuotas(){
   // Solo tiene sentido si estás parado en el ejercicio real en curso: suma las
