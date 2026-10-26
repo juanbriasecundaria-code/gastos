@@ -1274,19 +1274,31 @@ function projectMonth(){
 
 /* ===================== RESUMEN VIEW ===================== */
 var pivotCollapsed = {}; // recuerda qué grupos (fijo/variable) están colapsados entre renders
+// Mismos paths que los íconos de navegación de cada vista (sidebar/bottom-nav),
+// en miniatura, para que cada KPI se identifique de un vistazo sin leer el label.
+var KPI_ICONS = {
+  ingreso: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>',
+  gasto: '<path d="M4 3v18l3-2 3 2 3-2 3 2 3-2 3 2V3l-3 2-3-2-3 2-3-2-3 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/>',
+  dolar: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  tendencia: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>'
+};
+function kpiIco(kind, extraCls){
+  return '<svg class="kpi-ico'+(extraCls?' '+extraCls:'')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+KPI_ICONS[kind]+'</svg>';
+}
 function renderResumen(){
   var months = MESES.map(computeMonth);
   var yearIngresos = months.reduce(function(s,m){return s+m.totalIngresos;},0);
   var yearGastos = months.reduce(function(s,m){return s+m.totalGastos;},0);
   var yearRestante = months.reduce(function(s,m){return s+m.restanteMes;},0);
   var yearUsd = months.reduce(function(s,m){return s+m.totalUsd;},0);
+  var restantePos = yearRestante>=0;
 
   var kpiRow = document.getElementById('kpiRow');
   kpiRow.innerHTML =
-    '<div class="kpi k-ingreso"><div class="kpi-label">Ingresos del año</div><div class="kpi-value">'+money(yearIngresos)+'</div><div class="kpi-sub">acumulado 12 meses</div></div>'+
-    '<div class="kpi k-gasto"><div class="kpi-label">Gastos del año</div><div class="kpi-value">'+money(yearGastos)+'</div><div class="kpi-sub">fijos + variables</div></div>'+
-    '<div class="kpi k-restante kpi-hero"><div class="kpi-label">Restante del año</div><div class="kpi-value'+(yearRestante<0?' neg':'')+'">'+money(yearRestante)+'</div><div class="kpi-sub">ingresos − gastado total</div></div>'+
-    '<div class="kpi k-usd"><div class="kpi-label">USD comprados</div><div class="kpi-value">'+usd(yearUsd)+'</div><div class="kpi-sub">total del año</div></div>';
+    '<div class="kpi k-ingreso"><div class="kpi-label">'+kpiIco('ingreso')+'Ingresos del año</div><div class="kpi-value">'+money(yearIngresos)+'</div><div class="kpi-sub">acumulado 12 meses</div></div>'+
+    '<div class="kpi k-gasto"><div class="kpi-label">'+kpiIco('gasto')+'Gastos del año</div><div class="kpi-value">'+money(yearGastos)+'</div><div class="kpi-sub">fijos + variables</div></div>'+
+    '<div class="kpi k-restante kpi-hero" style="--accent:'+(restantePos?'var(--ingreso)':'var(--neg)')+'"><div class="kpi-label">'+kpiIco('tendencia', restantePos?'':'kpi-ico-down')+'Restante del año</div><div class="kpi-value'+(yearRestante<0?' neg':'')+'">'+money(yearRestante)+'</div><div class="kpi-sub">ingresos − gastado total</div></div>'+
+    '<div class="kpi k-usd"><div class="kpi-label">'+kpiIco('dolar')+'USD comprados</div><div class="kpi-value">'+usd(yearUsd)+'</div><div class="kpi-sub">total del año</div></div>';
   (function(){
     var p = null; try{ p = projectMonth(); }catch(_e){}
     if(!p) return;
@@ -1298,14 +1310,14 @@ function renderResumen(){
     else sub = 'a este ritmo, gasto total del mes';
     kpiRow.insertAdjacentHTML('beforeend',
       '<div class="kpi k-proyeccion" title="Los gastos fijos, las cuotas y los recurrentes se toman como están cargados; los variables se proyectan según el ritmo diario del mes.">'+
-      '<div class="kpi-label">Proyección de '+p.mes+'</div><div class="kpi-value'+(p.confiable && p.ingresos>0 && p.restanteProy<0?' neg':'')+'">'+money(p.totalProy)+'</div>'+
+      '<div class="kpi-label">'+kpiIco('gasto')+'Proyección de '+p.mes+'</div><div class="kpi-value'+(p.confiable && p.ingresos>0 && p.restanteProy<0?' neg':'')+'">'+money(p.totalProy)+'</div>'+
       '<div class="kpi-sub'+(p.confiable && p.ingresos>0 ? ' kpi-proj-amt' : '')+'">'+sub+'</div></div>');
   })();
   (function(){
     var comprometido = montoComprometidoCuotas();
     if(comprometido && comprometido.cuotas>0){
       kpiRow.insertAdjacentHTML('beforeend',
-        '<div class="kpi k-cuotas kpi-cuotas"><div class="kpi-label">Comprometido en cuotas</div><div class="kpi-value">'+money(comprometido.total)+'</div><div class="kpi-sub">'+comprometido.cuotas+' cuota(s) pendiente(s), resto del año</div></div>');
+        '<div class="kpi k-cuotas kpi-cuotas"><div class="kpi-label">'+kpiIco('gasto')+'Comprometido en cuotas</div><div class="kpi-value">'+money(comprometido.total)+'</div><div class="kpi-sub">'+comprometido.cuotas+' cuota(s) pendiente(s), resto del año</div></div>');
     }
   })();
   (function(){
