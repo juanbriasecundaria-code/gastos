@@ -1075,6 +1075,20 @@ main{max-width:2200px;margin-left:auto;margin-right:auto;}
 .confirm-actions .confirm-alt{flex:1 1 100%;}
 .btn.btn-danger{background:var(--neg);color:#2A0707;}
 html.theme-light .btn.btn-danger{color:#fff;}
+
+/* Niveles de gravedad del confirm: neutral (por defecto, sin cambios) / danger (borra pero hay
+   deshacer) / severe (irreversible — solo "eliminar cuenta" hoy). */
+.confirm-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.confirm-box h3{margin:0;align-self:center;}
+.confirm-ico{flex:none;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;}
+.confirm-ico .confirm-icon{width:17px;height:17px;}
+.confirm-box--danger{border-color:color-mix(in srgb, var(--neg) 45%, var(--line));}
+.confirm-box--danger .confirm-ico{background:color-mix(in srgb, var(--neg) 16%, transparent);color:var(--neg);}
+.confirm-box--severe{border:1.5px solid var(--neg);box-shadow:var(--shadow-pop), 0 0 0 3px color-mix(in srgb, var(--neg) 18%, transparent);}
+.confirm-box--severe .confirm-ico{background:var(--neg);color:#2A0707;}
+html.theme-light .confirm-box--severe .confirm-ico{color:#fff;}
+.confirm-box--severe h3{color:var(--neg);}
+.confirm-box--severe .confirm-actions .btn-danger:disabled{opacity:.55;cursor:not-allowed;}
 @media (max-width:860px){ #toast{bottom:calc(20px + 64px + env(safe-area-inset-bottom));} }
 
 /* ===== Encabezado solo-impresión ===== */

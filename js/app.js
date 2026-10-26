@@ -473,7 +473,8 @@ document.getElementById('btnDeleteEjercicio').addEventListener('click', function
     paragraphs: ['Se borran todos los ingresos, gastos, compras de dólares e inversiones de ese año. Antes se guarda una copia automática y vas a poder deshacerlo unos segundos.'],
     stats: [['Registros que se borran', String(exerciseRecords(DATA))]],
     confirmLabel: 'Eliminar ejercicio',
-    altLabel: 'Descargar copia y eliminar'
+    altLabel: 'Descargar copia y eliminar',
+    level: 'danger'
   }).then(function(res){
     if(!res) return;
     if(res === 'alt') downloadBackupFile();
@@ -709,20 +710,37 @@ function checkBackupReminder(){
 }
 // Diálogo de confirmación accesible. Devuelve una Promesa: false (cancelar), true (confirmar)
 // o 'alt' (acción alternativa, p. ej. "Descargar copia y continuar").
+// o.level diferencia el peso visual de la acción:
+//   'neutral' (por defecto) — cambios de estado sin pérdida de datos (cerrar sesión, salir de un libro)
+//   'danger'  — borra o reemplaza datos, pero hay copia automática + deshacer (eliminar ejercicio, importar backup)
+//   'severe'  — irreversible, sin deshacer posible (eliminar la cuenta)
+var CONFIRM_ICON = {
+  danger: '<svg class="icon confirm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  severe: '<svg class="icon confirm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+};
 function askConfirm(o){
   return new Promise(function(resolve){
     var prev = document.activeElement;
+    // o.level manda si está presente; si no, se infiere del viejo o.danger por compatibilidad.
+    var level = o.level || (o.danger === false ? 'neutral' : 'danger');
     var ov = document.createElement('div');
     ov.className = 'account-overlay open';
     var box = document.createElement('div');
-    box.className = 'account-box confirm-box';
+    box.className = 'account-box confirm-box confirm-box--' + level;
     box.setAttribute('role', 'alertdialog');
     box.setAttribute('aria-modal', 'true');
     var tid = 'confirmTitle' + Date.now();
     box.setAttribute('aria-labelledby', tid);
+    var hWrap = document.createElement('div'); hWrap.className = 'confirm-head';
+    if(level === 'danger' || level === 'severe'){
+      var icoWrap = document.createElement('span'); icoWrap.className = 'confirm-ico';
+      icoWrap.innerHTML = CONFIRM_ICON[level];
+      hWrap.appendChild(icoWrap);
+    }
     var h = document.createElement('h3');
-    h.id = tid; h.textContent = o.title; h.style.marginBottom = '10px';
-    box.appendChild(h);
+    h.id = tid; h.textContent = o.title;
+    hWrap.appendChild(h);
+    box.appendChild(hWrap);
     (o.paragraphs || []).forEach(function(t){
       var p = document.createElement('p'); p.textContent = t; box.appendChild(p);
     });
@@ -746,12 +764,33 @@ function askConfirm(o){
     }
     if(o.altLabel) mk(o.altLabel, 'ghost-btn confirm-alt', 'alt');
     var cancel = mk('Cancelar', 'ghost-btn', false);
-    mk(o.confirmLabel || 'Continuar', o.danger === false ? 'btn' : 'btn btn-danger', true);
+    var confirmCls = level === 'neutral' ? 'btn' : 'btn btn-danger';
+    var confirmBtn = mk(o.confirmLabel || 'Continuar', confirmCls, true);
     box.appendChild(act); ov.appendChild(box); document.body.appendChild(ov);
+    // Para acciones irreversibles (nivel "severe"), el botón de confirmar
+    // se habilita recién después de un segundo y medio: evita un Enter/click
+    // accidental sobre una acción que no tiene vuelta atrás.
+    var severeTmr = null;
+    if(level === 'severe'){
+      confirmBtn.disabled = true;
+      var baseLabel = o.confirmLabel || 'Continuar';
+      var left = 2;
+      confirmBtn.textContent = baseLabel + ' (' + left + ')';
+      severeTmr = setInterval(function(){
+        left--;
+        if(left <= 0){
+          clearInterval(severeTmr);
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = baseLabel;
+        } else {
+          confirmBtn.textContent = baseLabel + ' (' + left + ')';
+        }
+      }, 700);
+    }
     function onKey(e){
       if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(false); return; }
       if(e.key === 'Tab'){
-        var f = box.querySelectorAll('button');
+        var f = [].filter.call(box.querySelectorAll('button'), function(b){ return !b.disabled; });
         if(!f.length) return;
         var first = f[0], last = f[f.length-1];
         if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
@@ -759,6 +798,7 @@ function askConfirm(o){
       }
     }
     function done(val){
+      if(severeTmr) clearInterval(severeTmr);
       document.removeEventListener('keydown', onKey, true);
       ov.remove();
       if(prev && prev.focus) prev.focus();
@@ -978,7 +1018,7 @@ document.getElementById('btnDelCat').addEventListener('click', async function(){
   var msg = esBase
     ? '¿Eliminar la categoría original "'+cat+'"? Podés volver a agregarla después escribiendo el mismo nombre en "+ Agregar categoría nueva".'
     : '¿Eliminar la categoría "'+cat+'"? Esta acción no se puede deshacer.';
-  if(!(await askConfirmSimple(msg))) return;
+  if(!(await askConfirmSimple(msg, 'danger'))) return;
   if(esBase){
     if(DATA.deletedBaseCategorias[tipo].indexOf(cat)===-1) DATA.deletedBaseCategorias[tipo].push(cat);
   } else {
@@ -3104,7 +3144,8 @@ document.getElementById('fileImport').addEventListener('change', function(e){
       paragraphs: cfg.paragraphs.concat(['Antes se guarda una copia automática y vas a poder deshacerlo.']),
       stats: cfg.stats,
       confirmLabel: 'Reemplazar',
-      altLabel: 'Descargar copia actual y reemplazar'
+      altLabel: 'Descargar copia actual y reemplazar',
+      level: 'danger'
     }).then(function(res){
       if(!res) return;
       if(res === 'alt') downloadBackupFile();
@@ -3143,7 +3184,8 @@ document.getElementById('btnReset').addEventListener('click', function(){
       'Antes se guarda una copia automática y vas a poder deshacerlo.'],
     stats: [['Ejercicio ' + year + ' ahora', exerciseRecords(DATA) + ' registros'], ['Quedaría con', nuevaN + ' registros']],
     confirmLabel: esAnioOriginal ? 'Restaurar' : 'Vaciar',
-    altLabel: 'Descargar copia y continuar'
+    altLabel: 'Descargar copia y continuar',
+    level: 'danger'
   }).then(function(res){
     if(!res) return;
     if(res === 'alt') downloadBackupFile();
@@ -4375,7 +4417,7 @@ checkBackupReminder();
 /* ===== Mejoras (movidas dentro de startApp para acceder a DATA, toast, renderGastos, etc.) ===== */
 /* ===== Mejoras: modal de texto, carga rápida, duplicar, alerta de tope, fecha→mes ===== */
 var ICON_DUP='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-function askConfirmSimple(msg){ return askConfirm({title:'Confirmar', paragraphs:[msg], confirmLabel:'Aceptar'}); }
+function askConfirmSimple(msg, level){ return askConfirm({title:'Confirmar', paragraphs:[msg], confirmLabel:'Aceptar', level: level || 'neutral'}); }
 window.askConfirmSimple = askConfirmSimple; /* lo usa también el módulo de cuenta, fuera de startApp */
 function askPrompt(o){
   return new Promise(function(resolve){
@@ -5223,7 +5265,7 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
     shareMembersList.innerHTML = html || '<div class="empty-state">Sin miembros.</div>';
     shareMembersList.querySelectorAll('.member-remove').forEach(function(btn){
       btn.addEventListener('click', async function(){
-        if(!(await askConfirmSimple('¿Quitar a esta persona del libro compartido?'))) return;
+        if(!(await askConfirmSimple('¿Quitar a esta persona del libro compartido?', 'danger'))) return;
         var upd = {}; upd['miembros.'+btn.dataset.uid] = firebase.firestore.FieldValue.delete();
         libroRef(currentLibroId).set(upd, {merge:true}).then(function(){
           return docRef(btn.dataset.uid).set({ libroId: btn.dataset.uid }, { merge: true });
@@ -5500,7 +5542,7 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
       accDelMsg.textContent = 'El email escrito no coincide con el de tu cuenta.';
       return;
     }
-    if(!(await askConfirmSimple('Esto borra tu cuenta y todos tus datos guardados en la nube, sin vuelta atrás. ¿Confirmás?'))) return;
+    if(!(await askConfirmSimple('Esto borra tu cuenta y todos tus datos guardados en la nube, sin vuelta atrás. No hay copia automática ni "deshacer" para esto.', 'severe'))) return;
     var submitBtn = accDelForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     var cred = firebase.auth.EmailAuthProvider.credential(user.email, current);
