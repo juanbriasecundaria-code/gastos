@@ -1240,6 +1240,34 @@ details.data-menu[open] .data-summary .chev{transform:rotate(180deg);}
 .field-more[open]{padding-bottom:12px;}
 .field-more-grid{margin-top:4px;}
 
+/* Reparto de un gasto entre los miembros del libro compartido (formulario de Gastos) */
+.split-parte-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;font-size:13px;}
+.split-parte-row span{color:var(--text-dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.split-parte-row input{width:110px;flex:none;}
+
+/* Liquidación entre miembros (dentro del modal "Compartir este libro") */
+.liq-balance-row{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;
+}
+.liq-balance-row:last-child{border-bottom:none;}
+.liq-pill{font-size:12px;padding:2px 8px;border-radius:999px;font-family:var(--font-mono);font-weight:600;}
+.liq-pill.pos{background:rgba(52,199,89,.14);color:var(--ingreso);border:1px solid rgba(52,199,89,.3);}
+.liq-pill.neg{background:rgba(242,105,107,.14);color:var(--neg);border:1px solid rgba(242,105,107,.3);}
+.liq-pill.zero{background:var(--surface-2);color:var(--text-faint);border:1px solid var(--line);}
+.liq-move-row{
+  display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);
+  font-size:13px;
+}
+.liq-move-row:last-child{border-bottom:none;}
+.liq-move-row .liq-arrow{flex:none;width:14px;height:14px;color:var(--text-faint);}
+.liq-move-row .liq-monto{margin-left:auto;flex:none;font-family:var(--font-mono);font-weight:600;color:var(--neg);}
+.liq-balance-row span:first-child, .liq-move-row strong, .liq-move-row span:not(.liq-monto){
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.liq-empty{font-size:13px;color:var(--text-faint);padding:6px 0;}
+.liq-note{font-size:12px;color:var(--text-faint);margin:8px 0 0;line-height:1.45;}
+
 /* Estados vacíos con acción */
 .empty-state .empty-cta{margin-top:4px;min-height:44px;}
 /* Variante compacta: para cards vacías dentro de Gráficos, donde no hace

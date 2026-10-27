@@ -392,6 +392,20 @@
             <small id="gasCuotaPreview" style="display:block;color:var(--text-faint);margin-top:6px;"></small>
             <small id="gasCuotaHint" style="display:none;color:var(--fijo);margin-top:6px;"></small>
           </div>
+          <div class="field split-field" id="gasSplitWrap" style="display:none;">
+            <label>Reparto del gasto (libro compartido)</label>
+            <select id="gasSplitModo">
+              <option value="igual">Por igual entre todos los miembros</option>
+              <option value="personal">Personal — no entra en la liquidación</option>
+              <option value="personalizado">Montos distintos por persona</option>
+            </select>
+            <div class="field" style="margin-top:8px;" id="gasSplitPagadorWrap">
+              <label>Pagado por</label>
+              <select id="gasSplitPagador"></select>
+            </div>
+            <div id="gasSplitPartes" style="margin-top:8px;display:none;"></div>
+            <small id="gasSplitHint" style="display:block;color:var(--text-faint);margin-top:6px;"></small>
+          </div>
             </div>
           </details>
           <button type="submit" class="btn btn-accent-fijo" id="gasSubmitBtn">Agregar</button>
@@ -654,6 +668,11 @@
     <div class="account-section">
       <h4>Miembros</h4>
       <div id="shareMembersList"></div>
+    </div>
+
+    <div class="account-section" id="shareLiqSection" style="display:none;">
+      <h4>Liquidación</h4>
+      <div id="shareLiqBox"></div>
     </div>
 
     <div class="account-section" id="shareInviteSection" style="display:none;">

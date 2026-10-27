@@ -1829,6 +1829,7 @@ function resetFormDefaults(kind){
     if(rd) rd.style.display = 'none';
     var cc = document.getElementById('gasCuotas');
     if(cc){ cc.checked = false; if(window.__syncGasCuotas) window.__syncGasCuotas(); }
+    if(window.__gasSplit) window.__gasSplit.reset();
   }
   if(kind==='inversion'){ invDefaultDate(); invFormMode(); }
   if(kind==='ingresos'){
@@ -1867,6 +1868,7 @@ function populateFormForEdit(kind, item){
     document.getElementById('gasEtiquetas').value = (item.etiquetas||[]).join(', '); renderTagSug();
     setMoneyInputValue(document.getElementById('gasMonto'), item.monto);
     hideMoneyPreview('gasMontoPreview');
+    if(window.__gasSplit) window.__gasSplit.populateFromItem(item);
   } else if(kind==='dolar'){
     document.getElementById('usdMes').value = item.mes;
     setMoneyInputValue(document.getElementById('usdCant'), item.cant);
@@ -2082,6 +2084,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
   var _antes = new Set(DATA.gastos.map(function(x){return x.id;}));
   var _editado = editingId.gastos;
   var _tags = parseTags(fd.get('etiquetas'));
+  var _splitVal = window.__gasSplit ? window.__gasSplit.readForSave() : undefined;
   if(editingId.gastos){
     var item = DATA.gastos.filter(function(x){return x.id===editingId.gastos;})[0];
     if(item){
@@ -2096,6 +2099,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
       }
       var _montoFinal = (_esCuotaItem && _alc==='alt') ? item.monto : monto; // en cuotas, "y las siguientes" no toca el monto
       item.mes=fd.get('mes'); item.fecha=gasFechaVal; item.tipo=fd.get('tipo'); item.cat=cat; item.desc=fd.get('desc')||''; item.monto=_montoFinal; item.autor=currentAutor(); setTags(item,_tags);
+      if(_splitVal!==undefined) item.split = _splitVal;
       if(_alc==='alt') _sig.forEach(function(g){ g.tipo=item.tipo; g.cat=cat; g.desc=item.desc; if(!_esCuotaItem) g.monto=monto; g.autor=currentAutor(); setTags(g,_tags); });
     }
     editingId.gastos = null;
@@ -2124,7 +2128,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
         DATA.gastos.push({
           id:uid('gas'), mes:MESES[mi], fecha:fechaCuo, tipo:tipo, cat:cat, desc:desc, monto:montoCuota,
           cuotaGrupoId:cuotaGrupoId, cuotaNum:ci+1, cuotaTotal:nCuotas, cuotaMontoTotal:monto,
-          autor:currentAutor()
+          autor:currentAutor(), split:_splitVal
         });
         creadasCuo++;
       }
@@ -2146,7 +2150,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
           if(yaExiste) return; // evitar duplicar si ya había un gasto igual cargado ese mes
           var fechaOcurrencia = '';
           if(fechaBase) fechaOcurrencia = formatFechaISO(new Date(fechaBase.getFullYear(), i, fechaBase.getDate()));
-          DATA.gastos.push({id:uid('gas'), mes:m, fecha:fechaOcurrencia, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, autor:currentAutor()});
+          DATA.gastos.push({id:uid('gas'), mes:m, fecha:fechaOcurrencia, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, autor:currentAutor(), split:_splitVal});
           creados++;
         });
         toast(creados>1 ? 'Gasto agregado y repetido en '+(creados-1)+' mes(es) más' : 'Gasto agregado');
@@ -2168,7 +2172,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
             return x.fecha===fechaIso && x.tipo===tipo && x.cat===cat && (x.desc||'')===desc;
           });
           if(!yaExiste){
-            DATA.gastos.push({id:uid('gas'), mes:mesOcurrencia, fecha:fechaIso, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, recurrenciaFreq:freq, autor:currentAutor()});
+            DATA.gastos.push({id:uid('gas'), mes:mesOcurrencia, fecha:fechaIso, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, recurrenciaFreq:freq, autor:currentAutor(), split:_splitVal});
             creados++;
           }
           cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()+intervalo);
@@ -2176,7 +2180,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
         toast(creados>1 ? 'Gasto agregado y repetido '+(creados-1)+' vez(es) más' : 'Gasto agregado');
       }
     } else {
-      DATA.gastos.push({id:uid('gas'), mes:mes, fecha:gasFechaVal, tipo:tipo, cat:cat, desc:desc, monto:monto, autor:currentAutor()});
+      DATA.gastos.push({id:uid('gas'), mes:mes, fecha:gasFechaVal, tipo:tipo, cat:cat, desc:desc, monto:monto, autor:currentAutor(), split:_splitVal});
       toast('Gasto agregado');
     }
   }
@@ -2194,6 +2198,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
   document.getElementById('gasRepeatDias').style.display = 'none';
   document.getElementById('gasCuotas').checked = false;
   if(window.__syncGasCuotas) window.__syncGasCuotas();
+  if(window.__gasSplit) window.__gasSplit.reset();
   hideMoneyPreview('gasMontoPreview');
 });
 
@@ -2268,6 +2273,230 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
   sync();
   window.__syncGasCuotas = sync; // para resetear desde el submit handler
 })();
+
+/* ===== Reparto de gastos entre los miembros de un libro compartido ===== */
+// window.__gastosMiembros lo completa el módulo de cuenta/Firebase (más abajo en el archivo)
+// cada vez que cambia la lista de miembros del libro activo.
+function gastosMiembrosUsernames(){
+  var m = window.__gastosMiembros || {};
+  var vistos = {}, out = [];
+  Object.keys(m).forEach(function(uidM){
+    var u = m[uidM] && m[uidM].username;
+    if(!u || vistos[u]) return;
+    vistos[u] = 1; out.push(u);
+  });
+  return out;
+}
+function esLibroCompartido(){ return gastosMiembrosUsernames().length >= 2; }
+var __lastMiembrosUsernamesJson = null;
+// Llamado por el módulo de cuenta/Firebase cada vez que carga o cambia la lista de miembros
+// del libro activo (alguien se une, sale, o cambia de rol).
+window.__gastosOnMiembros = function(miembros){
+  window.__gastosMiembros = miembros || {};
+  var usernames = gastosMiembrosUsernames();
+  var json = JSON.stringify(usernames.slice().sort());
+  if(json === __lastMiembrosUsernamesJson) return; // no cambió realmente la lista, no tocar nada
+  __lastMiembrosUsernamesJson = json;
+  var compartido = usernames.length >= 2;
+  if(window.__gasSplit){
+    window.__gasSplit.setVisible(compartido);
+    if(compartido) window.__gasSplit.refreshMiembros();
+  }
+  var so = document.getElementById('shareOverlay');
+  if(so && so.classList.contains('open')) renderLiquidacion();
+};
+
+(function(){
+  var wrap = document.getElementById('gasSplitWrap');
+  if(!wrap) return;
+  var modoSel = document.getElementById('gasSplitModo');
+  var pagadorSel = document.getElementById('gasSplitPagador');
+  var partesBox = document.getElementById('gasSplitPartes');
+  var hint = document.getElementById('gasSplitHint');
+  var montoInput = document.getElementById('gasMonto');
+
+  function poblarSelects(){
+    var miembros = gastosMiembrosUsernames();
+    var prevPagador = pagadorSel.value;
+    pagadorSel.innerHTML = miembros.map(function(u){
+      return '<option value="'+escapeHtml(u)+'">'+escapeHtml(u)+(u===currentAutor()?' (vos)':'')+'</option>';
+    }).join('');
+    if(miembros.indexOf(prevPagador)!==-1) pagadorSel.value = prevPagador;
+    else if(miembros.indexOf(currentAutor())!==-1) pagadorSel.value = currentAutor();
+  }
+
+  function sumaPartes(){
+    var s = 0;
+    partesBox.querySelectorAll('.gasSplitParteInput').forEach(function(inp){
+      var v = parseMoneyValue(inp.value);
+      if(!isNaN(v)) s += v;
+    });
+    return Math.round(s*100)/100;
+  }
+
+  function actualizarHintPartes(){
+    if(modoSel.value !== 'personalizado'){ return; }
+    var total = parseMoneyValue(montoInput.value);
+    var asignado = sumaPartes();
+    if(isNaN(total)){ hint.textContent = ''; return; }
+    var falta = Math.round((total-asignado)*100)/100;
+    if(Math.abs(falta) < 0.01){ hint.textContent = 'Asignado '+money(asignado)+' — cierra con el total.'; hint.style.color = 'var(--ingreso)'; }
+    else { hint.textContent = falta>0 ? 'Falta asignar '+money(falta)+'.' : 'Te pasaste por '+money(-falta)+'.'; hint.style.color = 'var(--neg)'; }
+  }
+
+  function construirPartes(valoresPrevios){
+    var miembros = gastosMiembrosUsernames();
+    partesBox.innerHTML = miembros.map(function(u){
+      return '<div class="split-parte-row"><span>'+escapeHtml(u)+'</span><input type="text" inputmode="decimal" class="money-input gasSplitParteInput" data-user="'+escapeHtml(u)+'" placeholder="0"></div>';
+    }).join('');
+    if(valoresPrevios){
+      partesBox.querySelectorAll('.gasSplitParteInput').forEach(function(inp){
+        var u = inp.getAttribute('data-user');
+        if(valoresPrevios[u]!==undefined) setMoneyInputValue(inp, valoresPrevios[u]);
+      });
+    }
+    partesBox.querySelectorAll('.gasSplitParteInput').forEach(function(inp){
+      inp.addEventListener('input', actualizarHintPartes);
+    });
+    actualizarHintPartes();
+  }
+
+  function sync(){
+    if(modoSel.value === 'personalizado'){
+      partesBox.style.display = '';
+      construirPartes();
+    } else {
+      partesBox.style.display = 'none';
+      hint.style.color = 'var(--text-faint)';
+      hint.textContent = modoSel.value==='personal' ? 'Este gasto no se va a contar en la liquidación.' : '';
+    }
+  }
+
+  modoSel.addEventListener('change', sync);
+  montoInput.addEventListener('input', actualizarHintPartes);
+
+  window.__gasSplit = {
+    refreshMiembros: function(){ poblarSelects(); if(modoSel.value==='personalizado') construirPartes(); },
+    setVisible: function(v){ wrap.style.display = v ? '' : 'none'; },
+    reset: function(){ modoSel.value = 'igual'; poblarSelects(); sync(); },
+    populateFromItem: function(item){
+      var sp = item.split;
+      poblarSelects();
+      modoSel.value = (sp && sp.modo) || 'igual';
+      var pagador = (sp && sp.pagador) || item.autor;
+      if(pagador && gastosMiembrosUsernames().indexOf(pagador)!==-1) pagadorSel.value = pagador;
+      if(modoSel.value==='personalizado'){
+        partesBox.style.display = '';
+        construirPartes(sp && sp.partes);
+      } else {
+        partesBox.style.display = 'none';
+        hint.style.color = 'var(--text-faint)';
+        hint.textContent = modoSel.value==='personal' ? 'Este gasto no se va a contar en la liquidación.' : '';
+      }
+    },
+    readForSave: function(){
+      if(!esLibroCompartido()) return undefined;
+      var modo = modoSel.value;
+      var pagador = pagadorSel.value || currentAutor();
+      if(modo === 'personalizado'){
+        var partes = {};
+        partesBox.querySelectorAll('.gasSplitParteInput').forEach(function(inp){
+          var v = parseMoneyValue(inp.value);
+          partes[inp.getAttribute('data-user')] = isNaN(v) ? 0 : v;
+        });
+        return {modo:'personalizado', pagador:pagador, partes:partes};
+      }
+      if(modo === 'personal') return {modo:'personal', pagador:pagador};
+      return {modo:'igual', pagador:pagador};
+    }
+  };
+
+  wrap.style.display = esLibroCompartido() ? '' : 'none';
+  poblarSelects();
+  sync();
+})();
+
+/* ===== Liquidación: cuánto le debe cada miembro a cada otro ===== */
+function calcularLiquidacion(){
+  var miembros = gastosMiembrosUsernames();
+  if(miembros.length < 2) return null;
+  var balances = {}; miembros.forEach(function(u){ balances[u] = 0; });
+  var sinAsignar = 0;
+  DATA.gastos.forEach(function(g){
+    var sp = g.split;
+    if(sp && sp.modo === 'personal') return;
+    var monto = +g.monto || 0;
+    if(!monto) return;
+    var pagador = (sp && sp.pagador) || g.autor;
+    if(!pagador || miembros.indexOf(pagador) === -1){ sinAsignar++; return; }
+    var partes;
+    if(sp && sp.modo === 'personalizado' && sp.partes){
+      partes = sp.partes;
+    } else {
+      partes = {};
+      var cada = Math.round((monto/miembros.length)*100)/100;
+      var acumulado = 0;
+      miembros.forEach(function(u, i){
+        if(i === miembros.length-1) partes[u] = Math.round((monto-acumulado)*100)/100;
+        else { partes[u] = cada; acumulado += cada; }
+      });
+    }
+    balances[pagador] = (balances[pagador]||0) + monto;
+    Object.keys(partes).forEach(function(u){
+      if(balances[u]===undefined) balances[u] = 0;
+      balances[u] -= (+partes[u] || 0);
+    });
+  });
+  return {balances: balances, sinAsignar: sinAsignar};
+}
+function simplificarDeudas(balances){
+  var deudores = [], acreedores = [];
+  Object.keys(balances).forEach(function(u){
+    var v = Math.round(balances[u]*100)/100;
+    if(v < -0.005) deudores.push({u:u, v:-v});
+    else if(v > 0.005) acreedores.push({u:u, v:v});
+  });
+  deudores.sort(function(a,b){return b.v-a.v;});
+  acreedores.sort(function(a,b){return b.v-a.v;});
+  var movimientos = [], i=0, j=0;
+  while(i<deudores.length && j<acreedores.length){
+    var pago = Math.round(Math.min(deudores[i].v, acreedores[j].v)*100)/100;
+    if(pago > 0.005) movimientos.push({de:deudores[i].u, a:acreedores[j].u, monto:pago});
+    deudores[i].v -= pago; acreedores[j].v -= pago;
+    if(deudores[i].v <= 0.005) i++;
+    if(acreedores[j].v <= 0.005) j++;
+  }
+  return movimientos;
+}
+var ICON_LIQ_ARROW = '<svg class="icon liq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>';
+function renderLiquidacion(){
+  var box = document.getElementById('shareLiqBox');
+  var section = document.getElementById('shareLiqSection');
+  if(!box || !section) return;
+  var res = calcularLiquidacion();
+  if(!res){ section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  var movimientos = simplificarDeudas(res.balances);
+  var html = '';
+  if(!movimientos.length){
+    html += '<div class="liq-empty">Todo está en cero — nadie le debe nada a nadie.</div>';
+  } else {
+    html += movimientos.map(function(m){
+      return '<div class="liq-move-row"><strong>'+escapeHtml(m.de)+'</strong>'+ICON_LIQ_ARROW+'<span>'+escapeHtml(m.a)+'</span><span class="liq-monto">'+money(m.monto)+'</span></div>';
+    }).join('');
+  }
+  html += Object.keys(res.balances).map(function(u){
+    var v = Math.round(res.balances[u]*100)/100;
+    var cls = v>0.005?'pos':(v<-0.005?'neg':'zero');
+    var txt = v>0.005 ? 'le deben '+money(v) : (v<-0.005 ? 'debe '+money(-v) : 'está al día');
+    return '<div class="liq-balance-row"><span>'+escapeHtml(u)+'</span><span class="liq-pill '+cls+'">'+txt+'</span></div>';
+  }).join('');
+  if(res.sinAsignar){
+    html += '<p class="liq-note">'+res.sinAsignar+' gasto(s) sin autor asignado no se pudieron incluir en el cálculo.</p>';
+  }
+  html += '<p class="liq-note">Suma todos los gastos del ejercicio activo ('+STORE.activeEjercicio+'). Un gasto marcado "Personal" en Más opciones no entra acá.</p>';
+  box.innerHTML = html;
+}
 
 var usdCant = document.getElementById('usdCant');
 var usdValor = document.getElementById('usdValor');
@@ -4300,6 +4529,10 @@ function renderAll(){
   renderInversion();
   renderSidebarSummary();
   try{ renderRecoBanner(); }catch(_e){}
+  try{
+    var _so = document.getElementById('shareOverlay');
+    if(_so && _so.classList.contains('open')) renderLiquidacion();
+  }catch(_e){}
 }
 renderAll();
 
@@ -4585,6 +4818,7 @@ document.getElementById('listGastos').addEventListener('click',function(e){
   if(esSoloLectura()){ toast('Estás en modo solo lectura.'); return; }
   var it=DATA.gastos.filter(function(x){return x.id===b.getAttribute('data-dup');})[0]; if(!it) return;
   var _dup={id:uid('gas'),mes:it.mes,fecha:it.fecha||'',tipo:it.tipo,cat:it.cat,desc:it.desc||'',monto:it.monto,autor:currentAutor()};
+  if(it.split){ _dup.split = Object.assign({}, it.split, {pagador: currentAutor() || it.split.pagador}); }
   setTags(_dup,it.etiquetas); DATA.gastos.push(_dup);
   saveData(); renderAll(); toast('Gasto duplicado');
 });
@@ -5170,6 +5404,7 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
               var miembros = libroData.miembros || {};
               currentRol = (miembros[user.uid] && miembros[user.uid].rol) || 'owner';
               window.__gastosCurrentRol = currentRol;
+              if(window.__gastosOnMiembros) window.__gastosOnMiembros(miembros);
               // Auto-reparo: libros creados antes de la función "Compartir" no tienen
               // el campo miembros, lo que hace que las reglas de Firestore les nieguen
               // el acceso a su propio libro. Si sos el dueño y falta, lo completamos una vez.
@@ -5287,6 +5522,7 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
       if(!doc.exists) return;
       var data = doc.data();
       var miembros = data.miembros || {};
+      if(window.__gastosOnMiembros) window.__gastosOnMiembros(miembros);
       var nuevoRol = (miembros[currentUid] && miembros[currentUid].rol) || currentRol;
       if(nuevoRol !== currentRol){
         currentRol = nuevoRol;
@@ -5402,6 +5638,7 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
       shareMsg.textContent = 'No se pudo cargar la información para compartir (' + (err.message || err) + '). Si el problema persiste, puede ser un tema de permisos en Firestore.';
     });
     shareOverlay.classList.add('open');
+    try{ renderLiquidacion(); }catch(_e){}
   }
   function closeShareModal(){ shareOverlay.classList.remove('open'); }
   document.querySelectorAll('.share-trigger-btn').forEach(function(b){
