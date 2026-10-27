@@ -1268,6 +1268,38 @@ details.data-menu[open] .data-summary .chev{transform:rotate(180deg);}
 .liq-empty{font-size:13px;color:var(--text-faint);padding:6px 0;}
 .liq-note{font-size:12px;color:var(--text-faint);margin:8px 0 0;line-height:1.45;}
 
+/* Metas de ahorro por objetivo (Gráficos > Ahorro e inversión) */
+.meta-card{
+  border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--surface-2);
+}
+.meta-card:last-child{margin-bottom:0;}
+.meta-card.is-cumplida{border-color:rgba(52,199,89,.35);}
+.meta-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.meta-nombre{font-family:var(--font-display);font-size:14.5px;font-weight:700;}
+.meta-nombre-sub{font-size:12px;color:var(--text-faint);margin-top:2px;}
+.meta-actions{display:flex;gap:4px;flex-shrink:0;}
+.meta-icon-btn{
+  background:none;border:none;color:var(--text-faint);cursor:pointer;
+  width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  transition:color .15s, background .15s;
+}
+.meta-icon-btn svg{width:15px;height:15px;}
+.meta-icon-btn:hover{color:var(--dolar);background:rgba(91,159,237,.1);}
+.meta-icon-btn.meta-del:hover{color:var(--neg);background:rgba(242,105,107,.1);}
+.meta-bar-track{height:9px;border-radius:999px;background:var(--surface);border:1px solid var(--line);overflow:hidden;}
+.meta-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ingreso),color-mix(in srgb, var(--ingreso) 70%, var(--dolar)));transition:width .3s ease;}
+.meta-card.is-cumplida .meta-bar-fill{background:var(--ingreso);}
+.meta-sub-row{display:flex;justify-content:space-between;gap:8px;margin-top:7px;font-size:12.5px;color:var(--text-dim);font-family:var(--font-mono);}
+.meta-sub-row .meta-pct{font-weight:700;color:var(--text);}
+.meta-note{font-size:12px;color:var(--text-faint);margin-top:4px;}
+.meta-aportes-list{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;}
+.meta-aporte-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;padding:4px 0;color:var(--text-dim);}
+.meta-aporte-row .meta-aporte-monto{font-family:var(--font-mono);color:var(--text);}
+.meta-aporte-row .meta-aporte-del{background:none;border:none;color:var(--text-faint);cursor:pointer;padding:2px;display:flex;}
+.meta-aporte-row .meta-aporte-del:hover{color:var(--neg);}
+.meta-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.meta-form-grid .field-wide{grid-column:1 / -1;}
+
 /* Estados vacíos con acción */
 .empty-state .empty-cta{margin-top:4px;min-height:44px;}
 /* Variante compacta: para cards vacías dentro de Gráficos, donde no hace

@@ -167,6 +167,24 @@
       </div>
       <div class="usd-oficial-note chart-prefs-note" id="chartPrefsNote" role="status"></div>
       <div class="chart-grid">
+        <h2 class="chart-section">Comparación interanual</h2>
+        <div class="chart-card collapsed chart-card-wide" id="chartCardComparacion">
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Este año vs. otro ejercicio</h3>
+            <div class="chart-toggle-group" onclick="event.stopPropagation()">
+              <select id="compMetricSel" aria-label="Métrica a comparar">
+                <option value="gastos">Gastos</option>
+                <option value="ingresos">Ingresos</option>
+                <option value="restante">Restante (sin arrastre)</option>
+              </select>
+              <select id="compYearSel" aria-label="Año a comparar"></select>
+            </div>
+          </div>
+          <div class="chart-card-body">
+            <div id="chartComparacion"></div>
+            <p class="usd-oficial-note" id="compMesNote"></p>
+          </div>
+        </div>
         <h2 class="chart-section">Ingresos y gastos</h2>
         <div class="chart-card chart-card-wide">
           <div class="chart-card-head" data-chart-toggle>
@@ -233,6 +251,13 @@
         </div>
       
         <h2 class="chart-section">Ahorro e inversión</h2>
+        <div class="chart-card chart-card-wide" id="chartCardMetas">
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Metas de ahorro</h3>
+            <button type="button" class="ghost-btn" id="btnNuevaMeta" onclick="event.stopPropagation()">+ Nueva meta</button>
+          </div>
+          <div class="chart-card-body"><div id="metasBox"></div></div>
+        </div>
         <div class="chart-card">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Evolución del restante mensual</h3>
