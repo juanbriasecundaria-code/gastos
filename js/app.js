@@ -1540,7 +1540,7 @@ function renderIngresos(){
       var tagClass = it.tipo==='Sueldo' ? 'tag-sueldo' : 'tag-extra';
       var isEd = editingId.ingresos===it.id;
       var ingRecurBadge = it.recurrente ? '<span class="recur-badge" title="Ingreso recurrente"><svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>' : '';
-      var ingSub = [it.fecha?formatFechaCorta(it.fecha):null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
+      var ingSub = [it.fecha?formatFechaCorta(it.fecha):null, fmtMonedaOrig(it.monedaOrig)||null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
       html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+ingRecurBadge+(ingSub?('<small>'+ingSub+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
     });
     html += '</div></div>';
@@ -1631,7 +1631,8 @@ function renderGastos(){
     items.forEach(function(it){
       var tagClass = it.tipo==='Fijo' ? 'tag-fijo' : 'tag-variable';
       var isEd = editingId.gastos===it.id;
-      var subLine = [it.fecha?formatFechaCorta(it.fecha):null, it.desc?escapeHtml(it.desc):null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
+      var _monedaTxt = fmtMonedaOrig(it.monedaOrig || it.monedaOrigTotal);
+      var subLine = [it.fecha?formatFechaCorta(it.fecha):null, it.desc?escapeHtml(it.desc):null, _monedaTxt||null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
       var cuotaBadge = it.cuotaGrupoId ? '<span class="cuota-badge" title="Cuota '+it.cuotaNum+' de '+it.cuotaTotal+' — compra total '+money(it.cuotaMontoTotal)+'">Cuota '+it.cuotaNum+'/'+it.cuotaTotal+'</span>' : '';
       var recurBadge = (it.recurrente && !it.cuotaGrupoId) ? '<span class="recur-badge" title="Gasto recurrente"><svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>' : '';
       html += '<div class="entry-row has-dup'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+cuotaBadge+recurBadge+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+tagChipsHtml(it)+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-dup" data-dup="'+escapeHtml(it.id)+'" title="Duplicar" aria-label="Duplicar">'+ICON_DUP+'</button><button class="entry-edit" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
@@ -1831,6 +1832,7 @@ function resetFormDefaults(kind){
     var cc = document.getElementById('gasCuotas');
     if(cc){ cc.checked = false; if(window.__syncGasCuotas) window.__syncGasCuotas(); }
     if(window.__gasSplit) window.__gasSplit.reset();
+    if(__gasMoneda) __gasMoneda.reset();
   }
   if(kind==='inversion'){ invDefaultDate(); invFormMode(); }
   if(kind==='ingresos'){
@@ -1839,6 +1841,7 @@ function resetFormDefaults(kind){
     var ird = document.getElementById('ingRepeatDias');
     if(iro) iro.style.display = 'none';
     if(ird) ird.style.display = 'none';
+    if(__ingMoneda) __ingMoneda.reset();
   }
   if(kind==='gastos') hideMoneyPreview('gasMontoPreview');
 }
@@ -1857,6 +1860,7 @@ function populateFormForEdit(kind, item){
     document.getElementById('ingTipo').value = item.tipo;
     setMoneyInputValue(document.getElementById('ingMonto'), item.monto);
     hideMoneyPreview('ingMontoPreview');
+    if(__ingMoneda) __ingMoneda.populateFromItem(item);
   } else if(kind==='gastos'){
     document.getElementById('gasMes').value = item.mes;
     document.getElementById('gasFecha').value = item.fecha || '';
@@ -1870,6 +1874,7 @@ function populateFormForEdit(kind, item){
     setMoneyInputValue(document.getElementById('gasMonto'), item.monto);
     hideMoneyPreview('gasMontoPreview');
     if(window.__gasSplit) window.__gasSplit.populateFromItem(item);
+    if(__gasMoneda) __gasMoneda.populateFromItem({monedaOrig: item.monedaOrig || item.monedaOrigTotal});
   } else if(kind==='dolar'){
     document.getElementById('usdMes').value = item.mes;
     setMoneyInputValue(document.getElementById('usdCant'), item.cant);
@@ -1984,6 +1989,7 @@ document.getElementById('formIngreso').addEventListener('submit', async function
   var ingFecha = fd.get('fecha') || '';
   var _antesI = new Set(DATA.ingresos.map(function(x){return x.id;}));
   var _editadoI = editingId.ingresos;
+  var _monedaValI = __ingMoneda ? __ingMoneda.readForSave() : undefined;
   if(editingId.ingresos){
     var item = DATA.ingresos.filter(function(x){return x.id===editingId.ingresos;})[0];
     if(item){
@@ -1994,6 +2000,7 @@ document.getElementById('formIngreso').addEventListener('submit', async function
         if(!_alcI) return;
       }
       item.mes=fd.get('mes'); item.fecha=ingFecha; item.tipo=fd.get('tipo'); item.monto=monto; item.autor=currentAutor();
+      if(_monedaValI!==undefined) item.monedaOrig = _monedaValI; else delete item.monedaOrig;
       if(_alcI==='alt') _sigI.forEach(function(g){ g.tipo=item.tipo; g.monto=monto; g.autor=currentAutor(); });
     }
     editingId.ingresos = null;
@@ -2015,7 +2022,7 @@ document.getElementById('formIngreso').addEventListener('submit', async function
           if(yaExiste) return;
           var fechaOcurrencia = '';
           if(fechaBaseI) fechaOcurrencia = formatFechaISO(new Date(fechaBaseI.getFullYear(), i, fechaBaseI.getDate()));
-          DATA.ingresos.push({id:uid('ing'), mes:m, fecha:fechaOcurrencia, tipo:tipo, monto:monto, recurrente:true, autor:currentAutor()});
+          DATA.ingresos.push({id:uid('ing'), mes:m, fecha:fechaOcurrencia, tipo:tipo, monto:monto, recurrente:true, autor:currentAutor(), monedaOrig:_monedaValI});
           creadosI++;
         });
         toast(creadosI>1 ? 'Ingreso agregado y repetido en '+(creadosI-1)+' mes(es) más' : 'Ingreso agregado');
@@ -2035,7 +2042,7 @@ document.getElementById('formIngreso').addEventListener('submit', async function
           var mesOcurrenciaI = MESES[cursorI.getMonth()];
           var yaExisteI = DATA.ingresos.some(function(x){ return x.fecha===fechaIsoI && x.tipo===tipo; });
           if(!yaExisteI){
-            DATA.ingresos.push({id:uid('ing'), mes:mesOcurrenciaI, fecha:fechaIsoI, tipo:tipo, monto:monto, recurrente:true, recurrenciaFreq:freq, autor:currentAutor()});
+            DATA.ingresos.push({id:uid('ing'), mes:mesOcurrenciaI, fecha:fechaIsoI, tipo:tipo, monto:monto, recurrente:true, recurrenciaFreq:freq, autor:currentAutor(), monedaOrig:_monedaValI});
             creadosI++;
           }
           cursorI = new Date(cursorI.getFullYear(), cursorI.getMonth(), cursorI.getDate()+intervaloI);
@@ -2043,7 +2050,7 @@ document.getElementById('formIngreso').addEventListener('submit', async function
         toast(creadosI>1 ? 'Ingreso agregado y repetido '+(creadosI-1)+' vez(es) más' : 'Ingreso agregado');
       }
     } else {
-      DATA.ingresos.push({id:uid('ing'), mes:mes, fecha:ingFecha, tipo:tipo, monto:monto, autor:currentAutor()});
+      DATA.ingresos.push({id:uid('ing'), mes:mes, fecha:ingFecha, tipo:tipo, monto:monto, autor:currentAutor(), monedaOrig:_monedaValI});
       toast('Ingreso agregado');
     }
   }
@@ -2054,6 +2061,7 @@ document.getElementById('formIngreso').addEventListener('submit', async function
   document.getElementById('ingRepeat').checked = false;
   document.getElementById('ingRepeatOptions').style.display = 'none';
   document.getElementById('ingRepeatDias').style.display = 'none';
+  if(__ingMoneda) __ingMoneda.reset();
   hideMoneyPreview('ingMontoPreview');
 });
 
@@ -2086,6 +2094,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
   var _editado = editingId.gastos;
   var _tags = parseTags(fd.get('etiquetas'));
   var _splitVal = window.__gasSplit ? window.__gasSplit.readForSave() : undefined;
+  var _monedaVal = __gasMoneda ? __gasMoneda.readForSave() : undefined;
   if(editingId.gastos){
     var item = DATA.gastos.filter(function(x){return x.id===editingId.gastos;})[0];
     if(item){
@@ -2101,6 +2110,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
       var _montoFinal = (_esCuotaItem && _alc==='alt') ? item.monto : monto; // en cuotas, "y las siguientes" no toca el monto
       item.mes=fd.get('mes'); item.fecha=gasFechaVal; item.tipo=fd.get('tipo'); item.cat=cat; item.desc=fd.get('desc')||''; item.monto=_montoFinal; item.autor=currentAutor(); setTags(item,_tags);
       if(_splitVal!==undefined) item.split = _splitVal;
+      if(_monedaVal!==undefined) item.monedaOrig = _monedaVal; else delete item.monedaOrig;
       if(_alc==='alt') _sig.forEach(function(g){ g.tipo=item.tipo; g.cat=cat; g.desc=item.desc; if(!_esCuotaItem) g.monto=monto; g.autor=currentAutor(); setTags(g,_tags); });
     }
     editingId.gastos = null;
@@ -2129,7 +2139,8 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
         DATA.gastos.push({
           id:uid('gas'), mes:MESES[mi], fecha:fechaCuo, tipo:tipo, cat:cat, desc:desc, monto:montoCuota,
           cuotaGrupoId:cuotaGrupoId, cuotaNum:ci+1, cuotaTotal:nCuotas, cuotaMontoTotal:monto,
-          autor:currentAutor(), split:_splitVal
+          autor:currentAutor(), split:_splitVal,
+          monedaOrigTotal: ci===0 ? _monedaVal : undefined // la moneda original es de la compra completa, no de cada cuota
         });
         creadasCuo++;
       }
@@ -2151,7 +2162,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
           if(yaExiste) return; // evitar duplicar si ya había un gasto igual cargado ese mes
           var fechaOcurrencia = '';
           if(fechaBase) fechaOcurrencia = formatFechaISO(new Date(fechaBase.getFullYear(), i, fechaBase.getDate()));
-          DATA.gastos.push({id:uid('gas'), mes:m, fecha:fechaOcurrencia, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, autor:currentAutor(), split:_splitVal});
+          DATA.gastos.push({id:uid('gas'), mes:m, fecha:fechaOcurrencia, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, autor:currentAutor(), split:_splitVal, monedaOrig:_monedaVal});
           creados++;
         });
         toast(creados>1 ? 'Gasto agregado y repetido en '+(creados-1)+' mes(es) más' : 'Gasto agregado');
@@ -2173,7 +2184,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
             return x.fecha===fechaIso && x.tipo===tipo && x.cat===cat && (x.desc||'')===desc;
           });
           if(!yaExiste){
-            DATA.gastos.push({id:uid('gas'), mes:mesOcurrencia, fecha:fechaIso, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, recurrenciaFreq:freq, autor:currentAutor(), split:_splitVal});
+            DATA.gastos.push({id:uid('gas'), mes:mesOcurrencia, fecha:fechaIso, tipo:tipo, cat:cat, desc:desc, monto:monto, recurrente:true, recurrenciaFreq:freq, autor:currentAutor(), split:_splitVal, monedaOrig:_monedaVal});
             creados++;
           }
           cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()+intervalo);
@@ -2181,7 +2192,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
         toast(creados>1 ? 'Gasto agregado y repetido '+(creados-1)+' vez(es) más' : 'Gasto agregado');
       }
     } else {
-      DATA.gastos.push({id:uid('gas'), mes:mes, fecha:gasFechaVal, tipo:tipo, cat:cat, desc:desc, monto:monto, autor:currentAutor(), split:_splitVal});
+      DATA.gastos.push({id:uid('gas'), mes:mes, fecha:gasFechaVal, tipo:tipo, cat:cat, desc:desc, monto:monto, autor:currentAutor(), split:_splitVal, monedaOrig:_monedaVal});
       toast('Gasto agregado');
     }
   }
@@ -2200,6 +2211,7 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
   document.getElementById('gasCuotas').checked = false;
   if(window.__syncGasCuotas) window.__syncGasCuotas();
   if(window.__gasSplit) window.__gasSplit.reset();
+  if(__gasMoneda) __gasMoneda.reset();
   hideMoneyPreview('gasMontoPreview');
 });
 
@@ -2274,6 +2286,95 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
   sync();
   window.__syncGasCuotas = sync; // para resetear desde el submit handler
 })();
+
+/* ===== Moneda original (referencia): para gastos/ingresos hechos en otra moneda.
+   El monto en pesos sigue siendo el que manda para todos los totales, KPIs, gráficos,
+   presupuestos y liquidación — esto solo guarda el monto y la moneda real como recordatorio,
+   y ayuda a hacer la conversión al cargar. ===== */
+var MONEDAS_EXTRA = [
+  {c:'USD', n:'Dólar estadounidense'},
+  {c:'EUR', n:'Euro'},
+  {c:'GBP', n:'Libra esterlina'},
+  {c:'BRL', n:'Real brasileño'},
+  {c:'UYU', n:'Peso uruguayo'},
+  {c:'CLP', n:'Peso chileno'},
+  {c:'PYG', n:'Guaraní paraguayo'},
+  {c:'BOB', n:'Boliviano'},
+  {c:'PEN', n:'Sol peruano'},
+  {c:'COP', n:'Peso colombiano'},
+  {c:'MXN', n:'Peso mexicano'}
+];
+function monedaLabel(c){ var m = MONEDAS_EXTRA.filter(function(x){return x.c===c;})[0]; return m ? m.c : c; }
+function fmtMonedaOrig(mo){
+  if(!mo || !mo.moneda || !mo.monto) return '';
+  var n = (+mo.monto).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:2});
+  return mo.moneda+' '+n;
+}
+function setupMonedaWidget(prefix, montoFieldId){
+  var chk = document.getElementById(prefix+'MonedaOn');
+  var opts = document.getElementById(prefix+'MonedaOptions');
+  var sel = document.getElementById(prefix+'MonedaSel');
+  var montoExtInp = document.getElementById(prefix+'MonedaMonto');
+  var tcInp = document.getElementById(prefix+'MonedaTC');
+  var aplicarBtn = document.getElementById(prefix+'MonedaAplicar');
+  var hint = document.getElementById(prefix+'MonedaHint');
+  var montoPrincipal = document.getElementById(montoFieldId);
+  if(!chk || !opts || !sel || !montoExtInp || !tcInp || !aplicarBtn || !hint || !montoPrincipal) return null;
+
+  sel.innerHTML = MONEDAS_EXTRA.map(function(m){ return '<option value="'+m.c+'">'+m.c+' — '+escapeHtml(m.n)+'</option>'; }).join('');
+
+  function actualizarHint(){
+    var monto = parseMoneyValue(montoExtInp.value);
+    var tc = parseMoneyValue(tcInp.value);
+    if(isNaN(monto) || isNaN(tc) || monto<=0 || tc<=0){ hint.textContent = ''; return; }
+    hint.textContent = '≈ '+money(Math.round(monto*tc*100)/100)+' al tipo de cambio cargado.';
+  }
+  function sync(){
+    opts.style.display = chk.checked ? '' : 'none';
+    if(!chk.checked) hint.textContent = '';
+  }
+  chk.addEventListener('change', sync);
+  montoExtInp.addEventListener('input', actualizarHint);
+  tcInp.addEventListener('input', actualizarHint);
+  aplicarBtn.addEventListener('click', function(){
+    var monto = parseMoneyValue(montoExtInp.value);
+    var tc = parseMoneyValue(tcInp.value);
+    if(isNaN(monto) || monto<=0){ toast('Cargá el monto en la moneda original.'); return; }
+    if(isNaN(tc) || tc<=0){ toast('Cargá el tipo de cambio usado.'); return; }
+    setMoneyInputValue(montoPrincipal, Math.round(monto*tc*100)/100);
+    montoPrincipal.dispatchEvent(new Event('input', {bubbles:true}));
+    toast('Monto completado');
+  });
+  sync();
+
+  return {
+    reset: function(){
+      chk.checked = false; sel.value = MONEDAS_EXTRA[0].c;
+      montoExtInp.value = ''; tcInp.value = ''; hint.textContent = '';
+      sync();
+    },
+    populateFromItem: function(item){
+      var mo = item.monedaOrig;
+      if(mo && mo.moneda){
+        chk.checked = true; sel.value = mo.moneda;
+        setMoneyInputValue(montoExtInp, mo.monto||'');
+        if(mo.tc) setMoneyInputValue(tcInp, mo.tc);
+      } else {
+        chk.checked = false;
+      }
+      sync(); actualizarHint();
+    },
+    readForSave: function(){
+      if(!chk.checked) return undefined;
+      var monto = parseMoneyValue(montoExtInp.value);
+      if(isNaN(monto) || monto<=0) return undefined;
+      var tc = parseMoneyValue(tcInp.value);
+      return {moneda: sel.value, monto: monto, tc: (!isNaN(tc) && tc>0) ? tc : undefined};
+    }
+  };
+}
+var __gasMoneda = setupMonedaWidget('gas', 'gasMonto');
+var __ingMoneda = setupMonedaWidget('ing', 'ingMonto');
 
 /* ===== Reparto de gastos entre los miembros de un libro compartido ===== */
 // window.__gastosMiembros lo completa el módulo de cuenta/Firebase (más abajo en el archivo)
@@ -5063,6 +5164,8 @@ document.getElementById('listGastos').addEventListener('click',function(e){
   var it=DATA.gastos.filter(function(x){return x.id===b.getAttribute('data-dup');})[0]; if(!it) return;
   var _dup={id:uid('gas'),mes:it.mes,fecha:it.fecha||'',tipo:it.tipo,cat:it.cat,desc:it.desc||'',monto:it.monto,autor:currentAutor()};
   if(it.split){ _dup.split = Object.assign({}, it.split, {pagador: currentAutor() || it.split.pagador}); }
+  var _monedaCopia = it.monedaOrig || it.monedaOrigTotal;
+  if(_monedaCopia) _dup.monedaOrig = Object.assign({}, _monedaCopia);
   setTags(_dup,it.etiquetas); DATA.gastos.push(_dup);
   saveData(); renderAll(); toast('Gasto duplicado');
 });

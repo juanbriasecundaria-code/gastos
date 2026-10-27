@@ -323,6 +323,19 @@
             <input type="number" min="1" step="1" id="ingRepeatDias" placeholder="¿Cada cuántos días?" style="display:none;margin-top:6px;">
             <small id="ingRepeatHint" style="display:block;color:var(--text-faint);margin-top:6px;">Se repite hasta fin del ejercicio actual. Para semanal/quincenal/cada N días, completá la Fecha de arriba: ahí arranca la repetición.</small>
           </div>
+          <div class="field field-checkbox" id="ingMonedaWrap">
+            <label><input type="checkbox" id="ingMonedaOn"> Lo cobré en otra moneda</label>
+          </div>
+          <div class="field" id="ingMonedaOptions" style="display:none;">
+            <label>Moneda</label>
+            <select id="ingMonedaSel"></select>
+            <div class="meta-form-grid" style="margin-top:8px;">
+              <div class="field"><label>Monto en esa moneda</label><input type="text" inputmode="decimal" id="ingMonedaMonto" class="money-input" placeholder="0"></div>
+              <div class="field"><label>Tipo de cambio ($ARS)</label><input type="text" inputmode="decimal" id="ingMonedaTC" class="money-input" placeholder="0"></div>
+            </div>
+            <button type="button" class="ghost-btn" id="ingMonedaAplicar" style="margin-top:8px;">Convertir y completar el monto de arriba</button>
+            <small id="ingMonedaHint" style="display:block;color:var(--text-faint);margin-top:6px;"></small>
+          </div>
             </div>
           </details>
           <button type="submit" class="btn btn-accent-ingreso" id="ingSubmitBtn">Agregar</button>
@@ -416,6 +429,19 @@
             <input type="number" min="2" max="60" step="1" id="gasCuotasN" value="6">
             <small id="gasCuotaPreview" style="display:block;color:var(--text-faint);margin-top:6px;"></small>
             <small id="gasCuotaHint" style="display:none;color:var(--fijo);margin-top:6px;"></small>
+          </div>
+          <div class="field field-checkbox" id="gasMonedaWrap">
+            <label><input type="checkbox" id="gasMonedaOn"> Lo pagué en otra moneda</label>
+          </div>
+          <div class="field" id="gasMonedaOptions" style="display:none;">
+            <label>Moneda</label>
+            <select id="gasMonedaSel"></select>
+            <div class="meta-form-grid" style="margin-top:8px;">
+              <div class="field"><label>Monto en esa moneda</label><input type="text" inputmode="decimal" id="gasMonedaMonto" class="money-input" placeholder="0"></div>
+              <div class="field"><label>Tipo de cambio ($ARS)</label><input type="text" inputmode="decimal" id="gasMonedaTC" class="money-input" placeholder="0"></div>
+            </div>
+            <button type="button" class="ghost-btn" id="gasMonedaAplicar" style="margin-top:8px;">Convertir y completar el monto de arriba</button>
+            <small id="gasMonedaHint" style="display:block;color:var(--text-faint);margin-top:6px;"></small>
           </div>
           <div class="field split-field" id="gasSplitWrap" style="display:none;">
             <label>Reparto del gasto (libro compartido)</label>
