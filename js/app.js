@@ -308,6 +308,7 @@ function loadStore(){
   return storeNew;
 }
 function saveData(){
+  if(typeof invalidateArrastreCache === 'function') invalidateArrastreCache(); // los datos cambiaron: el cache de arrastre quedaría desactualizado
   if(cloudMode){
     localStorage.setItem(cloudCacheKey(), JSON.stringify(STORE));
   } else {
@@ -1209,6 +1210,28 @@ function arrastreCfg(){
   if(!c || typeof c!=='object') return {activo:true, desde:ARRASTRE_DESDE_DEFAULT};
   return {activo:c.activo!==false, desde:/^\d{4}-\d{2}$/.test(c.desde||'') ? c.desde : ARRASTRE_DESDE_DEFAULT};
 }
+// Cache de arrastre: sin esto, cada una de las 12 llamadas a computeMonth() de un render
+// recalculaba TODA la cadena histórica desde «desde» otra vez (y hay 5 vistas distintas que
+// hacen esas 12 llamadas), así que con varios años cargados el costo crecía con el cuadrado
+// de los años. Acá cada mes histórico se calcula una sola vez y la cadena se arma de forma
+// incremental; se invalida en saveData() y cuando llegan datos de otra persona del libro
+// compartido (únicos puntos donde los datos pueden cambiar).
+var _restanteCache = {}; // k (año*12+mes) -> totalRestante de ese mes, de cualquier ejercicio ya cargado
+var _carryCache = {};    // k (año*12+mes) -> saldo que ENTRA a ese mes (lo que devolvía arrastreInto)
+function invalidateArrastreCache(){ _restanteCache = {}; _carryCache = {}; }
+function restanteDeMes(k){
+  if(k in _restanteCache) return _restanteCache[k];
+  var ex = STORE.ejercicios[String(Math.floor(k/12))];
+  var val = 0;
+  if(ex){
+    var prevDATA = DATA;
+    DATA = ex;
+    val = computeMonthBase(MESES[((k%12)+12)%12]).totalRestante;
+    DATA = prevDATA;
+  }
+  _restanteCache[k] = val;
+  return val;
+}
 function arrastreInto(year, mi){
   // Saldo que entra al mes «mi» del ejercicio «year» = suma de (ingresos − gastado) de todos los
   // meses desde el anterior a «desde» hasta el mes previo al pedido.
@@ -1217,16 +1240,14 @@ function arrastreInto(year, mi){
   var desde = parseInt(cfg.desde.slice(0,4),10)*12 + (parseInt(cfg.desde.slice(5,7),10)-1);
   var target = parseInt(year,10)*12 + mi;
   if(target < desde) return 0;
-  var carry = 0, prevDATA = DATA;
-  try{
-    for(var k=desde-1; k<target; k++){
-      var ex = STORE.ejercicios[String(Math.floor(k/12))];
-      if(!ex) continue;
-      DATA = ex;
-      carry += computeMonthBase(MESES[((k%12)+12)%12]).totalRestante;
-    }
-  } finally { DATA = prevDATA; }
-  return carry;
+  var base = desde - 1;
+  if(!(base in _carryCache)) _carryCache[base] = 0;
+  var k = base;
+  while(k < target){
+    if(!((k+1) in _carryCache)) _carryCache[k+1] = _carryCache[k] + restanteDeMes(k);
+    k++;
+  }
+  return _carryCache[target];
 }
 function computeMonth(mes, idx){
   var m = computeMonthBase(mes);
@@ -1833,6 +1854,8 @@ function resetFormDefaults(kind){
     if(cc){ cc.checked = false; if(window.__syncGasCuotas) window.__syncGasCuotas(); }
     if(window.__gasSplit) window.__gasSplit.reset();
     if(__gasMoneda) __gasMoneda.reset();
+    var gm = document.getElementById('gasMore');
+    if(gm) gm.open = false; // vuelve al paso 1 del wizard mobile
   }
   if(kind==='inversion'){ invDefaultDate(); invFormMode(); }
   if(kind==='ingresos'){
@@ -2212,6 +2235,8 @@ document.getElementById('formGasto').addEventListener('submit', async function(e
   if(window.__syncGasCuotas) window.__syncGasCuotas();
   if(window.__gasSplit) window.__gasSplit.reset();
   if(__gasMoneda) __gasMoneda.reset();
+  var gm2 = document.getElementById('gasMore');
+  if(gm2) gm2.open = false; // vuelve al paso 1 del wizard mobile
   hideMoneyPreview('gasMontoPreview');
 });
 
@@ -5038,6 +5063,7 @@ window.__gastosApplyRemoteStore = function(json){
   STORE = incoming;
   STORE.activeEjercicio = activeYearStillExists ? STORE.activeEjercicio : Object.keys(STORE.ejercicios).sort()[0];
   DATA = STORE.ejercicios[STORE.activeEjercicio];
+  if(typeof invalidateArrastreCache === 'function') invalidateArrastreCache(); // llegaron datos nuevos de otra persona del libro
   if(cloudMode){ localStorage.setItem(cloudCacheKey(), JSON.stringify(STORE)); }
   renderEjercicioSelect();
   renderAll();
@@ -5214,6 +5240,169 @@ document.getElementById('listGastos').addEventListener('click',function(e){
     });
     monto.focus();
   });
+})();
+
+/* Wizard mobile del formulario de Gastos: "Más opciones" pasa a ser un segundo paso.
+   El <details id="gasMore"> ya es la única fuente de verdad del paso actual (ver CSS);
+   acá solo conectamos los dos botones a su atributo open. */
+(function(){
+  var more = document.getElementById('gasMore');
+  var btnMore = document.getElementById('gasWizardMoreBtn');
+  var btnBack = document.getElementById('gasWizardBackBtn');
+  var card = document.getElementById('gasFormCard');
+  if(!more || !btnMore || !btnBack) return;
+  function scrollCardIntoView(){
+    if(card && card.scrollIntoView) card.scrollIntoView({block:'start', inline:'nearest'});
+  }
+  btnMore.addEventListener('click', function(){
+    more.open = true;
+    scrollCardIntoView();
+  });
+  btnBack.addEventListener('click', function(){
+    more.open = false;
+    scrollCardIntoView();
+  });
+})();
+
+/* ===== Tour de bienvenida (onboarding) =====
+   Se dispara solo la primera vez que se abre la app en este navegador (localStorage, no
+   sincroniza entre dispositivos: es una preferencia de uso, no un dato financiero). También
+   se puede volver a ver a mano con el botón "Cómo funciona" del costado. */
+(function setupOnboarding(){
+  var overlay = document.getElementById('onboardOverlay');
+  var spot = document.getElementById('onboardSpot');
+  var dotsEl = document.getElementById('onboardDots');
+  var titleEl = document.getElementById('onboardTitle');
+  var textEl = document.getElementById('onboardText');
+  var btnNext = document.getElementById('onboardNext');
+  var btnBack = document.getElementById('onboardBack');
+  var btnSkip = document.getElementById('onboardSkip');
+  var btnVerTour = document.getElementById('btnVerTour');
+  if(!overlay || !spot || !dotsEl || !titleEl || !textEl || !btnNext || !btnBack || !btnSkip) return;
+  var FLAG = 'mibudget_onboarding_v1';
+  var sidebar = document.querySelector('.sidebar');
+  var backdrop = document.getElementById('mobileSidebarBackdrop');
+  function mob(){ return window.innerWidth <= 860; }
+  function elVisible(el){
+    if(!el) return false;
+    var r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+  function pick(selectors){
+    for(var i=0;i<selectors.length;i++){
+      var el = document.querySelector(selectors[i]);
+      if(elVisible(el)) return el;
+    }
+    return document.querySelector(selectors[0]);
+  }
+  function goToResumen(){
+    var btn = pick(['.sidebar nav [data-tab="resumen"]', '.bottom-nav [data-tab="resumen"]']);
+    if(btn && typeof btn.click === 'function') btn.click();
+  }
+  function openSidebarIfMobile(){
+    if(!mob() || !sidebar) return;
+    sidebar.classList.add('mobile-open');
+    if(backdrop) backdrop.classList.add('open');
+  }
+  function closeSidebarIfMobile(){
+    if(!sidebar) return;
+    sidebar.classList.remove('mobile-open');
+    if(backdrop) backdrop.classList.remove('open');
+  }
+
+  var steps = [
+    {
+      title:'Ejercicios (años)',
+      text:'Cada año es un ejercicio independiente — podés tener 2024, 2025, etc. cargados y moverte entre ellos sin mezclar los números, con este selector.',
+      needsSidebar:true,
+      target:function(){ return document.getElementById('ejercicioSelect'); }
+    },
+    {
+      title:'Las vistas',
+      text:'Resumen, Gráficos, Ingresos, Gastos, Dólar e Inversión — cada una lleva su propio registro del ejercicio activo.',
+      needsSidebar:false,
+      beforeShow:goToResumen,
+      target:function(){ return mob() ? document.querySelector('.bottom-nav') : document.querySelector('.sidebar nav'); }
+    },
+    {
+      title:'Presupuestos',
+      text:'Definí acá un tope mensual por categoría — la app te avisa cuando te estés por pasar.',
+      needsSidebar:false,
+      beforeShow:goToResumen,
+      target:function(){ return document.getElementById('btnPresupuestos'); }
+    },
+    {
+      title:'Buscador y carga rápida',
+      text:'Buscá cualquier movimiento con Ctrl+K (o tocando acá). El botón + flotante te deja cargar un gasto sin entrar a ningún formulario.',
+      needsSidebar:true,
+      target:function(){ return document.getElementById('btnOpenSearch'); }
+    }
+  ];
+  var idx = 0;
+
+  function renderDots(){
+    dotsEl.innerHTML = steps.map(function(_, i){ return '<span class="'+(i===idx?'active':'')+'"></span>'; }).join('');
+  }
+  function positionSpot(el){
+    if(!el){ spot.style.opacity = '0'; return; }
+    var r = el.getBoundingClientRect();
+    var pad = 6;
+    spot.style.opacity = '1';
+    spot.style.top = (r.top-pad)+'px';
+    spot.style.left = (r.left-pad)+'px';
+    spot.style.width = (r.width+pad*2)+'px';
+    spot.style.height = (r.height+pad*2)+'px';
+  }
+  function showStep(i){
+    idx = i;
+    var step = steps[idx];
+    if(step.beforeShow) step.beforeShow();
+    if(step.needsSidebar) openSidebarIfMobile(); else closeSidebarIfMobile();
+    titleEl.textContent = step.title;
+    textEl.textContent = step.text;
+    btnBack.style.display = idx===0 ? 'none' : '';
+    btnNext.textContent = idx===steps.length-1 ? 'Listo' : 'Siguiente';
+    renderDots();
+    var delay = step.needsSidebar ? 300 : 60;
+    setTimeout(function(){
+      var el = step.target();
+      if(el && el.scrollIntoView) el.scrollIntoView({block:'center', inline:'nearest'});
+      requestAnimationFrame(function(){ positionSpot(el); });
+    }, delay);
+  }
+  function finish(){
+    overlay.classList.remove('open');
+    closeSidebarIfMobile();
+    try{ localStorage.setItem(FLAG, '1'); }catch(_e){}
+  }
+  function start(){
+    overlay.classList.add('open');
+    showStep(0);
+  }
+
+  btnNext.addEventListener('click', function(){
+    if(idx >= steps.length-1){ finish(); return; }
+    showStep(idx+1);
+  });
+  btnBack.addEventListener('click', function(){
+    if(idx<=0) return;
+    showStep(idx-1);
+  });
+  btnSkip.addEventListener('click', finish);
+  window.addEventListener('resize', function(){
+    if(overlay.classList.contains('open')) positionSpot(steps[idx].target());
+  });
+  if(btnVerTour) btnVerTour.addEventListener('click', function(){
+    if(sidebar && sidebar.classList.contains('mobile-open') && mob()){
+      // si lo abren desde el cajón mobile, lo cerramos para que el tour arranque desde un estado prolijo
+      closeSidebarIfMobile();
+    }
+    start();
+  });
+
+  var yaVisto = false;
+  try{ yaVisto = localStorage.getItem(FLAG) === '1'; }catch(_e){}
+  if(!yaVisto) setTimeout(start, 900);
 })();
 
 /* ===== Recurrentes, filtros persistentes y orden ===== */
