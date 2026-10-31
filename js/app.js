@@ -179,6 +179,15 @@ function setCaretByDigitCount(el, formatted, digitCount){
   }
   el.setSelectionRange(pos,pos);
 }
+// Si el carácter recién tipeado (justo antes del cursor) es un punto, lo pasa a coma decimal.
+// Si el número que se está escribiendo ya tiene coma, el punto se descarta. Devuelve null si no aplica.
+function dotToDecimalComma(value, caret){
+  if(value.charAt(caret-1)!=='.') return null;
+  var before = value.slice(0, caret-1), after = value.slice(caret);
+  var termino = before.split(/[+\-*\/]/).pop() + after.split(/[+\-*\/]/)[0];
+  var rep = termino.indexOf(',')!==-1 ? '' : ',';
+  return {value: before + rep + after, caret: caret-1+rep.length};
+}
 function attachMoneyInput(el, previewEl){
   if(!el) return;
   function refreshPreview(){
@@ -197,8 +206,13 @@ function attachMoneyInput(el, previewEl){
     previewEl.style.display = 'block';
     previewEl.textContent = '= '+money(sum);
   }
-  el.addEventListener('input', function(){
+  el.addEventListener('input', function(e){
     var cursorPos = el.selectionStart;
+    // Un punto tipeado a mano funciona como coma decimal (los puntos de miles los pone la app sola).
+    if(e && e.inputType==='insertText' && e.data==='.'){
+      var fixed = dotToDecimalComma(el.value, cursorPos);
+      if(fixed){ el.value = fixed.value; cursorPos = fixed.caret; el.setSelectionRange(cursorPos, cursorPos); }
+    }
     var digitsBefore = countDigits(el.value.slice(0,cursorPos));
     var formatted = formatMoneyLive(el.value);
     el.value = formatted;
