@@ -56,14 +56,6 @@ function money(n){
   var s = "$" + fmt.format(Math.abs(Math.round(n)));
   return neg ? "-"+s : s;
 }
-// Igual que money() pero siempre con 2 decimales (centavos). Se usa solo en el resumen lateral
-// y en las listas de Ingresos y Gastos; el resto de la app sigue mostrando pesos enteros.
-function moneyDec(n){
-  if(n===null || n===undefined || isNaN(n)) return "-";
-  var r = Math.round(n*100)/100;
-  var s = "$" + fmtDec.format(Math.abs(r));
-  return r < 0 ? "-"+s : s;
-}
 function usd(n){
   if(n===null || n===undefined || isNaN(n)) return "-";
   return "US$" + fmtDec.format(n);
@@ -179,15 +171,6 @@ function setCaretByDigitCount(el, formatted, digitCount){
   }
   el.setSelectionRange(pos,pos);
 }
-// Si el carácter recién tipeado (justo antes del cursor) es un punto, lo pasa a coma decimal.
-// Si el número que se está escribiendo ya tiene coma, el punto se descarta. Devuelve null si no aplica.
-function dotToDecimalComma(value, caret){
-  if(value.charAt(caret-1)!=='.') return null;
-  var before = value.slice(0, caret-1), after = value.slice(caret);
-  var termino = before.split(/[+\-*\/]/).pop() + after.split(/[+\-*\/]/)[0];
-  var rep = termino.indexOf(',')!==-1 ? '' : ',';
-  return {value: before + rep + after, caret: caret-1+rep.length};
-}
 function attachMoneyInput(el, previewEl){
   if(!el) return;
   function refreshPreview(){
@@ -206,13 +189,8 @@ function attachMoneyInput(el, previewEl){
     previewEl.style.display = 'block';
     previewEl.textContent = '= '+money(sum);
   }
-  el.addEventListener('input', function(e){
+  el.addEventListener('input', function(){
     var cursorPos = el.selectionStart;
-    // Un punto tipeado a mano funciona como coma decimal (los puntos de miles los pone la app sola).
-    if(e && e.inputType==='insertText' && e.data==='.'){
-      var fixed = dotToDecimalComma(el.value, cursorPos);
-      if(fixed){ el.value = fixed.value; cursorPos = fixed.caret; el.setSelectionRange(cursorPos, cursorPos); }
-    }
     var digitsBefore = countDigits(el.value.slice(0,cursorPos));
     var formatted = formatMoneyLive(el.value);
     el.value = formatted;
@@ -1578,13 +1556,13 @@ function renderIngresos(){
     any = true;
     var total = items.reduce(function(s,x){return Math.round((s+(+x.monto||0))*100)/100;},0);
     var collapsed = collapsedGroups.has('ingresos-'+mes);
-    html += '<div class="month-group">'+monthHeadHtml('ingresos', mes, moneyDec(total))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
+    html += '<div class="month-group">'+monthHeadHtml('ingresos', mes, money(total))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
     items.forEach(function(it){
       var tagClass = it.tipo==='Sueldo' ? 'tag-sueldo' : 'tag-extra';
       var isEd = editingId.ingresos===it.id;
       var ingRecurBadge = it.recurrente ? '<span class="recur-badge" title="Ingreso recurrente"><svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>' : '';
       var ingSub = [it.fecha?formatFechaCorta(it.fecha):null, fmtMonedaOrig(it.monedaOrig)||null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+ingRecurBadge+(ingSub?('<small>'+ingSub+'</small>'):'')+'</span><span class="entry-amt">'+moneyDec(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+ingRecurBadge+(ingSub?('<small>'+ingSub+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
     });
     html += '</div></div>';
   });
@@ -1670,7 +1648,7 @@ function renderGastos(){
     any = true;
     var total = items.reduce(function(s,x){return Math.round((s+(+x.monto||0))*100)/100;},0);
     var collapsed = collapsedGroups.has('gastos-'+mes);
-    html += '<div class="month-group">'+monthHeadHtml('gastos', mes, moneyDec(total))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
+    html += '<div class="month-group">'+monthHeadHtml('gastos', mes, money(total))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
     items.forEach(function(it){
       var tagClass = it.tipo==='Fijo' ? 'tag-fijo' : 'tag-variable';
       var isEd = editingId.gastos===it.id;
@@ -1678,7 +1656,7 @@ function renderGastos(){
       var subLine = [it.fecha?formatFechaCorta(it.fecha):null, it.desc?escapeHtml(it.desc):null, _monedaTxt||null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
       var cuotaBadge = it.cuotaGrupoId ? '<span class="cuota-badge" title="Cuota '+it.cuotaNum+' de '+it.cuotaTotal+' — compra total '+money(it.cuotaMontoTotal)+'">Cuota '+it.cuotaNum+'/'+it.cuotaTotal+'</span>' : '';
       var recurBadge = (it.recurrente && !it.cuotaGrupoId) ? '<span class="recur-badge" title="Gasto recurrente"><svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>' : '';
-      html += '<div class="entry-row has-dup'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+cuotaBadge+recurBadge+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+tagChipsHtml(it)+'</span><span class="entry-amt">'+moneyDec(it.monto)+'</span><button class="entry-dup" data-dup="'+escapeHtml(it.id)+'" title="Duplicar" aria-label="Duplicar">'+ICON_DUP+'</button><button class="entry-edit" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
+      html += '<div class="entry-row has-dup'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+cuotaBadge+recurBadge+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+tagChipsHtml(it)+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-dup" data-dup="'+escapeHtml(it.id)+'" title="Duplicar" aria-label="Duplicar">'+ICON_DUP+'</button><button class="entry-edit" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
     });
     html += '</div></div>';
   });
@@ -4867,17 +4845,17 @@ function renderSidebarSummary(){
     var restante = yearMonths.reduce(function(s,m){return s+m.restanteMes;},0);
     box.innerHTML =
       '<div class="ss-title">Ejercicio '+escapeHtml(STORE.activeEjercicio)+'</div>'+
-      '<div class="ss-row"><span class="ss-label">Gastado</span><span class="ss-value">'+moneyDec(gastado)+'</span></div>'+
+      '<div class="ss-row"><span class="ss-label">Gastado</span><span class="ss-value">'+money(gastado)+'</span></div>'+
       '<div class="ss-divider"></div>'+
-      '<div class="ss-row"><span class="ss-label">Saldo</span><span class="ss-value '+(restante<0?'neg':'pos')+'">'+moneyDec(restante)+'</span></div>';
+      '<div class="ss-row"><span class="ss-label">Saldo</span><span class="ss-value '+(restante<0?'neg':'pos')+'">'+money(restante)+'</span></div>';
     return;
   }
   var m = computeMonth(MESES[idx]);
   box.innerHTML =
     '<div class="ss-title">'+MESES[idx]+'</div>'+
-    '<div class="ss-row"><span class="ss-label">Gastado</span><span class="ss-value">'+moneyDec(m.totalGastado)+'</span></div>'+
+    '<div class="ss-row"><span class="ss-label">Gastado</span><span class="ss-value">'+money(m.totalGastado)+'</span></div>'+
     '<div class="ss-divider"></div>'+
-    '<div class="ss-row"><span class="ss-label">Saldo</span><span class="ss-value '+(m.totalRestante<0?'neg':'pos')+'">'+moneyDec(m.totalRestante)+'</span></div>';
+    '<div class="ss-row"><span class="ss-label">Saldo</span><span class="ss-value '+(m.totalRestante<0?'neg':'pos')+'">'+money(m.totalRestante)+'</span></div>';
 }
 
 
@@ -5075,6 +5053,10 @@ document.addEventListener('keydown', function(e){
     return;
   }
 });
+
+// Permite que la capa de sincronización (fuera de este closure, ver más abajo "libros/{id}"
+// con un documento por ejercicio) leer el STORE actual para armar los diffs de guardado.
+window.__gastosGetStore = function(){ return STORE; };
 
 // Permite que la capa de sincronización (fuera de este closure) aplique
 // cambios guardados por otra persona del mismo libro compartido, en vivo.
@@ -5840,6 +5822,70 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
   function libroRef(libroId){
     return db.collection('libros').doc(libroId);
   }
+  // Cada ejercicio (año) vive en su propio documento, acá adentro — en vez de un solo campo
+  // "store" con TODOS los años juntos, que con el tiempo choca contra el límite de 1 MB por
+  // documento de Firestore. El documento principal (libroRef) se queda con lo que pesa poco y
+  // no crece sin límite: miembros, y un campo "meta" con activeEjercicio/arrastre/reglas/
+  // recordatorios/metas.
+  function ejerciciosCol(libroId){
+    return libroRef(libroId).collection('ejercicios');
+  }
+  function buildMetaJson(store){
+    return JSON.stringify({
+      activeEjercicio: store.activeEjercicio,
+      arrastre: store.arrastre,
+      reglas: store.reglas || [],
+      recordatorios: store.recordatorios || [],
+      metas: store.metas || []
+    });
+  }
+  function parseMetaField(raw){
+    if(!raw) return {};
+    try{ return JSON.parse(raw) || {}; }catch(e){ return {}; }
+  }
+  // Arma un STORE completo (la misma forma de siempre) a partir del documento principal
+  // (campo "meta") y los documentos de la subcolección "ejercicios" (uno por año).
+  function assembleStoreFromSnapshots(libroData, ejerciciosDocs){
+    var store = parseMetaField(libroData && libroData.meta);
+    store.ejercicios = {};
+    ejerciciosDocs.forEach(function(doc){
+      try{ store.ejercicios[doc.id] = JSON.parse(doc.data().data); }catch(e){ /* doc corrupto: se ignora */ }
+    });
+    return store;
+  }
+  // Migra un libro que todavía tiene todo en el campo viejo "store" al esquema nuevo
+  // (un documento por año). Es seguro llamarla de más: si ya migró, no hace nada; si se
+  // interrumpe a mitad de camino, el próximo arranque la reintenta desde cero sin problema
+  // (volver a escribir los mismos años es inofensivo). El campo viejo recién se borra al final,
+  // en un segundo paso, una vez confirmado que los años nuevos ya quedaron guardados.
+  function migrarAEjerciciosSeparados(libroId, libroData, store){
+    if(currentRol === 'lector') return; // solo lectura: no escribe
+    if(!libroData || !libroData.store) return; // nada en el formato viejo: no hay nada que migrar
+    if(libroData.migratedToPerYearDocsV1) return; // ya migrado (el campo store quedó huérfano, se ignora)
+    var years = Object.keys(store.ejercicios || {});
+    var batch = db.batch();
+    years.forEach(function(y){
+      batch.set(ejerciciosCol(libroId).doc(y), {
+        data: JSON.stringify(store.ejercicios[y]),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    });
+    batch.set(libroRef(libroId), {
+      meta: buildMetaJson(store),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    batch.commit().then(function(){
+      return libroRef(libroId).set({
+        store: firebase.firestore.FieldValue.delete(),
+        migratedToPerYearDocsV1: true
+      }, { merge: true });
+    }).then(function(){
+      years.forEach(function(y){ lastSyncedYearJson[y] = JSON.stringify(store.ejercicios[y]); });
+      lastSyncedMetaJson = buildMetaJson(store);
+    }).catch(function(err){
+      console.error('No se pudo migrar el libro al formato de un documento por ejercicio (se reintenta en el próximo arranque):', err);
+    });
+  }
   function invitacionRef(codigo){
     return db.collection('invitaciones').doc(codigo);
   }
@@ -5862,8 +5908,11 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
   var currentLibroId = null;     // id del libro (documento en la colección "libros") activo
   var currentUsername = null;
   var currentRol = 'owner';      // 'owner' | 'editor' | 'lector'
-  var libroUnsub = null;         // cancela el listener en tiempo real al cambiar de libro/salir
-  var lastAppliedStoreJson = null; // evita re-render cuando el snapshot es eco de nuestro propio guardado
+  var libroUnsub = null;         // array de 2 funciones para cancelar los listeners en tiempo real (meta + ejercicios) al cambiar de libro/salir
+  var lastSyncedMetaJson = null;   // último JSON de "meta" (activeEjercicio/arrastre/reglas/recordatorios/metas) escrito con éxito
+  var lastSyncedYearJson = {};     // año -> último JSON de ese ejercicio escrito con éxito; decide qué hace falta reescribir en cada guardado
+  var lastLibroDocData = null;     // último doc.data() del documento principal, visto por el listener en vivo
+  var lastEjerciciosDocs = null;   // último snapshot.docs de la subcolección "ejercicios", visto por el listener en vivo
 
   function updateConnStatus(){
     if(!syncDot || isSyncing) return;
@@ -5896,15 +5945,48 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
     }
     clearTimeout(syncTimer);
     syncTimer = setTimeout(function(){
-      var json = JSON.stringify(store);
-      lastAppliedStoreJson = json;
-      libroRef(currentLibroId).set({
-        store: json,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedByUid: currentUid,
-        updatedByUsername: currentUsername || null
-      }, { merge: true })
-        .then(function(){ isSyncing = false; updateConnStatus(); })
+      // Solo se reescribe lo que de verdad cambió desde el último guardado con éxito: el
+      // documento principal (meta) si cambiaron reglas/recordatorios/metas/arrastre/año activo,
+      // y el documento de cada ejercicio (año) si cambiaron sus gastos/ingresos/etc. Un año que
+      // ya no existe (se eliminó el ejercicio) se borra de Firestore también.
+      var metaJson = buildMetaJson(store);
+      var years = Object.keys(store.ejercicios || {});
+      var nuevosYearJson = {};
+      var batch = db.batch();
+      var huboCambios = false;
+      if(metaJson !== lastSyncedMetaJson){
+        batch.set(libroRef(currentLibroId), {
+          meta: metaJson,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedByUid: currentUid,
+          updatedByUsername: currentUsername || null
+        }, { merge: true });
+        huboCambios = true;
+      }
+      years.forEach(function(y){
+        var yJson = JSON.stringify(store.ejercicios[y]);
+        nuevosYearJson[y] = yJson;
+        if(lastSyncedYearJson[y] !== yJson){
+          batch.set(ejerciciosCol(currentLibroId).doc(y), {
+            data: yJson,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+          huboCambios = true;
+        }
+      });
+      Object.keys(lastSyncedYearJson).forEach(function(y){
+        if(!(y in nuevosYearJson)){
+          batch.delete(ejerciciosCol(currentLibroId).doc(y));
+          huboCambios = true;
+        }
+      });
+      if(!huboCambios){ isSyncing = false; updateConnStatus(); return; }
+      batch.commit()
+        .then(function(){
+          lastSyncedMetaJson = metaJson;
+          lastSyncedYearJson = nuevosYearJson;
+          isSyncing = false; updateConnStatus();
+        })
         .catch(function(err){
           isSyncing = false;
           if(syncDot){ syncDot.className = 'sync-dot err'; syncDot.title = 'Error al sincronizar'; }
@@ -5957,7 +6039,8 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
             currentLibroId = libroId;
             currentUsername = resolvedUsername;
             window.__gastosCurrentUsername = resolvedUsername;
-            libroRef(libroId).get().then(function(libroDoc){
+            Promise.all([ libroRef(libroId).get(), ejerciciosCol(libroId).get() ]).then(function(res){
+              var libroDoc = res[0], ejerciciosSnap = res[1];
               var libroData = (libroDoc.exists && libroDoc.data()) ? libroDoc.data() : {};
               var miembros = libroData.miembros || {};
               currentRol = (miembros[user.uid] && miembros[user.uid].rol) || 'owner';
@@ -5974,8 +6057,18 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
                   console.error('No se pudo reparar el campo miembros del libro:', err);
                 });
               }
-              var preloaded = libroData.store || null;
-              lastAppliedStoreJson = preloaded;
+              var preloaded;
+              if(ejerciciosSnap.size > 0 || libroData.migratedToPerYearDocsV1){
+                // Formato nuevo: un documento de Firestore por ejercicio.
+                preloaded = assembleStoreFromSnapshots(libroData, ejerciciosSnap.docs);
+                ejerciciosSnap.docs.forEach(function(doc){ lastSyncedYearJson[doc.id] = doc.data().data; });
+                lastSyncedMetaJson = libroData.meta || null;
+              } else {
+                // Todavía en el formato viejo (un solo campo "store" con todos los años
+                // juntos). Arranca igual con eso — la migración al formato nuevo pasa sola,
+                // en segundo plano, un poco más abajo.
+                preloaded = libroData.store || null;
+              }
               hideSplash();
               window.__gastosCloudSync = scheduleSync;
               appStarted = true;
@@ -5983,6 +6076,10 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
               updateConnStatus();
               watchLibroChanges();
               checkPendingInvites();
+              setTimeout(function(){
+                var storeActual = window.__gastosGetStore ? window.__gastosGetStore() : null;
+                if(storeActual) migrarAEjerciciosSeparados(libroId, libroData, storeActual);
+              }, 1500);
             }).catch(function(err){
               if(libroId !== user.uid && err && err.code === 'permission-denied'){
                 // Te quitaron del libro compartido: volvemos a tu libro personal
@@ -6050,7 +6147,7 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
       currentUsername = null;
       currentRol = 'owner';
       setUbPhoto(null);
-      if(libroUnsub){ libroUnsub(); libroUnsub = null; }
+      if(libroUnsub){ libroUnsub.forEach(function(u){ u(); }); libroUnsub = null; }
       window.__gastosCloudSync = null;
       userBadge.style.display = 'none';
       if(inviteBanner){ inviteBanner.style.display = 'none'; }
@@ -6072,11 +6169,42 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
 
   var ROLE_LABEL = { owner:'Dueño/a', editor:'Puede editar', lector:'Solo puede ver' };
 
+  // Compara lo último que llegó por los dos listeners (meta + ejercicios) contra lo que ya
+  // tenemos en memoria, y solo si de verdad cambió algo lo aplica. Esto reemplaza la comparación
+  // contra "lastAppliedStoreJson" de antes: ahora son dos documentos separados que pueden llegar
+  // en momentos distintos, así que se arma el STORE completo recién cuando llegaron los dos, y se
+  // compara contra la realidad actual (no contra una copia aparte) para no perder de vista nada.
+  function handleRemoteSnapshotChange(){
+    if(lastLibroDocData === null || lastEjerciciosDocs === null) return; // todavía no llegó alguno de los dos
+    if(!lastLibroDocData.meta && !lastEjerciciosDocs.length) return; // libro viejo sin migrar: no hay nada nuevo que aplicar acá
+    var storeActual = window.__gastosGetStore ? window.__gastosGetStore() : null;
+    if(!storeActual) return;
+    var incoming = assembleStoreFromSnapshots(lastLibroDocData, lastEjerciciosDocs);
+    var metaCambio = buildMetaJson(incoming) !== buildMetaJson(storeActual);
+    var ejerciciosCambiaron = false;
+    var yearsIncoming = Object.keys(incoming.ejercicios);
+    if(yearsIncoming.length !== Object.keys(storeActual.ejercicios).length){
+      ejerciciosCambiaron = true;
+    } else {
+      for(var i=0;i<yearsIncoming.length;i++){
+        var y = yearsIncoming[i];
+        if(JSON.stringify(incoming.ejercicios[y]) !== JSON.stringify(storeActual.ejercicios[y]||null)){ ejerciciosCambiaron = true; break; }
+      }
+    }
+    if(!metaCambio && !ejerciciosCambiaron) return; // eco de nuestro propio guardado: nada que hacer
+    if(window.__gastosApplyRemoteStore) window.__gastosApplyRemoteStore(incoming);
+  }
+
   // ---- Escucha en vivo los cambios que haga la otra persona en el mismo libro ----
+  // Dos listeners: uno al documento principal (miembros + metadatos chicos) y otro a la
+  // subcolección "ejercicios" (uno por año, para no repetir el límite de 1 MB que tenía el
+  // campo único "store" de antes).
   function watchLibroChanges(){
-    if(libroUnsub){ libroUnsub(); libroUnsub = null; }
+    if(libroUnsub){ libroUnsub.forEach(function(u){ u(); }); libroUnsub = null; }
     if(!currentLibroId) return;
-    libroUnsub = libroRef(currentLibroId).onSnapshot(function(doc){
+    lastLibroDocData = null;
+    lastEjerciciosDocs = null;
+    var unsubMeta = libroRef(currentLibroId).onSnapshot(function(doc){
       if(!doc.exists) return;
       var data = doc.data();
       var miembros = data.miembros || {};
@@ -6086,17 +6214,20 @@ renderGastos=function(){ fillFiltCat(); _renderGastosBase(); };
         currentRol = nuevoRol;
         window.__gastosCurrentRol = currentRol;
       }
-      if(data.store && data.store !== lastAppliedStoreJson){
-        lastAppliedStoreJson = data.store;
-        // No pisamos nuestro propio guardado recién hecho (updatedByUid === currentUid
-        // ya coincide con lastAppliedStoreJson, así que esto solo dispara con cambios ajenos).
-        if(window.__gastosApplyRemoteStore) window.__gastosApplyRemoteStore(data.store);
-      }
+      lastLibroDocData = data;
+      handleRemoteSnapshotChange();
       if(shareOverlay.classList.contains('open')) renderShareMembers(data);
       updateShareBadges(miembros);
     }, function(err){
       console.error('Error escuchando cambios del libro compartido:', err);
     });
+    var unsubEjercicios = ejerciciosCol(currentLibroId).onSnapshot(function(snapshot){
+      lastEjerciciosDocs = snapshot.docs;
+      handleRemoteSnapshotChange();
+    }, function(err){
+      console.error('Error escuchando los ejercicios del libro compartido:', err);
+    });
+    libroUnsub = [unsubMeta, unsubEjercicios];
   }
 
   // ---- Invitaciones pendientes (recibidas por nombre de usuario) ----
