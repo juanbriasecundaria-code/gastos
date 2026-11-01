@@ -1572,13 +1572,21 @@ function renderIngresos(){
   var groups = groupByMonth(arr);
   var html = "";
   var any = false;
-  MESES.forEach(function(mes){
+  MESES.forEach(function(mes, mi){
     var items = groups[mes];
-    if(!items.length) return;
+    // Saldo que arrastra el mes anterior (si la opción está activa): se muestra como una fila
+    // "Extra" de solo lectura, no es un ingreso cargado — por eso no tiene editar/eliminar ni
+    // cuenta para duplicarlo. Respeta los mismos filtros de mes/tipo que el resto de la lista.
+    var arrastreMes = (!filtMes || filtMes===mes) && filtTipo!=='Sueldo' ? Math.round(arrastreInto(STORE.activeEjercicio, mi)*100)/100 : 0;
+    if(!items.length && !arrastreMes) return;
     any = true;
-    var total = items.reduce(function(s,x){return Math.round((s+(+x.monto||0))*100)/100;},0);
+    var total = items.reduce(function(s,x){return Math.round((s+(+x.monto||0))*100)/100;},0) + arrastreMes;
     var collapsed = collapsedGroups.has('ingresos-'+mes);
     html += '<div class="month-group">'+monthHeadHtml('ingresos', mes, moneyDec(total))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
+    if(arrastreMes){
+      var mesAnteriorNombre = MESES[(mi+11)%12];
+      html += '<div class="entry-row entry-row--arrastre"><span class="tag tag-extra">Extra</span><span class="entry-desc">Saldo de '+mesAnteriorNombre+'<small>Se traslada solo, no lo repitas a mano</small></span><span class="entry-amt'+(arrastreMes<0?' neg':'')+'">'+moneyDec(arrastreMes)+'</span></div>';
+    }
     items.forEach(function(it){
       var tagClass = it.tipo==='Sueldo' ? 'tag-sueldo' : 'tag-extra';
       var isEd = editingId.ingresos===it.id;
