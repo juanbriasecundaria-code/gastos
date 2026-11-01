@@ -56,6 +56,14 @@ function money(n){
   var s = "$" + fmt.format(Math.abs(Math.round(n)));
   return neg ? "-"+s : s;
 }
+// Igual que money() pero siempre con 2 decimales (centavos). Se usa solo en el resumen lateral
+// y en las listas de Ingresos y Gastos; el resto de la app sigue mostrando pesos enteros.
+function moneyDec(n){
+  if(n===null || n===undefined || isNaN(n)) return "-";
+  var r = Math.round(n*100)/100;
+  var s = "$" + fmtDec.format(Math.abs(r));
+  return r < 0 ? "-"+s : s;
+}
 function usd(n){
   if(n===null || n===undefined || isNaN(n)) return "-";
   return "US$" + fmtDec.format(n);
@@ -171,6 +179,15 @@ function setCaretByDigitCount(el, formatted, digitCount){
   }
   el.setSelectionRange(pos,pos);
 }
+// Si el carácter recién tipeado (justo antes del cursor) es un punto, lo pasa a coma decimal.
+// Si el número que se está escribiendo ya tiene coma, el punto se descarta. Devuelve null si no aplica.
+function dotToDecimalComma(value, caret){
+  if(value.charAt(caret-1)!=='.') return null;
+  var before = value.slice(0, caret-1), after = value.slice(caret);
+  var termino = before.split(/[+\-*\/]/).pop() + after.split(/[+\-*\/]/)[0];
+  var rep = termino.indexOf(',')!==-1 ? '' : ',';
+  return {value: before + rep + after, caret: caret-1+rep.length};
+}
 function attachMoneyInput(el, previewEl){
   if(!el) return;
   function refreshPreview(){
@@ -189,8 +206,13 @@ function attachMoneyInput(el, previewEl){
     previewEl.style.display = 'block';
     previewEl.textContent = '= '+money(sum);
   }
-  el.addEventListener('input', function(){
+  el.addEventListener('input', function(e){
     var cursorPos = el.selectionStart;
+    // Un punto tipeado a mano funciona como coma decimal (los puntos de miles los pone la app sola).
+    if(e && e.inputType==='insertText' && e.data==='.'){
+      var fixed = dotToDecimalComma(el.value, cursorPos);
+      if(fixed){ el.value = fixed.value; cursorPos = fixed.caret; el.setSelectionRange(cursorPos, cursorPos); }
+    }
     var digitsBefore = countDigits(el.value.slice(0,cursorPos));
     var formatted = formatMoneyLive(el.value);
     el.value = formatted;
@@ -1556,13 +1578,13 @@ function renderIngresos(){
     any = true;
     var total = items.reduce(function(s,x){return Math.round((s+(+x.monto||0))*100)/100;},0);
     var collapsed = collapsedGroups.has('ingresos-'+mes);
-    html += '<div class="month-group">'+monthHeadHtml('ingresos', mes, money(total))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
+    html += '<div class="month-group">'+monthHeadHtml('ingresos', mes, moneyDec(total))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
     items.forEach(function(it){
       var tagClass = it.tipo==='Sueldo' ? 'tag-sueldo' : 'tag-extra';
       var isEd = editingId.ingresos===it.id;
       var ingRecurBadge = it.recurrente ? '<span class="recur-badge" title="Ingreso recurrente"><svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>' : '';
       var ingSub = [it.fecha?formatFechaCorta(it.fecha):null, fmtMonedaOrig(it.monedaOrig)||null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
-      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+ingRecurBadge+(ingSub?('<small>'+ingSub+'</small>'):'')+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
+      html += '<div class="entry-row'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+ingRecurBadge+(ingSub?('<small>'+ingSub+'</small>'):'')+'</span><span class="entry-amt">'+moneyDec(it.monto)+'</span><button class="entry-edit" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="ingresos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
     });
     html += '</div></div>';
   });
@@ -1648,7 +1670,7 @@ function renderGastos(){
     any = true;
     var total = items.reduce(function(s,x){return Math.round((s+(+x.monto||0))*100)/100;},0);
     var collapsed = collapsedGroups.has('gastos-'+mes);
-    html += '<div class="month-group">'+monthHeadHtml('gastos', mes, money(total))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
+    html += '<div class="month-group">'+monthHeadHtml('gastos', mes, moneyDec(total))+'<div class="entry-list"'+(collapsed?' style="display:none"':'')+'>';
     items.forEach(function(it){
       var tagClass = it.tipo==='Fijo' ? 'tag-fijo' : 'tag-variable';
       var isEd = editingId.gastos===it.id;
@@ -1656,7 +1678,7 @@ function renderGastos(){
       var subLine = [it.fecha?formatFechaCorta(it.fecha):null, it.desc?escapeHtml(it.desc):null, _monedaTxt||null, it.autor?escapeHtml(it.autor):null].filter(Boolean).join(' · ');
       var cuotaBadge = it.cuotaGrupoId ? '<span class="cuota-badge" title="Cuota '+it.cuotaNum+' de '+it.cuotaTotal+' — compra total '+money(it.cuotaMontoTotal)+'">Cuota '+it.cuotaNum+'/'+it.cuotaTotal+'</span>' : '';
       var recurBadge = (it.recurrente && !it.cuotaGrupoId) ? '<span class="recur-badge" title="Gasto recurrente"><svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>' : '';
-      html += '<div class="entry-row has-dup'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+cuotaBadge+recurBadge+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+tagChipsHtml(it)+'</span><span class="entry-amt">'+money(it.monto)+'</span><button class="entry-dup" data-dup="'+escapeHtml(it.id)+'" title="Duplicar" aria-label="Duplicar">'+ICON_DUP+'</button><button class="entry-edit" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
+      html += '<div class="entry-row has-dup'+(isEd?' is-editing':'')+'"><span class="tag '+tagClass+'">'+escapeHtml(it.tipo)+'</span><span class="entry-desc">'+cuotaBadge+recurBadge+escapeHtml(it.cat)+(subLine?('<small>'+subLine+'</small>'):'')+tagChipsHtml(it)+'</span><span class="entry-amt">'+moneyDec(it.monto)+'</span><button class="entry-dup" data-dup="'+escapeHtml(it.id)+'" title="Duplicar" aria-label="Duplicar">'+ICON_DUP+'</button><button class="entry-edit" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Editar" aria-label="Editar">'+ICON_EDIT+'</button><button class="entry-del" data-kind="gastos" data-id="'+escapeHtml(it.id)+'" title="Eliminar" aria-label="Eliminar">'+ICON_DEL+'</button></div>';
     });
     html += '</div></div>';
   });
@@ -4845,17 +4867,17 @@ function renderSidebarSummary(){
     var restante = yearMonths.reduce(function(s,m){return s+m.restanteMes;},0);
     box.innerHTML =
       '<div class="ss-title">Ejercicio '+escapeHtml(STORE.activeEjercicio)+'</div>'+
-      '<div class="ss-row"><span class="ss-label">Gastado</span><span class="ss-value">'+money(gastado)+'</span></div>'+
+      '<div class="ss-row"><span class="ss-label">Gastado</span><span class="ss-value">'+moneyDec(gastado)+'</span></div>'+
       '<div class="ss-divider"></div>'+
-      '<div class="ss-row"><span class="ss-label">Saldo</span><span class="ss-value '+(restante<0?'neg':'pos')+'">'+money(restante)+'</span></div>';
+      '<div class="ss-row"><span class="ss-label">Saldo</span><span class="ss-value '+(restante<0?'neg':'pos')+'">'+moneyDec(restante)+'</span></div>';
     return;
   }
   var m = computeMonth(MESES[idx]);
   box.innerHTML =
     '<div class="ss-title">'+MESES[idx]+'</div>'+
-    '<div class="ss-row"><span class="ss-label">Gastado</span><span class="ss-value">'+money(m.totalGastado)+'</span></div>'+
+    '<div class="ss-row"><span class="ss-label">Gastado</span><span class="ss-value">'+moneyDec(m.totalGastado)+'</span></div>'+
     '<div class="ss-divider"></div>'+
-    '<div class="ss-row"><span class="ss-label">Saldo</span><span class="ss-value '+(m.totalRestante<0?'neg':'pos')+'">'+money(m.totalRestante)+'</span></div>';
+    '<div class="ss-row"><span class="ss-label">Saldo</span><span class="ss-value '+(m.totalRestante<0?'neg':'pos')+'">'+moneyDec(m.totalRestante)+'</span></div>';
 }
 
 
