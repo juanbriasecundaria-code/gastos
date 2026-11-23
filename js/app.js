@@ -1377,6 +1377,7 @@ function renderResumen(){
   var restantePos = yearRestante>=0;
 
   var kpiRow = document.getElementById('kpiRow');
+  var kpiRowMes = document.getElementById('kpiRowMes'); kpiRowMes.innerHTML='';
   kpiRow.innerHTML =
     '<div class="kpi k-ingreso"><div class="kpi-label">'+kpiIco('ingreso')+'Ingresos del año</div><div class="kpi-value">'+money(yearIngresos)+'</div><div class="kpi-sub">acumulado 12 meses</div></div>'+
     '<div class="kpi k-gasto"><div class="kpi-label">'+kpiIco('gasto')+'Gastos del año</div><div class="kpi-value">'+money(yearGastos)+'</div><div class="kpi-sub">fijos + variables</div></div>'+
@@ -1391,7 +1392,7 @@ function renderResumen(){
       ? 'a este ritmo cerrás con '+money(p.restanteProy)+' libres'
       : 'a este ritmo cerrás '+money(-p.restanteProy)+' en rojo';
     else sub = 'a este ritmo, gasto total del mes';
-    kpiRow.insertAdjacentHTML('beforeend',
+    kpiRowMes.insertAdjacentHTML('beforeend',
       '<div class="kpi k-proyeccion" title="Los gastos fijos, las cuotas y los recurrentes se toman como están cargados; los variables se proyectan según el ritmo diario del mes.">'+
       '<div class="kpi-label">'+kpiIco('gasto')+'Proyección de '+p.mes+'</div><div class="kpi-value'+(p.confiable && p.ingresos>0 && p.restanteProy<0?' neg':'')+'">'+money(p.totalProy)+'</div>'+
       '<div class="kpi-sub'+(p.confiable && p.ingresos>0 ? ' kpi-proj-amt' : '')+'">'+sub+'</div></div>');
@@ -1399,7 +1400,7 @@ function renderResumen(){
   (function(){
     var comprometido = montoComprometidoCuotas();
     if(comprometido && comprometido.cuotas>0){
-      kpiRow.insertAdjacentHTML('beforeend',
+      kpiRowMes.insertAdjacentHTML('beforeend',
         '<div class="kpi k-cuotas kpi-cuotas"><div class="kpi-label">'+kpiIco('gasto')+'Comprometido en cuotas</div><div class="kpi-value">'+money(comprometido.total)+'</div><div class="kpi-sub">'+comprometido.cuotas+' cuota(s) pendiente(s), resto del año</div></div>');
     }
   })();
@@ -1419,6 +1420,8 @@ function renderResumen(){
     if(subs[1]) subs[1].insertAdjacentHTML('beforeend', vb(function(m){return m.totalGastos;},'gasto'));
     if(subs[2]) subs[2].insertAdjacentHTML('beforeend', vb(function(m){return m.totalRestante;},'ingreso'));
   })();
+
+  var lblMes = document.getElementById('kpiLblMes'); if(lblMes) lblMes.hidden = !kpiRowMes.childElementCount;
 
   var table = document.getElementById('pivotTable');
   var html = '<thead><tr><th>Categoría</th>';
@@ -1475,7 +1478,7 @@ function renderResumen(){
         var gastadoMes = r.vals[curIdx];
         var pctBudget = (gastadoMes/presupuesto)*100;
         var w = Math.min(100, Math.max(4, Math.round(pctBudget)));
-        var color = pctBudget>=100 ? 'var(--neg)' : (pctBudget>=80 ? '#F0B43A' : 'var(--'+groupKey+')');
+        var color = pctBudget>=100 ? 'var(--neg)' : (pctBudget>=80 ? 'var(--warn)' : 'var(--'+groupKey+')');
         barStyle = 'width:'+w+'%;background:'+color+';';
         if(pctBudget>=100){
           badge = '<span class="presu-badge" title="Superaste el presupuesto de '+money(presupuesto)+' para '+MESES[curIdx]+'">+'+Math.round(pctBudget-100)+'%</span>';
@@ -1544,7 +1547,27 @@ function renderResumen(){
   html += rowFor('Total Restante', function(m){return m.totalRestante;}, 'total-row', 'ingreso', false, function(){return months.reduce(function(a,m){return a+m.restanteMes;},0);});
 
   html += '</tbody>';
+  table.classList.remove('pivot-anim');
   table.innerHTML = html;
+  if(!window.__pivotAnimated){ window.__pivotAnimated = true; table.classList.add('pivot-anim'); }
+  (function(){
+    var ci = currentMonthIdxForDisplay();
+    if(ci<0) return;
+    var col = ci+1;
+    Array.prototype.forEach.call(table.rows, function(tr){
+      if(tr.cells.length>=14 && tr.cells[col]) tr.cells[col].classList.add('col-cur');
+    });
+    var wrap = table.closest('.table-wrap');
+    if(wrap && !window.__pivotScrolled){
+      requestAnimationFrame(function(){
+        if(!wrap.clientWidth || wrap.scrollWidth<=wrap.clientWidth) return;
+        var th = table.rows[0] && table.rows[0].cells[col]; if(!th) return;
+        var first = table.rows[0].cells[0].offsetWidth || 0;
+        wrap.scrollLeft = Math.max(0, th.offsetLeft - first - 8);
+        window.__pivotScrolled = true;
+      });
+    }
+  })();
   (function(){
     var yr=parseInt(STORE.activeEjercicio,10), now=new Date(), ny=now.getFullYear(), nm=now.getMonth();
     var cur = yr===ny ? nm : -1;
@@ -1850,7 +1873,7 @@ function renderInvestmentChart(){
   var currency=document.getElementById('invChartCurrency').value;
   invFillNames('invChartName',currency,'Todas las inversiones');
   var name=document.getElementById('invChartName').value,rows=invRows(currency,name),el=document.getElementById('chartInversion');
-  if(!rows.length){el.innerHTML='<div class="empty-state">Registrá aportes y saldos para ver su evolución.</div>';return;}
+  if(!rows.length){el.innerHTML='<div class="empty-state compact">Registrá aportes y saldos para ver su evolución.<button type="button" class="empty-link" data-goto-tab="inversion">Ir a Inversión</button></div>';return;}
   var end=Math.max.apply(null,rows.map(function(x){return MESES.indexOf(x.mes);}));
   var points=MESES.slice(0,end+1).map(function(m,i){var aa=invAccounts(currency,name,i),base=0,value=0,valid=aa.length>0;aa.forEach(function(a){base+=a.base;if(a.value===null||a.pending)valid=false;else value+=a.value;});return {mes:m,base:aa.length?base:null,value:valid?value:null};});
   var nums=[0];points.forEach(function(p){if(p.base!==null)nums.push(p.base);if(p.value!==null)nums.push(p.value);});
@@ -3750,7 +3773,7 @@ updateSnapshotButton();
 /* ===================== CHARTS ===================== */
 var CHART_COLORS = {
   ingreso:'#4FD1A5', fijo:'#F0B43A', variable:'#B47EF5', dolar:'#5B9FED',
-  inversion:'#F2679A', neg:'#F2696B', grid:'#2C333C', textDim:'#8B98A5', textFaint:'#5B6874'
+  inversion:'#F2679A', neg:'#F2696B', warn:'#FF8B5E', grid:'#2C333C', textDim:'#8B98A5', textFaint:'#5B6874'
 };
 var DONUT_PALETTE = ['#F0B43A','#B47EF5','#5B9FED','#4FD1A5','#F2679A','#FF8B5E','#8B98A5'];
 cargarUsdOficialCache();
@@ -3862,7 +3885,7 @@ function buildDonutChart(catTotals, opts){
   var fmtFull = opts.usd ? usd : money;
   var entries = Object.keys(catTotals).map(function(c){return {cat:c, val:catTotals[c]};}).filter(function(e){return e.val>0;});
   if(!entries.length){
-    return '<div class="empty-state">Todavía no hay gastos cargados.</div>';
+    return '<div class="empty-state compact">Todavía no hay gastos cargados.<button type="button" class="empty-link" data-goto-tab="gastos">Ir a Gastos</button></div>';
   }
   entries.sort(function(a,b){return b.val-a.val;});
   var top = entries.slice(0,6);
@@ -3947,7 +3970,7 @@ function buildDolarRefChart(valores, fuentes){
   fuentes = fuentes || valores.map(function(v){ return (v===null||v===undefined) ? null : 'compra'; });
   var known = valores.filter(function(v){return v!==null && v!==undefined;});
   if(!known.length){
-    return '<div class="empty-state">Todavía no registraste compras de dólares ni se pudo traer la cotización del dólar (necesitás conexión a internet al menos una vez).</div>';
+    return '<div class="empty-state compact">Todavía no registraste compras de dólares ni se pudo traer la cotización del dólar (necesitás conexión a internet al menos una vez).<button type="button" class="empty-link" data-goto-tab="dolar">Ir a Dólar</button></div>';
   }
   var W=860,H=260,padL=58,padR=14,padT=14,padB=40;
   var innerW=W-padL-padR, innerH=H-padT-padB;
@@ -4034,9 +4057,9 @@ function buildPresupuestoChart(mesSel){
     var pctProy = r.presu>0 ? r.proy/r.presu*100 : 0;
     var proyTxt = hayProy ? '<div class="pchart-proj-line pchart-proj-amt'+(pctProy>100?' over':'')+'">Proyección: '+money(r.proy)+' ('+Math.round(pctProy)+'% del tope)</div>' : '';
     var wPresu = Math.min(100, r.presu/barMax*100);
-    var color = pct>100 ? CHART_COLORS.neg : (pct>=80 ? CHART_COLORS.fijo : CHART_COLORS.ingreso);
-    var badgeClass = pct>100 ? 'var-bad' : 'var-good';
-    var badgeTxt = (pct>100?'+':'') + Math.round(pct-100) + '%';
+    var color = pct>100 ? CHART_COLORS.neg : (pct>=80 ? CHART_COLORS.warn : CHART_COLORS.ingreso);
+    var badgeClass = pct>100 ? 'var-bad' : (pct>=80 ? 'var-warn' : 'var-good');
+    var badgeTxt = Math.round(pct) + '% usado';
     return '<div class="pchart-row">'+
       '<div class="pchart-top"><span class="pchart-cat">'+escapeHtml(r.cat)+' <span style="opacity:.55;font-size:12px;">('+r.tipo+')</span></span>'+
       '<span class="pchart-vals">'+money(r.real)+' / '+money(r.presu)+' <span class="var-badge '+badgeClass+'">'+badgeTxt+'</span></span></div>'+
@@ -4048,7 +4071,7 @@ function buildPresupuestoChart(mesSel){
   }).join('');
   var legend = '<div class="chart-legend-row">'+
       '<div class="chart-legend-item"><span class="chart-legend-swatch" style="background:'+CHART_COLORS.ingreso+';"></span>Bajo control (&lt;80%)</div>'+
-      '<div class="chart-legend-item"><span class="chart-legend-swatch" style="background:'+CHART_COLORS.fijo+';"></span>Cerca del límite (80–100%)</div>'+
+      '<div class="chart-legend-item"><span class="chart-legend-swatch" style="background:'+CHART_COLORS.warn+';"></span>Cerca del límite (80–100%)</div>'+
       '<div class="chart-legend-item"><span class="chart-legend-swatch" style="background:'+CHART_COLORS.neg+';"></span>Excedido (&gt;100%)</div>'+
       '<div class="chart-legend-item"><span style="width:2px;height:12px;background:var(--text-faint);display:inline-block;"></span>Tope del presupuesto</div>'+
       (usaProy ? '<div class="chart-legend-item"><span class="chart-legend-swatch pchart-proj-swatch"></span>Proyección a fin de mes (ritmo actual)</div>' : '')+
@@ -4397,6 +4420,7 @@ function refreshChartThemeColors(){
   CHART_COLORS.dolar = v('--dolar', CHART_COLORS.dolar);
   CHART_COLORS.inversion = v('--inversion', CHART_COLORS.inversion);
   CHART_COLORS.neg = v('--neg', CHART_COLORS.neg);
+  CHART_COLORS.warn = v('--warn', CHART_COLORS.warn);
   CHART_COLORS.grid = v('--line', CHART_COLORS.grid);
   CHART_COLORS.textDim = v('--text-dim', CHART_COLORS.textDim);
   CHART_COLORS.textFaint = v('--text-faint', CHART_COLORS.textFaint);
@@ -4425,7 +4449,7 @@ function renderComparacionInteranual(){
     if(otros.indexOf(prevVal)!==-1) yearSel.value = prevVal;
   }
   if(!otros.length){
-    chartEl.innerHTML = '<div class="empty-state">Todavía no tenés otro ejercicio cargado para comparar. Creá un año anterior o posterior desde el selector de ejercicios (arriba a la izquierda) para habilitar esta comparación.</div>';
+    chartEl.innerHTML = '<div class="empty-state compact">Todavía no tenés otro ejercicio cargado para comparar. Creá un año anterior o posterior para habilitar esta comparación.<button type="button" class="empty-link" data-click-sel="#btnNuevoEjercicio">Crear ejercicio</button></div>';
     noteEl.textContent = '';
     return;
   }
@@ -5159,6 +5183,8 @@ function flashEntry(kind, antes, editadoId, mesPref){
   if(window.__ctaBound) return;
   window.__ctaBound = true;
   document.addEventListener('click', function(e){
+    var clickLink = e.target.closest('.empty-link[data-click-sel]');
+    if(clickLink){ var tgt = document.querySelector(clickLink.getAttribute('data-click-sel')); if(tgt) tgt.click(); return; }
     var tabLink = e.target.closest('.empty-link[data-goto-tab]');
     if(tabLink){ activarTab(tabLink.getAttribute('data-goto-tab')); return; }
     var b = e.target.closest('.empty-cta');
@@ -5292,6 +5318,31 @@ document.getElementById('listGastos').addEventListener('click',function(e){
     });
     monto.focus();
   });
+})();
+
+/* Índice de secciones de Gráficos: chips fijos arriba + resaltado de la sección visible */
+(function(){
+  var nav = document.getElementById('chartIndex'), view = document.getElementById('view-graficos');
+  if(!nav || !view) return;
+  var heads = Array.prototype.slice.call(view.querySelectorAll('h2.chart-section'));
+  if(heads.length<2){ nav.hidden = true; return; }
+  var btns = heads.map(function(h,i){
+    h.id = h.id || ('chart-sec-'+i);
+    var b = document.createElement('button'); b.type='button'; b.textContent = h.textContent.trim();
+    b.addEventListener('click', function(){ h.scrollIntoView({behavior:'smooth', block:'start'}); });
+    nav.appendChild(b); return b;
+  });
+  function setActive(i){ btns.forEach(function(b,j){ b.classList.toggle('active', i===j); }); if(btns[i] && btns[i].scrollIntoView && nav.scrollWidth>nav.clientWidth){ nav.scrollLeft = btns[i].offsetLeft - 16; } }
+  setActive(0);
+  if('IntersectionObserver' in window){
+    var vis = {};
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ vis[heads.indexOf(en.target)] = en.isIntersecting; });
+      var first = -1; heads.forEach(function(_,i){ if(first<0 && vis[i]) first = i; });
+      if(first>=0) setActive(first);
+    }, {rootMargin:'-10% 0px -70% 0px'});
+    heads.forEach(function(h){ io.observe(h); });
+  }
 })();
 
 /* Wizard mobile del formulario de Gastos: "Más opciones" pasa a ser un segundo paso.

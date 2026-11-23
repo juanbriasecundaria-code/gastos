@@ -6,13 +6,16 @@
   --line-soft:#232A32;
   --text:#E8ECEF;
   --text-dim:#8B98A5;
-  --text-faint:#7E8A97;
+  --text-faint:#8A96A3;
   --ingreso:#4FD1A5;
   --fijo:#F0B43A;
   --variable:#B47EF5;
   --dolar:#5B9FED;
   --inversion:#F2679A;
   --neg:#F2696B;
+  --warn:#FF8B5E;
+  --ingreso-ink:#4FD1A5;
+  --fijo-ink:#F0B43A;
   --radius:10px;
   --font-display:'Space Grotesk',sans-serif;
   --font-body:'Inter',sans-serif;
@@ -29,7 +32,10 @@ html.theme-light{
   --line-soft:#E7EAEE;
   --text:#1A1F27;
   --text-dim:#4B5563;
-  --text-faint:#6B7280;
+  --text-faint:#586170;
+  --warn:#C2410C;
+  --ingreso-ink:#0B7A58;
+  --fijo-ink:#8A5B00;
   --ingreso:#0E9E71;
   --fijo:#A9720A;
   --variable:#7C3AED;
@@ -739,20 +745,22 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
 }
 .pivot th:first-child, .pivot td:first-child{
   text-align:left;position:sticky;left:0;background:var(--surface);
-  font-family:var(--font-body);z-index:1;min-width:170px;position:relative;
+  font-family:var(--font-body);z-index:1;min-width:170px;box-shadow:1px 0 0 var(--line-soft);
 }
 .pivot thead th{
   color:var(--text-faint);font-weight:500;font-size:12px;
   border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:2;
 }
 .pivot thead th:first-child{z-index:3;}
+.pivot .col-cur{background:color-mix(in srgb,var(--dolar) 8%,transparent);}
+.pivot thead th.col-cur{color:var(--text);font-weight:700;box-shadow:inset 0 -2px 0 var(--dolar);}
 .pivot tbody tr:not(.grp-row) td{border-bottom:1px solid var(--line-soft);}
 .pivot tbody tr:hover td{background:var(--surface-2);}
 .pivot tbody tr td{transition:background .2s ease;}
 
 /* Entrada escalonada y sutil de las filas (estilo Plausible/Copilot) */
 @keyframes pivotRowIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
-.pivot tbody tr{animation:pivotRowIn .35s ease both;}
+.pivot.pivot-anim tbody tr{animation:pivotRowIn .35s ease both;}
 @media (prefers-reduced-motion: reduce){.pivot tbody tr{animation:none;}}
 
 .pivot .grp-row td{
@@ -811,6 +819,7 @@ table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px;}
   padding:1px 6px;border-radius:999px;margin-left:6px;font-family:var(--font-mono);
   vertical-align:middle;white-space:nowrap;cursor:default;
 }
+.var-warn{color:var(--warn);background:color-mix(in srgb, var(--warn) 16%, transparent);}
 .var-good{color:var(--ingreso);background:color-mix(in srgb, var(--ingreso) 16%, transparent);}
 .var-bad{color:var(--neg);background:color-mix(in srgb, var(--neg) 16%, transparent);}
 
@@ -1615,3 +1624,28 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):
 .resumen-prose{margin:0 0 16px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--ingreso);border-radius:12px;font-size:15px;line-height:1.55;color:var(--text);}
 .resumen-prose[hidden]{display:none;}
 .resumen-prose .prose-amt{font-family:var(--font-mono);font-weight:600;white-space:nowrap;}
+
+/* ===== KPI agrupados: "mirando adelante" vs "todo el año" ===== */
+.kpi-group-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin:4px 0 8px;}
+.kpi-group-label[hidden]{display:none;}
+#kpiRowMes:empty{display:none;}
+#kpiRowMes{margin-bottom:18px;}
+#kpiRow .kpi:not(.kpi-hero) .kpi-value{font-size:20px;}
+@media (max-width:860px){#kpiRow .kpi:not(.kpi-hero) .kpi-value{font-size:19px;}}
+
+/* ===== Índice de secciones de Gráficos ===== */
+.chart-index{position:sticky;top:0;z-index:20;display:flex;gap:8px;overflow-x:auto;white-space:nowrap;
+  padding:8px 0;margin:0 0 12px;background:var(--bg);-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.chart-index::-webkit-scrollbar{display:none;}
+.chart-index button{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--text-dim);
+  border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;min-height:34px;font-family:var(--font-body);}
+.chart-index button:hover{color:var(--text);border-color:var(--text-dim);}
+.chart-index button.active{color:var(--text);border-color:var(--dolar);background:var(--surface-2);font-weight:600;}
+#view-graficos h2.chart-section{scroll-margin-top:60px;}
+@media (max-width:860px){.chart-index{top:62px;}#view-graficos h2.chart-section{scroll-margin-top:120px;}}
+@media print{.chart-index{display:none;}}
+
+/* ===== Tema claro: tinta más oscura para texto verde/ámbar (contraste AA) ===== */
+html.theme-light :is(.ss-value.pos,.var-good,.tag-sueldo,.tag-inv,.liq-pill.pos,.imp-summary span:nth-child(2),.account-msg.ok,.ejercicio-add:hover,.pm-chip.active,.more-sheet button.active,.bottom-nav .nav-btn.active){color:var(--ingreso-ink);}
+html.theme-light :is(.hormiga-summary b,.tag-fijo,.imp-badge.imp-dup){color:var(--fijo-ink);}
+.chart-grid > .chart-index{grid-column:1 / -1;}
