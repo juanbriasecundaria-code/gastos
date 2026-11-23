@@ -2842,9 +2842,11 @@ document.getElementById('btnPrintResumen').addEventListener('click', function(){
 });
 
 /* ===================== PRESUPUESTOS POR CATEGORÍA ===================== */
+/* Vive inline en la pestaña "Presupuestos" (antes era un modal aparte). */
 function presuKey(tipo, cat){ return tipo+'|'+cat; }
-var presupuestosOverlay = document.getElementById('presupuestosOverlay');
-function renderPresupuestosModal(){
+function renderPresupuestos(){
+  var fijoList = document.getElementById('presupuestosFijoList');
+  if(!fijoList) return; // la vista puede no existir en versiones viejas cacheadas
   function listHtml(tipo){
     return catsFor(tipo).map(function(cat){
       var key = presuKey(tipo, cat);
@@ -2855,9 +2857,9 @@ function renderPresupuestosModal(){
       '</div>';
     }).join('');
   }
-  document.getElementById('presupuestosFijoList').innerHTML = listHtml('Fijo');
+  fijoList.innerHTML = listHtml('Fijo');
   document.getElementById('presupuestosVariableList').innerHTML = listHtml('Variable');
-  presupuestosOverlay.querySelectorAll('.presu-input').forEach(function(inp){
+  document.querySelectorAll('#view-presupuestos .presu-input').forEach(function(inp){
     attachMoneyInput(inp);
     inp.addEventListener('change', function(){
       var key = inp.getAttribute('data-key');
@@ -2872,14 +2874,6 @@ function renderPresupuestosModal(){
     });
   });
 }
-function openPresupuestosModal(){ renderPresupuestosModal(); presupuestosOverlay.classList.add('open'); }
-function closePresupuestosModal(){ presupuestosOverlay.classList.remove('open'); }
-document.getElementById('btnPresupuestos').addEventListener('click', openPresupuestosModal);
-document.getElementById('presupuestosClose').addEventListener('click', closePresupuestosModal);
-presupuestosOverlay.addEventListener('click', function(e){ if(e.target===presupuestosOverlay) closePresupuestosModal(); });
-document.addEventListener('keydown', function(e){
-  if(e.key==='Escape' && presupuestosOverlay.classList.contains('open')) closePresupuestosModal();
-});
 
 /* ===================== REGLAS: MODAL Y ENGANCHES ===================== */
 var reglasOverlay = document.getElementById('reglasOverlay');
@@ -3990,7 +3984,7 @@ function buildPresupuestoChart(mesSel){
     r.proy = (usaProy && r.tipo==='Variable' && proj.catProy[r.cat]!==undefined) ? proj.catProy[r.cat] : r.real;
   });
   if(!rows.length){
-    return '<div class="empty-state compact">No hay presupuestos definidos todavía.<button type="button" class="empty-link" onclick="document.getElementById(\'btnPresupuestos\').click()">Configurar presupuestos</button></div>';
+    return '<div class="empty-state compact">No hay presupuestos definidos todavía.<button type="button" class="empty-link" onclick="document.querySelector(\'[data-tab=presupuestos]\').click()">Configurar presupuestos</button></div>';
   }
   rows.sort(function(a,b){ return (b.real/b.presu) - (a.real/a.presu); });
   var rowsHtml = rows.map(function(r){
@@ -4922,6 +4916,7 @@ function guardarArrastreCfg(){
 function renderAll(){
   renderResumen();
   renderGraficos();
+  renderPresupuestos();
   renderIngresos();
   renderArrastreCfg();
   renderGastos();
@@ -5333,6 +5328,10 @@ document.getElementById('listGastos').addEventListener('click',function(e){
     var btn = pick(['.sidebar nav [data-tab="resumen"]', '.bottom-nav [data-tab="resumen"]']);
     if(btn && typeof btn.click === 'function') btn.click();
   }
+  function goToPresupuestos(){
+    var btn = pick(['.sidebar nav [data-tab="presupuestos"]', '.bottom-nav [data-tab="presupuestos"]']);
+    if(btn && typeof btn.click === 'function') btn.click();
+  }
   function openSidebarIfMobile(){
     if(!mob() || !sidebar) return;
     sidebar.classList.add('mobile-open');
@@ -5353,17 +5352,17 @@ document.getElementById('listGastos').addEventListener('click',function(e){
     },
     {
       title:'Las vistas',
-      text:'Resumen, Gráficos, Ingresos, Gastos, Dólar e Inversión — cada una lleva su propio registro del ejercicio activo.',
+      text:'Resumen, Gráficos, Ingresos, Gastos, Presupuestos, Dólar e Inversión — cada una lleva su propio registro del ejercicio activo.',
       needsSidebar:false,
       beforeShow:goToResumen,
       target:function(){ return mob() ? document.querySelector('.bottom-nav') : document.querySelector('.sidebar nav'); }
     },
     {
       title:'Presupuestos',
-      text:'Definí acá un tope mensual por categoría — la app te avisa cuando te estés por pasar.',
+      text:'Definí acá un tope mensual por categoría, mirá cómo vas y cargá tus metas de ahorro — la app te avisa cuando te estés por pasar.',
       needsSidebar:false,
-      beforeShow:goToResumen,
-      target:function(){ return document.getElementById('btnPresupuestos'); }
+      beforeShow:goToPresupuestos,
+      target:function(){ return pick(['.sidebar nav [data-tab="presupuestos"]', '.bottom-nav [data-tab="presupuestos"]']); }
     },
     {
       title:'Buscador y carga rápida',

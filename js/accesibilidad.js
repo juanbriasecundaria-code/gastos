@@ -7,7 +7,7 @@
   document.addEventListener('focusin',function(e){
     if(!e.target.closest || !e.target.closest('.account-overlay.open,.search-overlay.open')) lastOutside=e.target;
   },true);
-  [['presupuestosOverlay','Presupuestos'],['reglasOverlay','Reglas'],['recoOverlay','Recordatorios'],['accountOverlay','Cuenta'],['shareOverlay','Compartir'],['searchOverlay','Búsqueda']].forEach(function(sp){
+  [['reglasOverlay','Reglas'],['recoOverlay','Recordatorios'],['accountOverlay','Cuenta'],['shareOverlay','Compartir'],['searchOverlay','Búsqueda']].forEach(function(sp){
     var ov=document.getElementById(sp[0]); if(!ov) return;
     var box=ov.querySelector('.account-box,.search-box')||ov.firstElementChild||ov;
     box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true'); box.setAttribute('tabindex','-1');
