@@ -1377,11 +1377,13 @@ details.data-menu[open] .data-summary .chev{transform:rotate(180deg);}
 .prompt-input{width:100%;margin-top:6px;}
 .qa-fab{position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:60;width:56px;height:56px;border-radius:50%;border:none;background:var(--ingreso);color:#08221A;font-size:30px;line-height:1;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;transition:background .15s;}
 .qa-fab.show{display:flex;}
-/* El FAB toma el acento de la sección activa, igual que el botón
-   "Agregar" de cada vista, para que no se sienta pegado encima. */
-body[data-tab="gastos"] .qa-fab{background:var(--fijo);color:#241900;}
-body[data-tab="dolar"] .qa-fab{background:var(--dolar);color:#071B33;}
-body[data-tab="inversion"] .qa-fab{background:var(--ingreso);color:#08221A;}
+/* El FAB siempre hace lo mismo (cargar un gasto rápido), así que siempre
+   tiene el mismo color: el del gasto. Se oculta donde una carga rápida
+   de gasto no tiene sentido. */
+.qa-fab{background:var(--fijo);color:#241900;}
+body[data-tab="resumen"] .qa-fab.show,
+body[data-tab="graficos"] .qa-fab.show,
+body[data-tab="presupuestos"] .qa-fab.show{display:none;}
 @media (max-width:860px){.qa-fab{bottom:calc(76px + env(safe-area-inset-bottom));}}
 @media print{.qa-fab{display:none !important;}}
 .qa-row{display:grid;gap:10px;margin:12px 0;}
@@ -1608,3 +1610,8 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):
 .skip-link{position:fixed;left:12px;top:-60px;z-index:1000;background:var(--surface);color:var(--text);border:2px solid var(--dolar);border-radius:8px;padding:10px 14px;font-size:14px;text-decoration:none;transition:top .15s;}
 .skip-link:focus{top:12px;}
 @media (prefers-reduced-motion:reduce){.skip-link{transition:none;}}
+
+/* Resumen en prosa */
+.resumen-prose{margin:0 0 16px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--ingreso);border-radius:12px;font-size:15px;line-height:1.55;color:var(--text);}
+.resumen-prose[hidden]{display:none;}
+.resumen-prose .prose-amt{font-family:var(--font-mono);font-weight:600;white-space:nowrap;}

@@ -1329,8 +1329,47 @@ var KPI_ICONS = {
 function kpiIco(kind, extraCls){
   return '<svg class="kpi-ico'+(extraCls?' '+extraCls:'')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+KPI_ICONS[kind]+'</svg>';
 }
+/* Resumen en prosa (2-3 líneas arriba de los KPI): pensado para leer de un vistazo
+   o para mostrarle la pantalla a otra persona sin explicar la tabla. */
+function renderResumenProse(months){
+  var el = document.getElementById('resumenProse'); if(!el) return;
+  var now = new Date(), esActual = String(STORE.activeEjercicio)===String(now.getFullYear());
+  var mi = -1;
+  if(esActual) mi = now.getMonth();
+  else { for(var i=months.length-1;i>=0;i--){ if(months[i].totalGastos>0 || months[i].totalIngresos>0){ mi=i; break; } } }
+  if(mi<0 || !(months[mi].totalGastos>0 || months[mi].totalIngresos>0)){ el.hidden=true; el.innerHTML=''; return; }
+  var m = months[mi], mes = MESES[mi], prev = mi>0 ? months[mi-1] : null, mesPrev = mi>0 ? MESES[mi-1] : '';
+  function A(v){ return '<strong class="prose-amt">'+money(v)+'</strong>'; }
+  var s1;
+  if(esActual){
+    s1 = 'En '+mes+' llevás gastado '+A(m.totalGastos);
+    if(prev && prev.totalGastos>0) s1 += ', el '+Math.round(m.totalGastos/prev.totalGastos*100)+'% de lo que gastaste en '+mesPrev;
+  } else {
+    s1 = 'En '+mes+' gastaste '+A(m.totalGastos);
+    if(prev && prev.totalGastos>0){
+      var pct = Math.round((m.totalGastos-prev.totalGastos)/prev.totalGastos*100);
+      s1 += pct===0 ? ', igual que en '+mesPrev : ', un '+Math.abs(pct)+'% '+(pct>0?'más':'menos')+' que en '+mesPrev;
+    }
+  }
+  s1 += '.';
+  var r = m.totalRestante, s2 = '';
+  if(m.totalIngresos>0 || r!==0){
+    if(r>=0) s2 = esActual ? ' Te quedan '+A(r)+' disponibles.' : ' Te sobraron '+A(r)+'.';
+    else s2 = ' Estás '+A(-r)+' en rojo.';
+  }
+  var s3 = '';
+  if(esActual){
+    var p = null; try{ p = projectMonth(); }catch(_e){}
+    if(p && p.confiable && p.ingresos>0){
+      s3 = p.restanteProy>=0 ? ' A este ritmo cerrás el mes con '+A(p.restanteProy)+' libres.'
+                             : ' A este ritmo cerrás el mes '+A(-p.restanteProy)+' en rojo.';
+    }
+  }
+  el.innerHTML = s1+s2+s3; el.hidden = false;
+}
 function renderResumen(){
   var months = MESES.map(computeMonth);
+  try{ renderResumenProse(months); }catch(_e){}
   var yearIngresos = months.reduce(function(s,m){return s+m.totalIngresos;},0);
   var yearGastos = months.reduce(function(s,m){return s+m.totalGastos;},0);
   var yearRestante = months.reduce(function(s,m){return s+m.restanteMes;},0);

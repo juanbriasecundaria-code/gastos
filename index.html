@@ -117,10 +117,10 @@
     <button class="nav-btn" data-tab="resumen" aria-label="Resumen"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span><span class="bn-label">Resumen</span></button>
     <button class="nav-btn" data-tab="ingresos" aria-label="Ingresos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span><span class="bn-label">Ingresos</span></button>
     <button class="nav-btn" data-tab="gastos" aria-label="Gastos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v18l3-2 3 2 3-2 3 2 3-2 3 2V3l-3 2-3-2-3 2-3-2-3 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span><span class="bn-label">Gastos</span></button>
-    <button class="nav-btn" data-tab="presupuestos" aria-label="Presupuestos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span><span class="bn-label">Topes</span></button>
+    <button class="nav-btn" data-tab="presupuestos" aria-label="Presupuestos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span><span class="bn-label">Presupuestos</span></button>
     <button class="nav-btn" data-tab="graficos" aria-label="Gráficos"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span><span class="bn-label">Gráficos</span></button>
-    <button class="nav-btn" data-tab="dolar" aria-label="Dólar"><span class="bn-icon"><svg viewBox="0 0 24 24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="bn-label">Dólar</span></button>
-    <button class="nav-btn" data-tab="inversion" aria-label="Inversión"><span class="bn-icon"><svg viewBox="0 0 24 24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><span class="bn-label">Inversión</span></button>
+    <button class="nav-btn" data-tab="dolar" aria-label="Dólar"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="bn-label">Dólar</span></button>
+    <button class="nav-btn" data-tab="inversion" aria-label="Inversión"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><span class="bn-label">Inversión</span></button>
       <button class="nav-btn nav-more" id="btnNavMore" type="button" aria-label="Más secciones" aria-expanded="false"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg></span><span class="bn-label">Más</span></button>
   </nav>
   <div class="more-backdrop" id="moreBackdrop"></div>
@@ -143,6 +143,7 @@
         </div>
       </div>
       <div class="print-header" id="printHeader"></div>
+      <p class="resumen-prose" id="resumenProse" aria-live="polite" hidden></p>
       <div class="kpi-row" id="kpiRow"></div>
       <div class="ledger-rule"></div>
       <div class="table-wrap"><table class="pivot" id="pivotTable"></table></div>
@@ -153,7 +154,7 @@
       <div class="view-header">
         <div>
           <h1 class="view-title">Gráficos</h1>
-          <p class="view-desc">Panel visual: ingresos vs. gastos, composición y evolución del saldo.</p>
+          <p class="view-desc">Panel visual: ingresos vs. gastos, composición, presupuesto vs. real, metas de ahorro y evolución del saldo.</p>
         </div>
       </div>
       <div class="chart-prefs no-print">
@@ -578,7 +579,7 @@
     </section>
   </main>
 </div>
-<button type="button" class="qa-fab" id="qaFab" aria-label="Carga rápida de gasto" title="Carga rápida">+</button>
+<button type="button" class="qa-fab" id="qaFab" aria-label="Carga rápida de gasto" title="Gasto rápido">+</button>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <div class="search-overlay" id="searchOverlay">
