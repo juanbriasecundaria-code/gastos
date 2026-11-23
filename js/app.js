@@ -2760,7 +2760,6 @@ document.getElementById('toggleUsdFijoVar').addEventListener('change', renderGra
 document.getElementById('fijoVarChartMode').addEventListener('change', renderGraficos);
 document.getElementById('toggleUsdDonut').addEventListener('change', renderGraficos);
 document.getElementById('toggleUsdRestante').addEventListener('change', renderGraficos);
-document.getElementById('toggleUsdHeatmap').addEventListener('change', renderGraficos);
 ['hormigaMes','hormigaUmbral','hormigaMinOcurrencias'].forEach(function(id){
   document.getElementById(id).addEventListener('input', renderHormiga);
   document.getElementById(id).addEventListener('change', renderHormiga);
@@ -4130,57 +4129,6 @@ function renderAhorroChart(){
   document.getElementById('chartAhorro').innerHTML = buildSavingsRateChart(months, meta);
 }
 
-/* ----- Mapa de calor: gasto por categoría y mes ----- */
-function buildHeatmapChart(months, opts){
-  opts = opts || {};
-  var fmtFull = opts.usd ? usd : money;
-  var fmtCompact = opts.usd ? compactUsd : compactMoney;
-  var cats = [];
-  CAT_FIJAS.forEach(function(c){ cats.push({cat:c, tipo:'Fijo'}); });
-  CAT_VARIABLES.forEach(function(c){ cats.push({cat:c, tipo:'Variable'}); });
-  var rows = cats.map(function(c){
-    var vals = months.map(function(m){
-      return c.tipo==='Fijo' ? (m.fijosPorCat[c.cat]||0) : (m.variablesPorCat[c.cat]||0);
-    });
-    var total = vals.reduce(function(s,v){return s+v;},0);
-    return {cat:c.cat, tipo:c.tipo, vals:vals, total:total};
-  }).filter(function(r){ return r.total>0; });
-  if(!rows.length){
-    return '<div class="empty-state">Todavía no hay gastos cargados.</div>';
-  }
-  rows.sort(function(a,b){ return b.total-a.total; });
-  // Recortar del final los meses sin ningún gasto cargado (ej: meses futuros del año en curso)
-  var lastMonthWithData = -1;
-  months.forEach(function(m,i){
-    var hasAny = rows.some(function(r){ return r.vals[i] > 0; });
-    if(hasAny) lastMonthWithData = i;
-  });
-  var visibleCount = lastMonthWithData + 1;
-  rows = rows.map(function(r){ return {cat:r.cat, tipo:r.tipo, vals:r.vals.slice(0, visibleCount), total:r.total}; });
-  var mesesVisibles = MESES.slice(0, visibleCount);
-  var globalMax = Math.max.apply(null, rows.reduce(function(acc,r){return acc.concat(r.vals);},[]).concat([1]));
-  var head = '<tr><th></th>'+mesesVisibles.map(function(mes){return '<th>'+mes.slice(0,3)+'</th>';}).join('')+'</tr>';
-  var body = rows.map(function(r){
-    var baseColor = r.tipo==='Fijo' ? CHART_COLORS.fijo : CHART_COLORS.variable;
-    var cells = r.vals.map(function(v,i){
-      if(v<=0) return '<td class="heatmap-empty">·</td>';
-      var intensity = Math.min(1, v/globalMax);
-      var opacityPct = Math.round(12 + intensity*78);
-      return '<td class="heatmap-cell" style="background:color-mix(in srgb, '+baseColor+' '+opacityPct+'%, transparent);" data-tip="'+escapeHtml(r.cat+' · '+mesesVisibles[i]+': '+fmtFull(v))+'">'+fmtCompact(v)+'</td>';
-    }).join('');
-    return '<tr><td>'+escapeHtml(r.cat)+'</td>'+cells+'</tr>';
-  }).join('');
-  var legend = '<div class="chart-legend-row">'+
-      '<div class="chart-legend-item"><span class="chart-legend-swatch" style="background:'+CHART_COLORS.fijo+';"></span>Categoría fija</div>'+
-      '<div class="chart-legend-item"><span class="chart-legend-swatch" style="background:'+CHART_COLORS.variable+';"></span>Categoría variable</div>'+
-      '<div class="chart-legend-item chart-legend-scale">'+
-        '<span class="chart-legend-gradient" style="background:linear-gradient(90deg, color-mix(in srgb, '+CHART_COLORS.textFaint+' 12%, transparent), '+CHART_COLORS.textFaint+');"></span>'+
-        'Menor → mayor gasto ese mes'+
-      '</div>'+
-    '</div>';
-  return '<div class="heatmap-wrap"><table class="heatmap-table">'+head+body+'</table></div>'+legend;
-}
-
 /* ----- Dólar de referencia elegible (oficial / blue / MEP) y pesos constantes (inflación) — ArgentinaDatos -----
    A diferencia de "Evolución del dólar (referencia)" (que usa TU precio de compra cargado
    a mano), esto usa la cotización de mercado real de cada mes, así que sirve para ver si
@@ -4511,18 +4459,42 @@ function renderMetas(){
   var metas = getMetas();
   if(!metas.length){
     box.innerHTML = '<div class="empty-state">Todavía no armaste ninguna meta. Usá "+ Nueva meta" para arrancar (ej. "Vacaciones: $500.000").</div>';
+  } else {
+    var showArchived = box.getAttribute('data-show-arch')==='1';
+    var activas = metas.filter(function(m){ return !m.archivada; });
+    var archivadas = metas.filter(function(m){ return m.archivada; });
+    var lista = showArchived ? metas : activas;
+    var html = lista.map(metaCardHtml).join('');
+    if(!lista.length) html = '<div class="empty-state compact">No tenés metas activas.</div>';
+    if(archivadas.length){
+      html += '<button type="button" class="ghost-btn" id="btnToggleMetasArch" style="margin-top:4px;">'+(showArchived?'Ocultar archivadas':'Ver archivadas ('+archivadas.length+')')+'</button>';
+    }
+    box.innerHTML = html;
+  }
+  try{ renderMetasResumen(); }catch(_e){}
+}
+/* ----- Progreso de metas (solo lectura) para la pestaña Gráficos ----- */
+function metaResumenCardHtml(m){
+  var aportado = metaAportado(m);
+  var objetivo = +m.objetivo || 0;
+  var pct = objetivo>0 ? Math.min(100, Math.round(aportado/objetivo*100)) : 0;
+  var cumplida = objetivo>0 && aportado>=objetivo;
+  return '<div class="meta-card'+(cumplida?' is-cumplida':'')+'">'+
+    '<div class="meta-head"><div><div class="meta-nombre">'+escapeHtml(m.nombre)+'</div><div class="meta-nombre-sub">'+(cumplida?'🎉 Meta cumplida':'Objetivo: '+moneyMeta(objetivo, m.moneda))+'</div></div></div>'+
+    '<div class="meta-bar-track"><div class="meta-bar-fill" style="width:'+pct+'%"></div></div>'+
+    '<div class="meta-sub-row"><span>'+moneyMeta(aportado, m.moneda)+' de '+moneyMeta(objetivo, m.moneda)+'</span><span class="meta-pct">'+pct+'%</span></div>'+
+  '</div>';
+}
+function renderMetasResumen(){
+  var box = document.getElementById('metasResumenBox');
+  if(!box) return;
+  var activas = getMetas().filter(function(m){ return !m.archivada; });
+  var gestionarBtn = '<button type="button" class="ghost-btn" style="margin-top:8px;" onclick="activarTab(\'presupuestos\')">Gestionar metas →</button>';
+  if(!activas.length){
+    box.innerHTML = '<div class="empty-state compact">Todavía no tenés metas de ahorro activas.</div>'+gestionarBtn;
     return;
   }
-  var showArchived = box.getAttribute('data-show-arch')==='1';
-  var activas = metas.filter(function(m){ return !m.archivada; });
-  var archivadas = metas.filter(function(m){ return m.archivada; });
-  var lista = showArchived ? metas : activas;
-  var html = lista.map(metaCardHtml).join('');
-  if(!lista.length) html = '<div class="empty-state compact">No tenés metas activas.</div>';
-  if(archivadas.length){
-    html += '<button type="button" class="ghost-btn" id="btnToggleMetasArch" style="margin-top:4px;">'+(showArchived?'Ocultar archivadas':'Ver archivadas ('+archivadas.length+')')+'</button>';
-  }
-  box.innerHTML = html;
+  box.innerHTML = activas.map(metaResumenCardHtml).join('') + gestionarBtn;
 }
 function openMetaForm(existing){
   return new Promise(function(resolve){
@@ -4751,14 +4723,6 @@ function renderGraficos(){
   renderPresupuestoChart();
   try{ renderEtiquetasChart(); }catch(_e){}
   renderAhorroChart();
-  var enUsdHeatmap = document.getElementById('toggleUsdHeatmap').checked;
-  var monthsHeatmap = (!enUsdHeatmap && !constOn) ? months : months.map(function(m,i){
-    var fijosPorCat={}, variablesPorCat={};
-    Object.keys(m.fijosPorCat).forEach(function(c){ fijosPorCat[c]=convUsd(m.fijosPorCat[c],i,enUsdHeatmap); });
-    Object.keys(m.variablesPorCat).forEach(function(c){ variablesPorCat[c]=convUsd(m.variablesPorCat[c],i,enUsdHeatmap); });
-    return Object.assign({}, m, {fijosPorCat:fijosPorCat, variablesPorCat:variablesPorCat});
-  });
-  document.getElementById('chartHeatmap').innerHTML = buildHeatmapChart(monthsHeatmap, {usd:enUsdHeatmap});
 
   if(usdFetchState()==='idle'){
     fetchUsdOficialHistorico(function(){ renderGraficos(); });
@@ -4796,18 +4760,38 @@ function renderChartPrefsNote(constOn){
   });
 })();
 
-/* ----- Tarjetas de gráficos colapsables ----- */
+/* ----- Tarjetas colapsables (Gráficos y Presupuestos), con estado guardado por tarjeta -----
+   Cada tarjeta con id recuerda si el usuario la dejó abierta o cerrada (localStorage),
+   para que "ocultar" un gráfico sea una preferencia real y no algo que se resetea
+   cada vez que se recarga la página. Las tarjetas sin id (poco frecuentes) solo
+   colapsan/expanden durante la sesión, como antes. */
+var CHART_COLLAPSE_PREFIX = 'libroGastos_chartCollapse_';
+(function restoreChartCollapseState(){
+  document.querySelectorAll('.chart-grid .chart-card[id]').forEach(function(card){
+    var saved = null;
+    try{ saved = localStorage.getItem(CHART_COLLAPSE_PREFIX+card.id); }catch(e){}
+    if(saved === null) return; // sin preferencia guardada: se respeta el default del HTML
+    var collapsed = saved === '1';
+    card.classList.toggle('collapsed', collapsed);
+    var chevron = card.querySelector('.grp-chevron');
+    if(chevron) chevron.classList.toggle('is-collapsed', collapsed);
+  });
+})();
 (function setupChartCollapse(){
-  var grid = document.querySelector('#view-graficos .chart-grid');
-  if(!grid) return;
-  grid.addEventListener('click', function(e){
-    var head = e.target.closest('[data-chart-toggle]');
-    if(!head) return;
-    var card = head.closest('.chart-card');
-    if(!card) return;
-    card.classList.toggle('collapsed');
-    var chevron = head.querySelector('.grp-chevron');
-    if(chevron) chevron.classList.toggle('is-collapsed', card.classList.contains('collapsed'));
+  document.querySelectorAll('.chart-grid').forEach(function(grid){
+    grid.addEventListener('click', function(e){
+      var head = e.target.closest('[data-chart-toggle]');
+      if(!head) return;
+      var card = head.closest('.chart-card');
+      if(!card) return;
+      card.classList.toggle('collapsed');
+      var collapsed = card.classList.contains('collapsed');
+      var chevron = head.querySelector('.grp-chevron');
+      if(chevron) chevron.classList.toggle('is-collapsed', collapsed);
+      if(card.id){
+        try{ localStorage.setItem(CHART_COLLAPSE_PREFIX+card.id, collapsed ? '1' : '0'); }catch(err){}
+      }
+    });
   });
 })();
 

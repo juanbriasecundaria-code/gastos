@@ -187,7 +187,7 @@
           </div>
         </div>
         <h2 class="chart-section">Ingresos y gastos</h2>
-        <div class="chart-card chart-card-wide">
+        <div class="chart-card chart-card-wide" id="chartCardIngGas">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Ingresos vs. Gastos por mes</h3>
             <label class="chart-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="toggleUsdEquiv"> Ver en USD equivalente</label>
@@ -195,7 +195,7 @@
           <div class="chart-card-body"><div id="chartIngGas"></div></div>
         </div>
         <h2 class="chart-section">Composición y hábitos de gasto</h2>
-        <div class="chart-card chart-card-wide">
+        <div class="chart-card chart-card-wide" id="chartCardFijoVar">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Composición de gastos</h3>
             <div class="chart-toggle-group" onclick="event.stopPropagation()">
@@ -208,14 +208,14 @@
           </div>
           <div class="chart-card-body"><div id="chartFijoVar"></div><div class="usd-oficial-note" id="usdOficialNote"></div></div>
         </div>
-        <div class="chart-card">
+        <div class="chart-card" id="chartCardDonut">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Top categorías de gasto (año)</h3>
             <label class="chart-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="toggleUsdDonut"> Ver en USD equivalente</label>
           </div>
           <div class="chart-card-body"><div id="chartDonut"></div></div>
         </div>
-        <div class="chart-card collapsed">
+        <div class="chart-card collapsed" id="chartCardEtiquetas">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Gastos por etiqueta</h3>
             <div class="hormiga-controls" onclick="event.stopPropagation()">
@@ -224,14 +224,7 @@
           </div>
           <div class="chart-card-body"><div id="chartEtiquetas"></div></div>
         </div>
-        <div class="chart-card collapsed chart-card-wide">
-          <div class="chart-card-head" data-chart-toggle>
-            <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Mapa de calor: gasto por categoría y mes</h3>
-            <label class="chart-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="toggleUsdHeatmap"> Ver en USD equivalente</label>
-          </div>
-          <div class="chart-card-body"><div id="chartHeatmap"></div></div>
-        </div>
-        <div class="chart-card collapsed chart-card-wide">
+        <div class="chart-card collapsed chart-card-wide" id="chartCardHormiga">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Gasto hormiga</h3>
             <div class="hormiga-controls" onclick="event.stopPropagation()">
@@ -244,14 +237,29 @@
         </div>
       
         <h2 class="chart-section">Ahorro e inversión</h2>
-        <div class="chart-card">
+        <div class="chart-card chart-card-wide" id="chartCardPresupuesto">
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Presupuesto vs. Real por categoría</h3>
+            <div class="hormiga-controls" onclick="event.stopPropagation()">
+              <select id="presuChartMes"></select>
+            </div>
+          </div>
+          <div class="chart-card-body"><div id="chartPresupuesto"></div></div>
+        </div>
+        <div class="chart-card chart-card-wide" id="chartCardMetasResumen">
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Progreso de metas de ahorro</h3>
+          </div>
+          <div class="chart-card-body"><div id="metasResumenBox"></div></div>
+        </div>
+        <div class="chart-card" id="chartCardRestante">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Evolución del restante mensual</h3>
             <label class="chart-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="toggleUsdRestante"> Ver en USD equivalente</label>
           </div>
           <div class="chart-card-body"><div id="chartRestante"></div></div>
         </div>
-        <div class="chart-card collapsed">
+        <div class="chart-card collapsed" id="chartCardAhorro">
           <div class="chart-card-head" data-chart-toggle>
             <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Tasa de ahorro mensual</h3>
             <div class="hormiga-controls" onclick="event.stopPropagation()">
@@ -260,13 +268,13 @@
           </div>
           <div class="chart-card-body"><div id="chartAhorro"></div></div>
         </div>
-        <div class="chart-card collapsed chart-card-wide">
+        <div class="chart-card collapsed chart-card-wide" id="chartCardInversion">
           <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Evolución de las inversiones</h3><div class="chart-toggle-group" onclick="event.stopPropagation()"><select id="invChartCurrency" aria-label="Moneda del gráfico"><option value="ARS">Pesos (ARS)</option><option value="USD">Dólares (USD)</option></select><select id="invChartName" aria-label="Inversión del gráfico"><option value="">Todas las inversiones</option></select></div></div>
           <div class="chart-card-body"><div id="chartInversion"></div></div>
         </div>
 
         <h2 class="chart-section">Dólar</h2>
-        <div class="chart-card collapsed">
+        <div class="chart-card collapsed" id="chartCardDolarRef">
           <div class="chart-card-head" data-chart-toggle><h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Evolución del dólar (referencia)</h3></div>
           <div class="chart-card-body"><div id="chartDolarRef"></div></div>
         </div>
@@ -481,31 +489,23 @@
       <div class="view-header">
         <div>
           <h1 class="view-title">Presupuestos</h1>
-          <p class="view-desc">Topes mensuales por categoría, cómo vas respecto a ellos, y tus metas de ahorro.</p>
+          <p class="view-desc">Configurá acá tus topes y tus metas de ahorro — los resultados los vas a ver reflejados en Gastos, Resumen y Gráficos.</p>
         </div>
       </div>
-      <div class="form-card">
-        <h3>Topes por categoría</h3>
-        <p class="account-current-email" style="word-break:normal;">Fijá un tope por categoría. Cuando el gasto del mes en curso lo supere, la barra se pone roja. Dejá vacío para no controlar esa categoría.</p>
-        <div class="account-section">
-          <h4>Gastos fijos</h4>
-          <div id="presupuestosFijoList"></div>
-        </div>
-        <div class="account-section">
-          <h4>Gastos variables</h4>
-          <div id="presupuestosVariableList"></div>
-        </div>
-      </div>
+      <p class="account-current-email" style="word-break:normal;">Fijá un tope por categoría. Cuando el gasto del mes en curso lo supere, la barra se pone roja. Dejá vacío para no controlar esa categoría.</p>
       <div class="chart-grid">
-        <h2 class="chart-section">Cómo vas este mes</h2>
-        <div class="chart-card" id="chartCardPresupuesto">
+        <h2 class="chart-section">Topes por categoría</h2>
+        <div class="chart-card collapsed" id="chartCardTopesFijo">
           <div class="chart-card-head" data-chart-toggle>
-            <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Presupuesto vs. Real por categoría</h3>
-            <div class="hormiga-controls" onclick="event.stopPropagation()">
-              <select id="presuChartMes"></select>
-            </div>
+            <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Gastos fijos</h3>
           </div>
-          <div class="chart-card-body"><div id="chartPresupuesto"></div></div>
+          <div class="chart-card-body"><div id="presupuestosFijoList"></div></div>
+        </div>
+        <div class="chart-card collapsed" id="chartCardTopesVariable">
+          <div class="chart-card-head" data-chart-toggle>
+            <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Gastos variables</h3>
+          </div>
+          <div class="chart-card-body"><div id="presupuestosVariableList"></div></div>
         </div>
         <h2 class="chart-section">Metas de ahorro</h2>
         <div class="chart-card chart-card-wide" id="chartCardMetas">
@@ -517,6 +517,8 @@
         </div>
       </div>
     </section>
+
+    <!-- DOLAR -->
 
     <!-- DOLAR -->
     <section class="view" id="view-dolar">
