@@ -1659,3 +1659,39 @@ html.theme-light :is(.hormiga-summary b,.tag-fijo,.imp-badge.imp-dup){color:var(
 .alert-banner .reco-txt{display:flex;align-items:baseline;}
 .alert-opt{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4;margin:8px 0;cursor:pointer;}
 .alert-opt input{width:18px;height:18px;margin-top:2px;flex:none;accent-color:var(--ingreso);}
+
+/* ===== Presupuestos: una sola tarjeta "Topes por categoría" con dos columnas ===== */
+.presu-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;}
+.presu-col-title{margin:0 0 10px;font-family:var(--font-body);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);}
+.presu-col + .presu-col{border-left:1px solid var(--line-soft);padding-left:28px;}
+@media (max-width:860px){
+  .presu-cols{grid-template-columns:1fr;gap:18px 0;}
+  .presu-col + .presu-col{border-left:none;padding-left:0;border-top:1px solid var(--line-soft);padding-top:16px;}
+}
+
+/* ===== Mobile: Resumen más liviano ===== */
+@media (max-width:860px){
+  /* header: el menú ⋯ va en la fila del título y se esconde la descripción */
+  #view-resumen .view-header{flex-wrap:nowrap;align-items:flex-start;gap:10px;margin-bottom:12px;}
+  #view-resumen .view-header > div:first-child{flex:1;min-width:0;}
+  #view-resumen .view-header .view-desc{display:none;}
+  #view-resumen .view-header-actions{flex:none;}
+  /* párrafo compacto */
+  .resumen-prose{font-size:14px;line-height:1.5;padding:10px 12px;margin-bottom:12px;}
+  /* sin rótulos de grupo (cada tarjeta ya dice "del año" / "Proyección") */
+  .kpi-group-label{display:none;}
+  /* tarjetas compactas; "Restante" primero y a todo el ancho */
+  .kpi-row{gap:8px;margin-bottom:12px;}
+  .kpi{padding:10px 12px 9px;}
+  .kpi-label{font-size:12px;margin-bottom:3px;}
+  .kpi-value,.kpi.kpi-hero .kpi-value{font-size:20px;}
+  .kpi.kpi-hero .kpi-value{font-size:24px;}
+  #kpiRow .kpi:not(.kpi-hero) .kpi-value{font-size:18px;}
+  .kpi-sub{min-height:0;margin-top:3px;font-size:11.5px;}
+  .kpi-sub .var-badge{padding:2px 8px;font-size:11.5px;}
+  #kpiRow .kpi-hero{order:-1;}
+  #kpiRowMes .kpi:only-child{grid-column:1 / -1;}
+  /* barra inferior: el ancho de cada botón sigue a su texto, así "Presupuestos" no pisa a "Gráficos" */
+  .bottom-nav .nav-btn{flex:1 1 auto;padding-left:2px;padding-right:2px;}
+  .bottom-nav .nav-btn .bn-label{font-size:10.5px;letter-spacing:-.01em;white-space:nowrap;}
+}

@@ -500,18 +500,22 @@
       </div>
       <p class="account-current-email" style="word-break:normal;">Fijá un tope por categoría. Cuando el gasto del mes en curso lo supere, la barra se pone roja. Dejá vacío para no controlar esa categoría.</p>
       <div class="chart-grid">
-        <h2 class="chart-section">Topes por categoría</h2>
-        <div class="chart-card collapsed" id="chartCardTopesFijo">
+        <div class="chart-card chart-card-wide" id="chartCardTopes">
           <div class="chart-card-head" data-chart-toggle>
-            <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Gastos fijos</h3>
+            <h3><span class="grp-chevron"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Topes por categoría</h3>
           </div>
-          <div class="chart-card-body"><div id="presupuestosFijoList"></div></div>
-        </div>
-        <div class="chart-card collapsed" id="chartCardTopesVariable">
-          <div class="chart-card-head" data-chart-toggle>
-            <h3><span class="grp-chevron is-collapsed"><svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>Gastos variables</h3>
+          <div class="chart-card-body">
+            <div class="presu-cols">
+              <div class="presu-col">
+                <h4 class="presu-col-title">Gastos fijos</h4>
+                <div id="presupuestosFijoList"></div>
+              </div>
+              <div class="presu-col">
+                <h4 class="presu-col-title">Gastos variables</h4>
+                <div id="presupuestosVariableList"></div>
+              </div>
+            </div>
           </div>
-          <div class="chart-card-body"><div id="presupuestosVariableList"></div></div>
         </div>
         <h2 class="chart-section">Metas de ahorro</h2>
         <div class="chart-card chart-card-wide" id="chartCardMetas">

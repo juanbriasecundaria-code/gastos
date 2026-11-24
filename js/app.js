@@ -1357,15 +1357,7 @@ function renderResumenProse(months){
     if(r>=0) s2 = esActual ? ' Te quedan '+A(r)+' disponibles.' : ' Te sobraron '+A(r)+'.';
     else s2 = ' Estás '+A(-r)+' en rojo.';
   }
-  var s3 = '';
-  if(esActual){
-    var p = null; try{ p = projectMonth(); }catch(_e){}
-    if(p && p.confiable && p.ingresos>0){
-      s3 = p.restanteProy>=0 ? ' A este ritmo cerrás el mes con '+A(p.restanteProy)+' libres.'
-                             : ' A este ritmo cerrás el mes '+A(-p.restanteProy)+' en rojo.';
-    }
-  }
-  el.innerHTML = s1+s2+s3; el.hidden = false;
+  el.innerHTML = s1+s2; el.hidden = false;
 }
 function renderResumen(){
   var months = MESES.map(computeMonth);
@@ -4940,6 +4932,15 @@ function renderChartPrefsNote(constOn){
    cada vez que se recarga la página. Las tarjetas sin id (poco frecuentes) solo
    colapsan/expanden durante la sesión, como antes. */
 var CHART_COLLAPSE_PREFIX = 'libroGastos_chartCollapse_';
+/* "Topes por categoría" era dos tarjetas (fijos y variables); ahora es una. Si el usuario tenía alguna abierta, queda abierta. */
+(function migrateTopesCollapse(){
+  try{
+    if(localStorage.getItem(CHART_COLLAPSE_PREFIX+'chartCardTopes')!==null) return;
+    var a = localStorage.getItem(CHART_COLLAPSE_PREFIX+'chartCardTopesFijo'), b = localStorage.getItem(CHART_COLLAPSE_PREFIX+'chartCardTopesVariable');
+    if(a===null && b===null) return;
+    localStorage.setItem(CHART_COLLAPSE_PREFIX+'chartCardTopes', (a!=='0' && b!=='0') ? '1' : '0');
+  }catch(e){}
+})();
 (function restoreChartCollapseState(){
   document.querySelectorAll('.chart-grid .chart-card[id]').forEach(function(card){
     var saved = null;
