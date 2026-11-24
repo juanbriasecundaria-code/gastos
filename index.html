@@ -129,6 +129,7 @@
 
   <main id="mainContent" tabindex="-1">
   <div id="recoBanner" class="reco-banner no-print" style="display:none;"></div>
+  <div id="alertBanner" class="reco-banner alert-banner no-print" style="display:none;" role="status"></div>
     <!-- RESUMEN -->
     <section class="view active" id="view-resumen">
       <div class="view-header">
@@ -646,8 +647,8 @@
 <div class="account-overlay" id="recoOverlay">
   <div class="account-box">
     <button class="account-close" id="recoClose" title="Cerrar (Esc)" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    <h3>Recordatorios de vencimientos</h3>
-    <p class="account-current-email" style="word-break:normal;">Elegí qué gastos querés que te recuerde y qué día del mes vencen. Te avisamos unos días antes, en un cartel al abrir la app y con una notificación.</p>
+    <h3>Recordatorios y avisos</h3>
+    <p class="account-current-email" style="word-break:normal;">Elegí qué gastos querés que te recuerde y qué día del mes vencen, y cuándo avisarte por tus topes de presupuesto. Los avisos salen en un cartel dentro de la app y, si activás las notificaciones, también como notificación.</p>
     <div class="account-section">
       <h4>Notificaciones</h4>
       <div class="reco-note" id="recoPermStatus"></div>
@@ -656,6 +657,12 @@
         <button type="button" class="ghost-btn" id="recoTestBtn">Enviar notificación de prueba</button>
       </div>
       <div class="reco-note">Con la app abierta (o al volver a ella) el aviso es seguro. Con la app cerrada depende del navegador: en Android con Chrome suele llegar aproximadamente una vez por día; en iPhone solo al abrirla (instalá la app desde Compartir → Agregar a inicio).</div>
+    </div>
+    <div class="account-section">
+      <h4>Avisos de presupuesto</h4>
+      <label class="alert-opt"><input type="checkbox" id="alertCfgTope"> <span>Avisarme cuando llego al 80% de un tope y cuando me paso</span></label>
+      <label class="alert-opt"><input type="checkbox" id="alertCfgRitmo"> <span>Avisarme si, a este ritmo, me voy a pasar de un tope o a cerrar el mes en rojo</span></label>
+      <div class="reco-note">Estos avisos aparecen en un cartel arriba y al cargar un gasto. Con las notificaciones activadas, también te llegan cuando la app está en segundo plano y cambian los datos (por ejemplo, si alguien carga un gasto en un libro compartido). No llegan con la app cerrada del todo. La configuración es de este dispositivo.</div>
     </div>
     <div class="account-section">
       <h4>Nuevo recordatorio</h4>

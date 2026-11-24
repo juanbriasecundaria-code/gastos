@@ -3654,6 +3654,117 @@ document.addEventListener('visibilitychange', function(){ if(document.visibility
 setInterval(function(){ if(document.visibilityState==='visible') renderRecoBanner(); }, 30*60*1000);
 window.addEventListener('load', recoRegistrarPeriodic);
 
+/* ===================== AVISOS DE PRESUPUESTO =====================
+   Calcula, para el mes en curso, qué categorías con tope están en riesgo y lo muestra en un cartel.
+   Niveles (de mayor a menor): "over" te pasaste, "proj" a este ritmo te pasás, "warn" llevás 80% o más.
+   Además: "rojo" = a este ritmo cerrás el mes en negativo.
+   - Con la app visible: cartel + aviso breve al cargar un gasto.
+   - Con la app en segundo plano (y permiso de notificaciones): notificación, una sola vez por nivel y mes. */
+var ALERT_CFG_KEY = 'libroGastos_alertCfg', ALERT_DONE_KEY = 'libroGastos_alertNotif', ALERT_SNOOZE_KEY = 'libroGastos_alertSnooze';
+function alertCfg(){
+  var c = {}; try{ c = JSON.parse(localStorage.getItem(ALERT_CFG_KEY)||'{}') || {}; }catch(_e){}
+  return {tope: c.tope!==false, ritmo: c.ritmo!==false};
+}
+function alertCfgGuardar(c){ try{ localStorage.setItem(ALERT_CFG_KEY, JSON.stringify(c)); }catch(_e){} }
+function alertDoneLeer(){ try{ return JSON.parse(localStorage.getItem(ALERT_DONE_KEY)||'{}') || {}; }catch(_e){ return {}; } }
+function alertDoneGuardar(d){
+  var ks = Object.keys(d); if(ks.length>200){ ks.slice(0,ks.length-200).forEach(function(k){ delete d[k]; }); }
+  try{ localStorage.setItem(ALERT_DONE_KEY, JSON.stringify(d)); }catch(_e){}
+}
+function alertasCalcular(){
+  var out = [];
+  if(!isActiveYearCurrent()) return out;
+  var cfg = alertCfg(); if(!cfg.tope && !cfg.ritmo) return out;
+  var now = new Date(), mes = MESES[now.getMonth()], anio = String(STORE.activeEjercicio);
+  var m = computeMonth(mes), pres = DATA.presupuestos || {};
+  var proj = null; try{ proj = projectMonth(); }catch(_e){}
+  var projOk = !!(proj && proj.confiable && proj.mes===mes && proj.hoy<proj.dias);
+  Object.keys(pres).forEach(function(k){
+    var tope = +pres[k]; if(!(tope>0)) return;
+    var p = k.indexOf('|'); if(p<0) return;
+    var tipo = k.slice(0,p), cat = k.slice(p+1);
+    var porCat = tipo==='Fijo' ? m.fijosPorCat : m.variablesPorCat;
+    var real = (porCat && porCat[cat]) || 0;
+    var pct = real/tope*100, base = 'pres-'+anio+'-'+mes+'-'+k+'-';
+    if(cfg.tope && real>tope){
+      var extra = Math.max(1, Math.round(pct-100));
+      out.push({sev:3, tipo:tipo, cat:cat, tag:base+'over', title:'Te pasaste del tope de '+cat,
+        text:'Te pasaste del tope de '+cat+' por '+extra+'% ('+money(real)+' de '+money(tope)+')'});
+      return;
+    }
+    if(cfg.ritmo && projOk && tipo==='Variable' && proj.catProy[cat]!==undefined && proj.catProy[cat]>tope){
+      var pp = proj.catProy[cat];
+      out.push({sev:2, tipo:tipo, cat:cat, tag:base+'proj', title:'A este ritmo te pasás del tope de '+cat,
+        text:'A este ritmo te pasás del tope de '+cat+': proyectás '+money(pp)+' ('+Math.round(pp/tope*100)+'% del tope de '+money(tope)+')'});
+      return;
+    }
+    if(cfg.tope && pct>=80){
+      out.push({sev:1, tipo:tipo, cat:cat, tag:base+'warn', title:'Cerca del tope de '+cat,
+        text:'Ya llevás '+Math.round(pct)+'% del tope de '+cat+' ('+money(real)+' de '+money(tope)+')'});
+    }
+  });
+  if(cfg.ritmo && projOk && proj.ingresos>0 && proj.restanteProy<0){
+    out.push({sev:3, tipo:'', cat:'', tag:'pres-'+anio+'-'+mes+'-rojo', title:'Cierre de '+mes+' en rojo',
+      text:'A este ritmo cerrás '+mes+' '+money(-proj.restanteProy)+' en rojo'});
+  }
+  return out.sort(function(a,b){ return b.sev-a.sev; });
+}
+function alertasRenderBanner(list){
+  var el = document.getElementById('alertBanner'); if(!el) return;
+  var snooze = ''; try{ snooze = localStorage.getItem(ALERT_SNOOZE_KEY)||''; }catch(_e){}
+  if(!list.length || snooze===recoIso(new Date())){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  var peor = list[0].sev>=3;
+  el.className = 'reco-banner alert-banner no-print'+(peor?' sev-over':'');
+  el.innerHTML = '<div class="reco-head"><strong>Avisos de presupuesto</strong><span class="reco-actions">'+
+    '<button type="button" class="ghost-btn" data-alert-open>Ver presupuestos</button>'+
+    '<button type="button" class="ghost-btn" data-alert-snooze aria-label="Ocultar por hoy" title="Ocultar por hoy">✕</button></span></div>'+
+    list.slice(0,4).map(function(a){
+      var t = escapeHtml(a.text).replace(/-?\$[\d.,]+/g,'<span class="alert-amt">$&</span>');
+      return '<div class="reco-row"><span class="reco-txt"><span class="alert-dot'+(a.sev>=3?' sev-over':'')+'" aria-hidden="true"></span><span>'+t+'</span></span></div>';
+    }).join('')+(list.length>4 ? '<div class="reco-row"><span class="reco-txt">+ '+(list.length-4)+' más</span></div>' : '');
+  el.style.display = '';
+}
+function alertasRevisar(){
+  var list = alertasCalcular();
+  alertasRenderBanner(list);
+  if(!list.length) return;
+  var done = alertDoneLeer(), fresh = list.filter(function(a){ return !done[a.tag]; });
+  if(!fresh.length) return;
+  // Con la app visible el cartel ya informa (se da por visto, para no repetirlo como notificación después);
+  // solo se notifica cuando la página está en segundo plano.
+  if(document.visibilityState==='visible'){ fresh.forEach(function(a){ done[a.tag] = 1; }); alertDoneGuardar(done); return; }
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  fresh.slice(0,3).forEach(function(a){ recoMostrarNotif(a.title, a.text, a.tag); });
+  if(fresh.length>3) recoMostrarNotif('Avisos de presupuesto', 'Y '+(fresh.length-3)+' avisos más. Abrí la app para verlos.', 'pres-mas');
+  fresh.forEach(function(a){ done[a.tag] = 1; });
+  alertDoneGuardar(done);
+}
+/* Aviso breve al guardar un gasto: dice cómo quedó esa categoría (cada vez que se carga algo en una que ya está en riesgo) */
+function alertasAvisoAlGuardar(tipo, cat, mes){
+  var hoy = new Date();
+  if(!isActiveYearCurrent() || mes!==MESES[hoy.getMonth()]) return false;
+  var a = alertasCalcular().filter(function(x){ return x.tipo===tipo && x.cat===cat; })[0];
+  var done = alertDoneLeer();
+  if(a){ setTimeout(function(){ toast(a.text); }, 1800); done[a.tag] = 1; alertDoneGuardar(done); }
+  alertasRevisar();
+  return true;
+}
+window.__alertas = {revisar: alertasRevisar, alGuardar: alertasAvisoAlGuardar};
+(function(){
+  var banner = document.getElementById('alertBanner');
+  if(banner) banner.addEventListener('click', function(e){
+    if(e.target.closest('[data-alert-open]')){ activarTab('presupuestos'); return; }
+    if(e.target.closest('[data-alert-snooze]')){ try{ localStorage.setItem(ALERT_SNOOZE_KEY, recoIso(new Date())); }catch(_e){} alertasRevisar(); }
+  });
+  var t = document.getElementById('alertCfgTope'), r = document.getElementById('alertCfgRitmo');
+  function pintar(){ var c = alertCfg(); if(t) t.checked = c.tope; if(r) r.checked = c.ritmo; }
+  function cambio(){ alertCfgGuardar({tope: !t || t.checked, ritmo: !r || r.checked}); try{ localStorage.removeItem(ALERT_SNOOZE_KEY); }catch(_e){} alertasRevisar(); }
+  if(t) t.addEventListener('change', cambio); if(r) r.addEventListener('change', cambio);
+  var btn = document.getElementById('btnReco'); if(btn) btn.addEventListener('click', pintar);
+  pintar();
+  document.addEventListener('visibilitychange', function(){ alertasRevisar(); });
+})();
+
 /* ===================== BACKUP ===================== */
 document.getElementById('btnExport').addEventListener('click', function(){
   downloadBackupFile();
@@ -4971,6 +5082,7 @@ function renderAll(){
   renderInversion();
   renderSidebarSummary();
   try{ renderRecoBanner(); }catch(_e){}
+  try{ if(window.__alertas) window.__alertas.revisar(); }catch(_e){}
   try{
     var _so = document.getElementById('shareOverlay');
     if(_so && _so.classList.contains('open')) renderLiquidacion();
@@ -5231,11 +5343,12 @@ function askPrompt(o){
   });
 }
 function budgetAlert(tipo,cat,mes){
+  try{ if(window.__alertas && window.__alertas.alGuardar(tipo,cat,mes)) return; }catch(_e){}
   var tope=DATA.presupuestos && DATA.presupuestos[presuKey(tipo,cat)];
   if(!tope) return;
   var gastado=DATA.gastos.filter(function(g){return g.mes===mes&&g.tipo===tipo&&g.cat===cat;}).reduce(function(a,g){return a+(+g.monto||0);},0);
   var pct=Math.round(gastado/tope*100);
-  if(pct>=80) setTimeout(function(){ toast(pct>=100 ? 'Te pasaste del tope de '+cat+' ('+pct+'%)' : 'Ya llevás '+pct+'% del tope de '+cat); },1800);
+  if(pct>=80) setTimeout(function(){ toast(pct>100 ? 'Te pasaste del tope de '+cat+' por '+Math.max(1,pct-100)+'%' : 'Ya llevás '+pct+'% del tope de '+cat); },1800);
 }
 /* La fecha manda: define el mes (en Ingresos y Gastos) */
 function syncMesFromFecha(form){

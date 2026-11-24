@@ -7,7 +7,7 @@
    grave: los archivos propios de la app se piden primero a la red, así que siempre se
    ve la última versión cuando hay conexión; la versión solo sirve para limpiar cachés viejas.
 */
-var CACHE_NAME = 'libro-gastos-d0c34fecef';
+var CACHE_NAME = 'libro-gastos-d8f9d99111';
 
 var DATA_CACHE = 'libro-gastos-data'; // copia de los recordatorios para avisar con la app cerrada (no se borra al actualizar)
 
